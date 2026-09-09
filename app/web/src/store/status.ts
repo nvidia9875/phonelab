@@ -43,15 +43,17 @@ const STAGE_LABEL: Record<StudyRecord["stage"], string> = {
   result: "結果",
 };
 
-export function themeStatus(theme: Theme, records: StudyRecord[], caps: DeviceCaps, policy: ClassPolicy): ThemeStatus {
+export function themeStatus(theme: Theme, records: StudyRecord[], caps: DeviceCaps, policy: ClassPolicy, testMode = false): ThemeStatus {
+  if (!testMode) {
   if (theme.enabledBy === "teacher" && !policy.teacherEnabled.includes(theme.id)) return { kind: "unavailable", reason: "先生が有効化する実験です" };
-  if (theme.enabledBy === "later" || theme.variants.length === 0) return { kind: "unavailable", reason: "準備中" };
+  if (theme.enabledBy === "later") return { kind: "unavailable", reason: "準備中" };
   const denied = theme.sensors.find((s) => !policy.allowedSensors.includes(s) && s !== "speaker");
   if (denied) return { kind: "unavailable", reason: `${SENSOR_LABEL[denied]}は学級で不可` };
   const needsMotion = theme.sensors.includes("accelerometer") || theme.sensors.includes("gyroscope");
   if (needsMotion && !caps.motion) return { kind: "unavailable", reason: "この端末には加速度センサーがありません" };
   const needsMedia = theme.sensors.includes("microphone") || theme.sensors.includes("camera");
   if (needsMedia && !caps.media) return { kind: "unavailable", reason: "この端末ではマイク・カメラが使えません" };
+  }
 
   const mine = records.filter((r) => r.themeId === theme.id);
   const active = mine.find((r) => r.status === "open" || r.status === "held" || r.status === "judged");
@@ -61,7 +63,8 @@ export function themeStatus(theme: Theme, records: StudyRecord[], caps: DeviceCa
   const signed = mine.filter((r) => r.status === "signed");
   if (signed.length) {
     const labels = signed.map((r) => theme.variants.find((v) => v.id === r.variantId)?.changes.split("（")[0] ?? "").filter(Boolean);
-    return { kind: "done", count: Math.min(signed.length, theme.variants.length), total: theme.variants.length, labels };
+    const total = Math.max(theme.variants.length, 1);
+    return { kind: "done", count: Math.min(signed.length, total), total, labels };
   }
   return { kind: "new" };
 }

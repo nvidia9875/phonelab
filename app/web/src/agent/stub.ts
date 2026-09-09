@@ -5,7 +5,7 @@
  * - checkPolicy: 危険な要望・注入・答えの要求を決定論で止める（Policy 3.2 / 3.4 / 3.7 相当）
  * - judge: 測定値の差と許容誤差だけで判定文を作る（verifier.md 3 章と同じ規則）
  */
-import type { Theme, Variable, Variant } from "../catalog/themes";
+import { variantsOf, type Theme, type Variable, type Variant } from "../catalog/themes";
 import type { Claim, Direction, Judgement, Rejection } from "../store/records";
 
 const VARIABLE_WORDS: [RegExp, Variable][] = [
@@ -69,8 +69,9 @@ export function checkPolicy(text: string, theme: Theme, done: string[]): PolicyR
 }
 
 export function pickVariant(theme: Theme, claim: Claim, done: string[]): Variant {
-  const remaining = theme.variants.filter((v) => !done.includes(v.id));
-  const pool = remaining.length ? remaining : theme.variants;
+  const all = variantsOf(theme);
+  const remaining = all.filter((v) => !done.includes(v.id));
+  const pool = remaining.length ? remaining : all;
   return pool.find((v) => v.variable === claim.variable) ?? pool[0];
 }
 

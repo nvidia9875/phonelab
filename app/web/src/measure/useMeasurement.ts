@@ -3,7 +3,7 @@ import { analyze, collect, localChecks, rawHash, requestMotionPermission, type L
 
 export type MeasurementState =
   | { phase: "idle" }
-  | { phase: "denied"; reason: "denied" | "unsupported" }
+  | { phase: "denied"; reason: "denied" | "unsupported"; message?: string }
   | { phase: "measuring"; elapsed: number; samples: number; seconds: number }
   | { phase: "done"; features: PendulumFeatures; checks: LocalCheck[]; rawHash: string; seconds: number; stopped: boolean };
 
@@ -40,6 +40,7 @@ export function useMeasurement() {
   }, []);
 
   const reset = useCallback(() => setState({ phase: "idle" }), []);
+  const markUnsupported = useCallback((message: string) => setState({ phase: "denied", reason: "unsupported", message }), []);
 
-  return { state, start, stop, reset };
+  return { state, start, stop, reset, markUnsupported };
 }

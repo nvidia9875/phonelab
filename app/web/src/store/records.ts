@@ -75,8 +75,15 @@ export interface Student {
 const KEY_RECORDS = "phonelab.records.v1";
 const KEY_STUDENT = "phonelab.student.v1";
 const KEY_HALTED = "phonelab.halted.v1";
+const KEY_SETTINGS = "phonelab.settings.v1";
 
-type State = { records: StudyRecord[]; student: Student | null; halted: boolean };
+export interface Settings {
+  /** テストモード: 全テーマを選べ、センサーが無くてもサンプルで進める（記録に demo が残る） */
+  testMode: boolean;
+}
+const DEFAULT_SETTINGS: Settings = { testMode: false };
+
+type State = { records: StudyRecord[]; student: Student | null; halted: boolean; settings: Settings };
 
 function read<T>(key: string, fallback: T): T {
   try {
@@ -94,13 +101,14 @@ function write(key: string, value: unknown): void {
   }
 }
 
-let state: State = { records: read(KEY_RECORDS, []), student: read(KEY_STUDENT, null), halted: read(KEY_HALTED, false) };
+let state: State = { records: read(KEY_RECORDS, []), student: read(KEY_STUDENT, null), halted: read(KEY_HALTED, false), settings: { ...DEFAULT_SETTINGS, ...read(KEY_SETTINGS, {}) } };
 const listeners = new Set<() => void>();
 function emit(next: State): void {
   state = next;
   write(KEY_RECORDS, state.records);
   write(KEY_STUDENT, state.student);
   write(KEY_HALTED, state.halted);
+  write(KEY_SETTINGS, state.settings);
   listeners.forEach((l) => l());
 }
 function subscribe(l: () => void): () => void {
@@ -117,6 +125,9 @@ export function setStudent(student: Student | null): void {
 }
 export function setHalted(halted: boolean): void {
   emit({ ...state, halted });
+}
+export function setSettings(patch: Partial<Settings>): void {
+  emit({ ...state, settings: { ...state.settings, ...patch } });
 }
 
 /* ---------- 記録 ---------- */
@@ -181,5 +192,5 @@ export function activeRecordForTheme(themeId: string, records = state.records): 
   return records.find((r) => r.themeId === themeId && (r.status === "open" || r.status === "held" || r.status === "judged"));
 }
 export function clearAll(): void {
-  emit({ records: [], student: state.student, halted: false });
+  emit({ records: [], student: state.student, halted: false, settings: state.settings });
 }

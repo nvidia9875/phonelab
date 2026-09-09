@@ -3,7 +3,7 @@
  * サーバ実装後は、choosePlan / checkPolicy / judge / sign の呼び先を API に差し替える。
  */
 import { checkPolicy, choosePlan, judge, readClaim } from "../agent/stub";
-import { SENSOR_LABEL, themeById, variantById, type Theme } from "../catalog/themes";
+import { SENSOR_LABEL, themeById, variantById, variantsOf, type Theme } from "../catalog/themes";
 import type { LocalCheck, PendulumFeatures } from "../measure/pendulum";
 import { activeRecordForTheme, addEvent, createRecord, recordsForTheme, updateRecord, type CondKey, type Direction, type StudyRecord } from "../store/records";
 
@@ -121,7 +121,7 @@ export function setExplain(rec: StudyRecord, text: string): void {
 
 export function nextVariantFor(rec: StudyRecord, theme: Theme) {
   const done = new Set([...doneVariantIds(theme.id), rec.variantId]);
-  return theme.variants.find((v) => !done.has(v.id)) ?? null;
+  return variantsOf(theme).find((v) => !done.has(v.id)) ?? null;
 }
 
 export function chooseNext(rec: StudyRecord, theme: Theme, direction: Direction): void {

@@ -11,7 +11,8 @@ export type IconName =
   | "ribbon"
   | "list"
   | "stop"
-  | "arrow";
+  | "arrow"
+  | "gear";
 
 type Props = SVGProps<SVGSVGElement> & { name: IconName; size?: number };
 
@@ -103,6 +104,13 @@ export function Icon({ name, size = 18, ...rest }: Props) {
       return (
         <svg {...common}>
           <path d="M4 12h15M14 6l6 6-6 6" />
+        </svg>
+      );
+    case "gear":
+      return (
+        <svg {...common}>
+          <circle cx="12" cy="12" r="3" />
+          <path d="M12 3v2.5M12 18.5V21M3 12h2.5M18.5 12H21M5.6 5.6l1.8 1.8M16.6 16.6l1.8 1.8M5.6 18.4l1.8-1.8M16.6 7.4l1.8-1.8" />
         </svg>
       );
   }

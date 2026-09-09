@@ -20,6 +20,7 @@ export function usePath(): string {
 export type Route =
   | { name: "home" }
   | { name: "me" }
+  | { name: "settings" }
   | { name: "predict"; theme: string }
   | { name: "plan"; theme: string }
   | { name: "rejected"; theme: string }
@@ -36,6 +37,7 @@ export function matchRoute(path: string): Route {
   const p = path.replace(/\/+$/, "") || "/";
   if (p === "/") return { name: "home" };
   if (p === "/me") return { name: "me" };
+  if (p === "/settings") return { name: "settings" };
   if (p === "/halted") return { name: "halted" };
   if (p === "/gallery") return { name: "gallery" };
   if (p.startsWith("/teacher")) return { name: "teacher" };

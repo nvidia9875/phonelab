@@ -170,5 +170,29 @@ export function themeById(id: string): Theme | undefined {
   return THEMES.find((t) => t.id === id);
 }
 export function variantById(theme: Theme, id: string | null): Variant | undefined {
-  return theme.variants.find((v) => v.id === id);
+  return theme.variants.find((v) => v.id === id) ?? (id === placeholderId(theme) ? placeholderVariant(theme) : undefined);
+}
+
+/** 実験が未定義のテーマ用（テストモード）。条件 A/B を仮に置いて流れだけ通す */
+export function placeholderId(theme: Theme): string {
+  return `${theme.id}_test`;
+}
+export function placeholderVariant(theme: Theme): Variant {
+  return {
+    id: placeholderId(theme),
+    variable: "object",
+    title: `${theme.title}（テスト用の仮の実験）`,
+    changes: "条件（A から B へ）",
+    holds: "それ以外",
+    conditions: [
+      { key: "A", label: "条件 A", setup: "テストモード: 準備の手順はまだありません" },
+      { key: "B", label: "条件 B", setup: "テストモード: 条件を変えたことにして進めます" },
+    ],
+    tolerance: 0.05,
+    unit: "s",
+  };
+}
+/** テーマの実験一覧。無ければ仮の実験 1 つ */
+export function variantsOf(theme: Theme): Variant[] {
+  return theme.variants.length ? theme.variants : [placeholderVariant(theme)];
 }

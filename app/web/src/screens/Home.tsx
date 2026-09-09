@@ -15,20 +15,27 @@ export interface HomeProps {
   onOpenTheme: (theme: Theme) => void;
   onOpenRecord: (id: string) => void;
   onMe: () => void;
+  onSettings: () => void;
+  testMode: boolean;
 }
 
 /** トップ: 学級と番号、進み方、テーマのカタログ（状態つき）、記録 */
-export function Home({ student, records, caps, policy, halted, onOpenTheme, onOpenRecord, onMe }: HomeProps) {
-  const statuses = THEMES.map((t) => ({ theme: t, status: themeStatus(t, records, caps, policy) }));
+export function Home({ student, records, caps, policy, halted, onOpenTheme, onOpenRecord, onMe, onSettings, testMode }: HomeProps) {
+  const statuses = THEMES.map((t) => ({ theme: t, status: themeStatus(t, records, caps, policy, testMode) }));
   const done = records.filter((r) => r.status === "signed").length;
   const signed = records.filter((r) => r.status === "signed" || r.status === "judged");
 
   return (
     <Screen
       right={
-        <button type="button" className={`student-chip${student ? "" : " student-chip--empty"}`} onClick={onMe}>
-          {student ? `${student.classCode} ${student.number}` : "学級と番号を入れる"}
-        </button>
+        <span className="head-right">
+          <button type="button" className={`student-chip${student ? "" : " student-chip--empty"}`} onClick={onMe}>
+            {student ? `${student.classCode} ${student.number}` : "学級と番号を入れる"}
+          </button>
+          <button type="button" className="gear" onClick={onSettings} aria-label="設定">
+            <Icon name="gear" size={16} />
+          </button>
+        </span>
       }
     >
       <div className="hero">
@@ -42,6 +49,12 @@ export function Home({ student, records, caps, policy, halted, onOpenTheme, onOp
           <p className="card__text">学級コードと出席番号を入れてください。名前は要りません。</p>
           <Button sm onClick={onMe}>学級と番号を入れる</Button>
         </Card>
+      )}
+
+      {testMode && (
+        <div className="test-band" role="status">
+          <Icon name="warn" size={14} /> テストモード: 全テーマを選べます。測定はサンプル値で進めます
+        </div>
       )}
 
       {halted && (

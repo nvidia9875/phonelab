@@ -70,3 +70,16 @@
 /* ---------- 予想 ---------- */
 .predict-art { max-width: 220px; margin: 0 auto; color: var(--ink); }
 .predict-art .theme-art { aspect-ratio: 4 / 3; }
+
+/* ---------- 設定 ---------- */
+.switch-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+.switch-row__t { display: block; font-size: 15px; font-weight: 700; }
+.switch-row__d { display: block; font-size: 12px; color: var(--muted); line-height: 1.5; margin-top: 2px; }
+.toggle { flex: 0 0 auto; width: 44px; height: 24px; border-radius: 12px; background: var(--line); border: 0; padding: 2px; display: flex; align-items: center; cursor: pointer; transition: background var(--dur-normal) var(--ease-out); }
+.toggle--on { background: var(--teal); }
+.toggle__knob { width: 20px; height: 20px; border-radius: 10px; background: var(--card); transform: translateX(0); transition: transform var(--dur-normal) var(--ease-out); }
+.toggle--on .toggle__knob { transform: translateX(20px); }
+.toggle:focus-visible { outline: 3px solid var(--ink); outline-offset: 2px; }
+.gear { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 50%; border: 2px solid var(--ink); background: transparent; color: var(--ink); cursor: pointer; }
+.head-right { display: flex; align-items: center; gap: 8px; }
+.test-band { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 700; color: var(--orange-deep); background: color-mix(in oklab, var(--orange) 12%, var(--paper)); border: 1.5px dashed var(--orange); border-radius: var(--r-note); padding: 8px 12px; }

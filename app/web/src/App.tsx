@@ -11,9 +11,10 @@ import { Result } from "./screens/Result";
 import { Record } from "./screens/Record";
 import { Halted } from "./screens/Halted";
 import { Teacher } from "./screens/Teacher";
+import { Settings } from "./screens/Settings";
 import { themeById, variantById, type Theme } from "./catalog/themes";
 import { matchRoute, nav, usePath, type Route } from "./router";
-import { activeRecordForTheme, clearAll, createRecord, recordById, setHalted, setStudent, useStore, type StudyRecord } from "./store/records";
+import { activeRecordForTheme, clearAll, createRecord, recordById, setHalted, setSettings, setStudent, useStore, type StudyRecord } from "./store/records";
 import { DEFAULT_CLASS_POLICY, detectCaps } from "./store/status";
 import { useMeasurement } from "./measure/useMeasurement";
 import { analyze, localChecks, type PendulumFeatures } from "./measure/pendulum";
@@ -101,6 +102,8 @@ export function App() {
     },
     onOpenRecord: (id: string) => nav(`/records/${id}`),
     onMe: () => nav("/me"),
+    onSettings: () => nav("/settings"),
+    testMode: store.settings.testMode,
   };
 
   if (redirect || need) return null;
@@ -110,6 +113,8 @@ export function App() {
       return <Teacher halted={store.halted} onHalt={() => setHalted(!store.halted)} />;
     case "halted":
       return <Halted halted={store.halted} onHome={goHome} />;
+    case "settings":
+      return <Settings settings={store.settings} onChange={setSettings} onMe={() => nav("/me")} onTeacher={() => nav("/teacher")} onHome={goHome} />;
     case "me":
       return (
         <Me
@@ -189,7 +194,9 @@ export function App() {
           onReady={() => {
             flow.startMeasure(r, route.cond);
             nav(`/x/${t.id}/measure/${route.cond}`);
-            void m.start({ sensors: ["accelerometer", "gyroscope"], seconds: t.seconds }); // iOS の許可はこのタップの中で
+            const canSense = t.measureProfile === "pendulum_period" && !store.settings.testMode;
+            if (canSense) void m.start({ sensors: ["accelerometer", "gyroscope"], seconds: t.seconds }); // iOS の許可はこのタップの中で
+            else m.markUnsupported(store.settings.testMode ? "テストモード: サンプルの測定で進めます" : "この実験の測定はまだ実装中です。サンプルで進めます");
           }}
           onBack={() => nav(`/x/${t.id}/plan`)}
           onHome={goHome}
@@ -205,7 +212,7 @@ export function App() {
           ? { phase: "measuring", elapsed: s.elapsed, seconds: s.seconds, conditionLabel: label, tAccel: null, tGyro: null, checks: [], sentBytes: null, allOk: false }
           : s.phase === "done"
             ? { phase: "done", elapsed: s.seconds, seconds: s.seconds, conditionLabel: label, tAccel: s.features.T_accel_s, tGyro: s.features.T_gyro_s, checks: checksToRows(s.checks), sentBytes: JSON.stringify(s.features).length, allOk: s.checks.every((c) => c.ok), previousHold: r.retries[route.cond] > 0 ? "前回の測定は検査で保留になりました。今回はその再測定です。" : undefined }
-            : { phase: "denied", elapsed: 0, seconds: t.seconds, conditionLabel: label, tAccel: null, tGyro: null, checks: [], sentBytes: null, allOk: false, deniedReason: s.phase === "denied" && s.reason === "denied" ? "センサーの許可がありませんでした" : s.phase === "idle" ? "測定が始まっていません。準備画面から「測る」を押してください" : "この端末では加速度センサーが読めません" };
+            : { phase: "denied", elapsed: 0, seconds: t.seconds, conditionLabel: label, tAccel: null, tGyro: null, checks: [], sentBytes: null, allOk: false, deniedReason: s.phase === "denied" ? (s.message ?? (s.reason === "denied" ? "センサーの許可がありませんでした" : "この端末では加速度センサーが読めません")) : "測定が始まっていません。準備画面から「測る」を押してください" };
       const finish = (features: PendulumFeatures, demo: boolean) => {
         const hash = s.phase === "done" ? s.rawHash : "sha256:demo";
         const outcome = flow.finishMeasure(r, route.cond, features, localChecks(features), hash, demo);
