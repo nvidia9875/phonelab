@@ -1,31 +1,50 @@
-import { Button, Card, CardLabel, CardTitle, Foot, FootNote, InfoRow, Pair, PermitChip, Screen, Section } from "../components/ui";
-import { plan, prediction } from "../sample/data";
+import { useState } from "react";
+import { Button, Card, CardTitle, Eyebrow, Field, Foot, FootNote, InfoRow, Note, Screen, Section } from "../components/ui";
+import { SENSOR_LABEL, type Theme } from "../catalog/themes";
 
-export function Predict({ onApprove, onOther }: { onApprove: () => void; onOther: () => void }) {
+export interface PredictProps {
+  theme: Theme;
+  initialText: string;
+  questionBack: string | null;
+  hintMessage: string | null;
+  onSubmit: (text: string) => void;
+  onHome: () => void;
+}
+
+/** 予想ゲート: 予想を書くまで実験もヒントもセンサーも出ない */
+export function Predict({ theme, initialText, questionBack, hintMessage, onSubmit, onHome }: PredictProps) {
+  const [text, setText] = useState(initialText);
+  const canGo = text.trim().length > 0;
   return (
-    <Screen badge="1 予想">
-      <Section label="振り子を見て、どう思う？">
-        <Card variant="orange">
-          <p className="card__eyebrow">あなたの予想</p>
-          <p className="card__text">{prediction.text}</p>
-        </Card>
-      </Section>
-
+    <Screen badge="予想" tone="orange" onHome={onHome}>
       <Card panel>
-        <CardLabel icon="target">Agent が選んだ実験</CardLabel>
-        <CardTitle>{plan.title}</CardTitle>
-        <Pair items={[{ k: "変えるもの", v: plan.changes }, { k: "一定にするもの", v: plan.holds }]} />
-        <PermitChip sensors={plan.sensors} seconds={plan.seconds} denied={plan.denied} />
+        <Eyebrow>テーマ</Eyebrow>
+        <CardTitle>{theme.title}</CardTitle>
+        <p className="card__hint">{theme.tagline}</p>
         <InfoRow icon="box-check">
-          <strong>手元にある？</strong>　{plan.materials}。なければ「別の実験を見る」
+          <strong>要るもの</strong>　{theme.materials}
         </InfoRow>
-        <InfoRow icon="warn">{plan.safety}</InfoRow>
+        <InfoRow icon="timer">
+          <strong>使うセンサー</strong>　{theme.sensors.map((s) => SENSOR_LABEL[s]).join("・")}を {theme.seconds} 秒ずつ。承認するまで読みません
+        </InfoRow>
+        <InfoRow icon="warn">{theme.safety}</InfoRow>
       </Card>
 
+      <Section label={theme.question}>
+        <Field
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          placeholder="たとえば：重い方が引っ張られる力が強いから、速く振れると思う"
+          rows={4}
+          style={{ borderColor: "var(--orange)" }}
+        />
+        {questionBack && <Note icon="bulb">{questionBack}</Note>}
+        {hintMessage && <Note icon="shield-x">{hintMessage}</Note>}
+      </Section>
+
       <Foot>
-        <Button onClick={onApprove}>この実験を承認して測る</Button>
-        <Button secondary onClick={onOther}>別の実験を見る</Button>
-        <FootNote>Agent は答えを言いません。決めるのは測定と、あなた。</FootNote>
+        <Button disabled={!canGo} onClick={() => onSubmit(text)}>Agent に実験を選んでもらう</Button>
+        <FootNote>予想を書くまで、実験もヒントもセンサーも出ません。理由も一緒に。</FootNote>
       </Foot>
     </Screen>
   );

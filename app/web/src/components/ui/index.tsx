@@ -9,18 +9,29 @@ export function Screen({
   badge,
   tone = "ink",
   tight,
+  onHome,
+  right,
   children,
 }: {
-  badge: string;
+  badge?: string;
   tone?: BadgeTone;
   tight?: boolean;
+  /** 見出しをトップへのリンクにする。測定中は渡さない（誤タップ防止） */
+  onHome?: () => void;
+  right?: ReactNode;
   children: ReactNode;
 }) {
   return (
     <main className={`screen${tight ? " screen--tight" : ""}`}>
       <header className="screen__head">
-        <h1 className="screen__title">PhoneLab</h1>
-        <Badge tone={tone}>{badge}</Badge>
+        {onHome ? (
+          <button type="button" className="screen__title screen__title--link" onClick={onHome} aria-label="トップへ">
+            PhoneLab
+          </button>
+        ) : (
+          <h1 className="screen__title">PhoneLab</h1>
+        )}
+        {right ?? (badge ? <Badge tone={tone}>{badge}</Badge> : null)}
       </header>
       {children}
     </main>

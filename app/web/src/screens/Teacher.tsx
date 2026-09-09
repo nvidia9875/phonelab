@@ -3,7 +3,7 @@ import { teacher } from "../sample/data";
 import "./teacher.css";
 
 /** 教員画面。学級の許可・上限、全端末停止、生徒ごとのトレース。名前は出さない、番号だけ */
-export function Teacher({ onHalt }: { onHalt: () => void }) {
+export function Teacher({ halted, onHalt }: { halted: boolean; onHalt: () => void }) {
   const t = teacher;
   return (
     <main className="teacher">
@@ -16,8 +16,8 @@ export function Teacher({ onHalt }: { onHalt: () => void }) {
           <button type="button" className="tbtn tbtn--outline">
             <Icon name="list" /> トレース
           </button>
-          <button type="button" className="tbtn tbtn--halt" onClick={onHalt}>
-            <Icon name="stop" /> 全端末の測定を止める
+          <button type="button" className={`tbtn ${halted ? "tbtn--outline" : "tbtn--halt"}`} onClick={onHalt} aria-pressed={halted}>
+            <Icon name="stop" /> {halted ? "停止を解除する" : "全端末の測定を止める"}
           </button>
         </div>
       </header>

@@ -251,13 +251,13 @@ flowchart LR
   C1 --> C9
 ```
 
-- [ ] C1 PWA 骨格（`manifest.json`、オフライン時は固定手順に縮退して測定だけ続ける）
-- [ ] C2 画面 1
+- [~] C1 PWA 骨格: `app/web`（Vite + React + TS）。**UX の流れを `docs/ux-flow.md` に固め、トップ（テーマのカタログ＋状態）、生徒の情報、予想ゲート、計画、準備、測定、保留、却下、結果、記録、停止、教員の 12 画面を結線**。記録は localStorage、Agent/Policy/判定は端末内スタブ（`src/agent/stub.ts`）。ブラウザで全経路を一周して検証済み（9/9）。`manifest.json` とオフライン縮退は未
+- [x] C2 画面 1（承認から実測に結線済み。`app/web/src/measure/pendulum.ts` が端末内計算）
 - [ ] C3 Planner（プロンプトは「仮説の候補、許可された実験、検査の基準、問い返し方」だけ。答えを含めない。出力は JSON schema で固定）
-- [ ] C4 画面 2
+- [~] C4 画面 2（実測の値と端末内検査を表示。サーバ Verifier 未）
 - [ ] C5 Verifier（サーバ側。特徴量だけを受け取る）
-- [ ] C6 画面 3
-- [ ] C7 画面 4
+- [~] C6 画面 3（見た目のみ。判定はサーバ実装後）
+- [~] C7 画面 4（見た目のみ）
 - [ ] C8 Firestore
 - [ ] C9 CI/CD（push で自動 deploy。min-instances=0）
 
@@ -279,11 +279,11 @@ flowchart LR
 ```
 
 - [ ] D1 Policy（決定論。テストを先に書く: `drop_phone` を含む要望は必ず却下）
-- [ ] D2 画面 5
+- [~] D2 画面 5（見た目のみ）
 - [ ] D3 Model Armor（B6 の結果次第）
 - [ ] D4 Trace
 - [ ] D5 署名＋画面 6（PDF 書き出しは時間があれば）
-- [ ] D6 教員画面（`/teacher`、学級コードで入る）
+- [~] D6 教員画面 `/teacher`（見た目のみ。許可トグル・停止・提案 UI はサーバ実装後）
 - [ ] D7 停止と上限（全端末停止は `GET /api/class/{code}/status` を測定中 2 秒ごとにポーリング。`halt_latency_ms` を Trace に）
 - [ ] D8 答えの漏えい検知（教員画面「0 件 答えの漏えい」の裏側。`after_model_callback`）
 - [ ] D9 ClassAgent（`docs/architecture.md` 2.3。時間が無ければ「要約だけ・提案なし」に縮退）
@@ -383,7 +383,8 @@ flowchart LR
 │   ├── 09-submission-checklist.md  フェーズ別チェックリスト
 │   └── 10-idea-analysis.md         没案の分析（軸②の実装要素表は流用）
 ├── app/                         ← 実装（Cloud Run にデプロイするもの）
-│   ├── server/                     FastAPI + ADK
+│   ├── server/                     FastAPI + ADK（/api/*、/spike、web/dist の配信）
+│   ├── web/                        Vite + React + TS の PWA（src/screens 12 画面, src/flow 記録の操作, src/agent スタブ, src/store, src/catalog, src/measure）
 │   ├── pyproject.toml / uv.lock
 │   └── Dockerfile
 ├── idea/                        ← アイデアシート（決定版）
@@ -393,6 +394,7 @@ flowchart LR
 └── docs/                        ← B0 設計ドキュメント（作成済み 9/9）
     ├── README.md                   読む順と実装対応表
     ├── architecture.md             ADK の構造・信頼境界・Model Armor のリージョン・費用（一次情報の URL つき）
+    ├── ux-flow.md                  画面の一覧と URL、テーマ／実験／条件の 3 層、状態遷移、レビューの記録
     ├── idea-sheet.md               公式テンプレ版（説明文の下書き）
     ├── experiments.md              実験カタログ
     ├── policy.md                   統制層の検査ルール

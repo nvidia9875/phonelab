@@ -94,7 +94,16 @@ export function collect(permit: Permit, onTick?: (elapsedS: number, samples: num
     finish(buf);
   };
   const timer = window.setTimeout(stopAll, permit.seconds * 1000);
-  return { done, stop: stopAll };
+  // 2 秒たっても 1 サンプルも来ない端末（PC など）は待たずに終える
+  const probe = window.setTimeout(() => {
+    if (buf.t.length === 0) stopAll();
+  }, 2000);
+  const origStop = stopAll;
+  const stopWithProbe = () => {
+    window.clearTimeout(probe);
+    origStop();
+  };
+  return { done, stop: stopWithProbe };
 }
 
 /* ---------- 数値処理 ---------- */
@@ -209,7 +218,7 @@ export function localChecks(f: PendulumFeatures): LocalCheck[] {
   const u1 = Math.abs(f.T_accel_first_half_s - f.T_accel_second_half_s);
   const u2 = Math.abs(f.T_gyro_first_half_s - f.T_gyro_second_half_s);
   return [
-    { code: "low_rate", ok: f.rate_hz >= 30, text: f.rate_hz >= 30 ? `欠測なし（${Math.round(f.rate_hz)} Hz で連続）` : `サンプリングが遅い（${f.rate_hz} Hz）` },
+    { code: "low_rate", ok: f.rate_hz >= 30, text: f.rate_hz >= 30 ? `サンプリング ${Math.round(f.rate_hz)} Hz` : `サンプリングが遅い（${f.rate_hz} Hz）` },
     { code: "gap", ok: f.max_gap_ms < 250 && f.gap_total_ms < 500, text: f.max_gap_ms < 250 ? "途切れなし" : `${(f.max_gap_ms / 1000).toFixed(1)} 秒の欠測` },
     { code: "saturation", ok: f.saturation_runs === 0 && f.accel_norm_peak_ms2 < 39, text: f.saturation_runs === 0 ? "飽和なし" : "飽和。振りが強すぎる" },
     { code: "no_signal", ok: f.accel_norm_std_ms2 >= 0.3 || f.gyro_std_dps >= 5, text: "信号あり" },

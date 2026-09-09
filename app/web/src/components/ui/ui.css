@@ -10,7 +10,8 @@
 }
 .screen--tight { gap: 14px; }
 .screen__head { display: flex; align-items: center; justify-content: space-between; }
-.screen__title { font-size: 22px; font-weight: 900; letter-spacing: 0.01em; }
+.screen__title { font-size: 22px; font-weight: 900; letter-spacing: 0.01em; font-family: var(--font-head); }
+.screen__title--link { background: none; border: 0; padding: 0; cursor: pointer; color: var(--ink); }
 .screen__foot { display: flex; flex-direction: column; gap: 10px; margin-top: auto; padding-top: 6px; }
 .screen__foot--row { flex-direction: row; }
 .screen__foot--row > * { flex: 1 1 0; }
