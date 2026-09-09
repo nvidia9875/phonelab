@@ -1,0 +1,39 @@
+/* PhoneLab デザイントークン — idea/*.dc.html のアートボードから抽出 */
+:root {
+  /* 色: 橙は予想だけ、青緑は測定だけ、紺は保留・却下・停止 */
+  --paper: #F7F3EA;
+  --card: #FFFDF8;
+  --sand: #EEE7D8;
+  --line: #D9D2C3;
+  --ink: #1E2A3A;
+  --ink-2: #3A4552;
+  --muted: #5B6572;
+  --muted-2: #8A93A0;
+  --gray: #B8C0CA;
+  --orange: #E27A3F;
+  --orange-deep: #B85C2A;
+  --teal: #1FA39F;
+
+  /* 字体 */
+  --font-body: "BIZ UDPGothic", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif;
+  --font-head: "Zen Maru Gothic", "Hiragino Maru Gothic ProN", "Hiragino Sans", sans-serif;
+  --font-mono: ui-monospace, Menlo, monospace;
+
+  /* 角丸 */
+  --r-card: 14px;
+  --r-panel: 16px;
+  --r-inner: 10px;
+  --r-note: 12px;
+  --r-pill: 999px;
+
+  /* 余白 */
+  --pad-screen: 20px;
+  --gap-screen: 16px;
+  --pad-card: 14px;
+  --pad-panel: 16px;
+
+  /* 動き */
+  --dur-fast: 150ms;
+  --dur-normal: 300ms;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+}

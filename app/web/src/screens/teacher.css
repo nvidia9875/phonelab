@@ -1,0 +1,53 @@
+.teacher { min-height: 100dvh; padding: 28px 32px; display: flex; flex-direction: column; gap: 20px; max-width: 1280px; margin: 0 auto; }
+.teacher__head { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.teacher__crumb { display: flex; align-items: baseline; gap: 14px; }
+.teacher__brand { font-size: 24px; font-weight: 900; }
+.teacher__where { font-size: 14px; font-weight: 700; color: var(--muted); }
+.teacher__actions { display: flex; gap: 12px; }
+.tbtn { display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-radius: 12px; border: 2px solid var(--ink); background: transparent; font-size: 14px; font-weight: 700; cursor: pointer; }
+.tbtn--halt { background: var(--ink); color: var(--paper); padding: 10px 16px; }
+.tbtn:focus-visible { outline: 3px solid var(--teal); outline-offset: 2px; }
+
+.teacher__grid { display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); gap: 20px; flex: 1; }
+@media (max-width: 900px) { .teacher__grid { grid-template-columns: 1fr; } .teacher { padding: 20px; } }
+.teacher__side { display: flex; flex-direction: column; gap: 20px; }
+
+.tpanel { display: flex; flex-direction: column; gap: 12px; background: var(--card); border: 2px solid var(--ink); border-radius: 18px; padding: 20px; }
+.tpanel h2 { font-size: 18px; font-weight: 700; }
+.tpanel--navy { background: var(--ink); color: var(--paper); flex: 1; gap: 10px; }
+.tpanel--navy h2 { font-size: 16px; color: var(--paper); }
+.tpanel__head { display: flex; align-items: baseline; justify-content: space-between; }
+.tpanel__hint { font-size: 12px; color: var(--muted); }
+
+.trow { display: grid; grid-template-columns: 70px minmax(0, 1fr) 120px 130px; gap: 0 12px; align-items: center; font-size: 14px; padding: 8px 0; border-bottom: 1px solid var(--sand); }
+.trow--head { font-size: 12px; font-weight: 700; color: var(--muted); border-bottom: 1.5px solid var(--line); padding-bottom: 8px; }
+.trow__no { font-weight: 700; }
+.trow__check { font-size: 12px; color: var(--muted); }
+.trow__check--strong { color: var(--ink); font-weight: 700; }
+@media (max-width: 600px) { .trow { grid-template-columns: 56px minmax(0, 1fr) 100px; } .trow > :nth-child(4) { grid-column: 2 / -1; } }
+
+.tstate { font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: var(--r-pill); justify-self: start; border: 1.5px solid var(--ink); }
+.tstate--teal { background: var(--teal); border-color: var(--teal); color: var(--ink); }
+.tstate--navy { background: var(--ink); color: var(--paper); }
+.tstate--outline { background: transparent; }
+
+.tstats { display: flex; gap: 18px; margin-top: auto; padding-top: 8px; font-size: 13px; color: var(--muted); flex-wrap: wrap; }
+.tstats strong { color: var(--ink); }
+
+.perm-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.perm { display: flex; align-items: center; justify-content: space-between; border: 1.5px solid var(--line); border-radius: 10px; padding: 10px 12px; font-size: 13px; font-weight: 700; }
+.perm--never { color: var(--muted-2); }
+.perm__never { font-size: 12px; font-weight: 700; color: var(--muted-2); }
+.toggle { width: 40px; height: 22px; border-radius: 11px; background: var(--line); border: 0; padding: 2px; display: flex; align-items: center; cursor: pointer; transition: background var(--dur-normal) var(--ease-out); }
+.toggle--on { background: var(--teal); }
+.toggle__knob { width: 18px; height: 18px; border-radius: 9px; background: var(--card); transform: translateX(0); transition: transform var(--dur-normal) var(--ease-out); }
+.toggle--on .toggle__knob { transform: translateX(18px); }
+.toggle:focus-visible { outline: 3px solid var(--ink); outline-offset: 2px; }
+
+.limits { display: flex; gap: 10px; align-items: center; font-size: 13px; font-weight: 700; flex-wrap: wrap; }
+.limit { padding: 4px 10px; border-radius: 8px; border: 1.5px solid var(--ink); }
+
+.ttrace { display: flex; flex-direction: column; gap: 8px; font-size: 13px; line-height: 1.5; }
+.ttrace__row { display: flex; gap: 10px; }
+.ttrace__t { color: var(--gray); width: 44px; flex: 0 0 auto; }
+.ttrace__strong { font-weight: 700; text-decoration: underline; }

@@ -2,3 +2,5 @@
 __pycache__
 *.pyc
 tests
+web/node_modules
+web/dist

@@ -185,7 +185,7 @@ flowchart LR
 - [x] A4 予算アラート（請求アカウント通貨は JPY。45,000 円で 50% / 90% に通知。9/9）
 - [x] A5 API 有効化（run / cloudbuild / artifactregistry / aiplatform / firestore / cloudtrace / logging / monitoring / modelarmor / cloudkms / billingbudgets）。Firestore native を asia-northeast1 に作成済み。デフォルト compute SA に cloudbuild.builds.builder 等を付与（新規プロジェクトはこれが無いとソースデプロイが失敗する）
 - [x] A6 GitHub リポジトリ **nvidia9875/phonelab（private）** 作成（9/9）。このフォルダがそのままリポジトリ。**ダッシュボードの GitHub App 連携は未**
-- [ ] A7 ダッシュボードにプロジェクト作成（説明文は後で）＋ GitHub App でリポジトリ連携
+- [x] A7 ダッシュボードにプロジェクト **PhoneLab** 作成済み（9/9。デプロイ URL と動作確認の方法の下書きも保存）。GitHub App の連携は **GitHub のパスキー認証待ち**（Chrome のタブで本人が認証すると `nvidia9875/phonelab` が連携される。未完なら「審査向け情報」タブからやり直す）
 - [x] A8 Cloud Run `phonelab` を asia-northeast1 にデプロイ済み（9/9）。URL: **https://phonelab-1094091671194.asia-northeast1.run.app** 。ヘルスチェックは `/api/status`（`/healthz` は Google Front End が手前で 404 を返す）
 
 ### B0. 設計ドキュメント（〜9/13、B と並行）
@@ -227,7 +227,7 @@ flowchart TD
   B3 --> B7
 ```
 
-- [ ] B1 DeviceMotion 取得（iOS の `DeviceMotionEvent.requestPermission()` はタップハンドラ内でのみ動く。この制約がそのまま「許可チップ＋承認ボタン」の UI 根拠になる）
+- [~] B1 検証ページを配備済み: **https://phonelab-1094091671194.asia-northeast1.run.app/spike**（9/9）。糸 50 cm の振り子に入れて「許可して 20 秒測る」→ 加速度×2 とジャイロの T、検査 7 項目、特徴量 JSON が出る。**実機で測って JSON を記録するのが次**（iOS の `requestPermission()` はタップ内でのみ動く。この制約が許可チップの UI 根拠）
 - [ ] B2 Web Audio で基本周波数
 - [ ] B3 振り子の周期を端末内で計算し、理論値 `T = 2π√(L/g)` と比較
 - [ ] B4 Go/No-Go 判定（**9/14 までに決める**）
