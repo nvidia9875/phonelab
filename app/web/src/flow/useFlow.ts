@@ -35,7 +35,8 @@ export function submitPrediction(rec: StudyRecord, theme: Theme, text: string): 
     return "rejected";
   }
   const plan = choosePlan(text, theme, done);
-  if (plan.questionBack) {
+  // 問い返しは 1 回だけ。2 回目の送信は理由が無くても受け付ける（行き止まりにしない）
+  if (plan.questionBack && !rec.prediction.questionBack) {
     updateRecord(rec.id, (r) => ({ ...r, prediction: { ...r.prediction, text, questionBack: plan.questionBack } }));
     return "predict";
   }
@@ -43,7 +44,7 @@ export function submitPrediction(rec: StudyRecord, theme: Theme, text: string): 
   updateRecord(rec.id, (r) => {
     let n: StudyRecord = { ...r, prediction: { ...r.prediction, text, claim, questionBack: null }, rejection: null, variantId: plan.variant.id, stage: "plan" };
     n = addEvent(n, "予想", `${text}（証拠を見る前に記入）`, "orange");
-    n = addEvent(n, "計画", `${plan.variant.title}。Agent 提案`);
+    n = addEvent(n, "計画", `${plan.variant.title}。AI 提案`);
     return n;
   });
   return "plan";
@@ -139,7 +140,7 @@ export async function closeAndNext(rec: StudyRecord, theme: Theme): Promise<Stud
     const text = `${nv.changes.split("（")[0]}を変えたら、${dirWord}と思う`;
     let n: StudyRecord = { ...r, variantId: nv.id, stage: "plan", prediction: { ...r.prediction, text, claim: { variable: nv.variable, direction: rec.nextPrediction!.direction }, questionBack: null } };
     n = addEvent(n, "予想", `${text}（前の実験の結果を見て記入）`, "orange");
-    n = addEvent(n, "計画", `${nv.title}。Agent 提案`);
+    n = addEvent(n, "計画", `${nv.title}。AI 提案`);
     return n;
   });
   return next;

@@ -1,4 +1,4 @@
-import type { ButtonHTMLAttributes, ReactNode, TextareaHTMLAttributes } from "react";
+import { forwardRef, type ButtonHTMLAttributes, type ReactNode, type TextareaHTMLAttributes } from "react";
 import { Icon, type IconName } from "./Icon";
 import "./ui.css";
 
@@ -216,9 +216,9 @@ export function Choices<T extends string>({ options, value, onChange }: { option
   );
 }
 
-export function Field(props: TextareaHTMLAttributes<HTMLTextAreaElement>) {
-  return <textarea className="field" rows={3} {...props} />;
-}
+export const Field = forwardRef<HTMLTextAreaElement, TextareaHTMLAttributes<HTMLTextAreaElement>>(function Field(props, ref) {
+  return <textarea ref={ref} className="field" rows={3} {...props} />;
+});
 
 export function Note({ icon = "warn", children }: { icon?: IconName; children: ReactNode }) {
   return (

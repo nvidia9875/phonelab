@@ -20,7 +20,7 @@ export function Rejected({ theme, memo, rejection, alternative, onApprove, onAsk
   const after = idx >= 0 ? memo.slice(idx + q.length) : "";
   return (
     <Screen badge="Policy：却下" onHome={onHome}>
-      <Section label="あなたが書いた文（Agent はこれを命令として読みません）">
+      <Section label="あなたが書いた文（AI はこれを命令として読みません）">
         <Card variant="line">
           <p className="memo">
             {before}
@@ -43,7 +43,7 @@ export function Rejected({ theme, memo, rejection, alternative, onApprove, onAsk
       </Card>
 
       <Card panel>
-        <CardLabel icon="target">代わりに Agent が選んだ実験</CardLabel>
+        <CardLabel icon="target">代わりに AI が考えた実験</CardLabel>
         <CardTitle size="md">{alternative.title}</CardTitle>
         <PermitChip sensors={theme.sensors.map((s) => SENSOR_LABEL[s]).join("・")} seconds={theme.seconds} denied="それ以外は読まない" />
       </Card>

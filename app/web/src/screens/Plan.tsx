@@ -26,7 +26,7 @@ export function Plan({ theme, variant, predictionText, why, onApprove, onOther, 
       </Section>
 
       <Card panel>
-        <CardLabel icon="target">Agent が選んだ実験</CardLabel>
+        <CardLabel icon="target">AI が考えた実験</CardLabel>
         <CardTitle>{variant.title}</CardTitle>
         <p className="card__hint">{why}</p>
         <Pair items={[{ k: "変えるもの", v: variant.changes }, { k: "一定にするもの", v: variant.holds }]} />
@@ -40,7 +40,7 @@ export function Plan({ theme, variant, predictionText, why, onApprove, onOther, 
       <Foot>
         <Button onClick={onApprove}>この実験を承認して測る</Button>
         <Button secondary onClick={onOther}>別の実験を見る</Button>
-        <FootNote>Agent は答えを言いません。決めるのは測定と、あなた。</FootNote>
+        <FootNote>AI は実験を考える係。答えは、測って見つける。</FootNote>
       </Foot>
     </Screen>
   );

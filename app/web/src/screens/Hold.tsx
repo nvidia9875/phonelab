@@ -53,7 +53,7 @@ export function Hold({ checks, conditionLabel, retry, maxRetry, onRetry, onOther
       </Card>
 
       <Card variant="line">
-        <Eyebrow>Agent の提案</Eyebrow>
+        <Eyebrow>AI の提案</Eyebrow>
         <p style={{ fontSize: 14, lineHeight: 1.6 }}>{canRetry ? PROPOSAL[first?.code ?? "gap"] : `この端末では${conditionLabel}が ${maxRetry} 回続けて保留になりました。この実験は保留のまま、別の実験へ進みます。`}</p>
       </Card>
 

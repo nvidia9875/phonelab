@@ -57,7 +57,7 @@ export function Measure({ view, onStop, onContinue, onDemo }: MeasureProps) {
       </Grid2>
 
       <Card variant="line">
-        <Eyebrow>機械の検査（Agent は見ていない）</Eyebrow>
+        <Eyebrow>機械の検査（AI は見ていない）</Eyebrow>
         <Checks>
           {done ? (
             view.checks.map((c, i) => (

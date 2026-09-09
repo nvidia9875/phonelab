@@ -43,7 +43,7 @@ const HINT_REQ = /答え(だけ)?教えて|正解(は|を)|答えを教え/;
 
 export function checkPolicy(text: string, theme: Theme, done: string[]): PolicyResult {
   if (HINT_REQ.test(text)) {
-    return { kind: "hint", message: "Agent は答えを言いません。まず、あなたはどうなると思う？ 理由も一緒に書いてみて" };
+    return { kind: "hint", message: "答えは測って見つけよう。まず、あなたはどうなると思う？ 理由も一緒に書いてみて" };
   }
   const forbidden = FORBIDDEN.find(([re]) => re.test(text));
   const injected = INJECTION.test(text);

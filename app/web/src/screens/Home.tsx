@@ -32,8 +32,8 @@ export function Home({ student, records, caps, policy, halted, onOpenTheme, onOp
       }
     >
       <div className="hero">
-        <h2 className="hero__title">スマホが実験器具。<br />AI は答えを言わない。</h2>
-        <p className="hero__sub">テーマを選んで予想を書くと、Agent がその予想を試せる実験を選びます。決めるのは測定と、あなた。</p>
+        <h2 className="hero__title">スマホが実験器具。<br />AI といっしょに、たしかめよう。</h2>
+        <p className="hero__sub">テーマを選んで「こうなると思う」を書くと、AI がそれを試せる実験をいっしょに考えます。答えは測って、自分で見つける。</p>
       </div>
 
       {!student && (

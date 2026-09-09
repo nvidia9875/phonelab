@@ -25,6 +25,8 @@ export interface Variant {
 export interface Theme {
   id: string;
   title: string;
+  /** 予想の前に、まず作って見てもらう手順 */
+  build: string[];
   question: string;
   tagline: string;
   materials: string;
@@ -48,7 +50,8 @@ export const THEMES: Theme[] = [
   {
     id: "pendulum",
     title: "振り子の周期",
-    question: "振り子を見て、どう思う？",
+    build: ["糸（1 m 以下）の先に袋を結び、消しゴムを 1 個入れる", "机の端から垂らして、小さく振ってみる", "何回か往復を見て、速さを感じてみる。まだスマホは入れない"],
+    question: "振ってみて、どう思った？　重さや糸の長さを変えたら、速さはどうなりそう？",
     tagline: "重い方が速い？　長い方が遅い？",
     materials: "糸（1 m 以下）、袋、消しゴム 2 個",
     sensors: ["accelerometer", "gyroscope"],
@@ -101,6 +104,7 @@ export const THEMES: Theme[] = [
   {
     id: "freefall",
     title: "自由落下 ― 撮って、聞く",
+    build: ["コインと消しゴムを用意して、クッションの上に落としてみる", "目で見て、耳で聞いて、どっちが先に着くか感じてみる"],
     question: "コインと消しゴム、どっちが先に落ちる？",
     tagline: "スマホは落とさない。着地のコマと音、二つの時計",
     materials: "コイン、消しゴム、クッション",
@@ -128,6 +132,7 @@ export const THEMES: Theme[] = [
   {
     id: "bottle",
     title: "ペットボトルの音",
+    build: ["空のペットボトルの口に、息を吹いて音を出してみる", "水を少し入れて、もう一度吹いてみる"],
     question: "水を増やすと、音は高くなる？低くなる？",
     tagline: "口に息を吹いて、基本周波数を測る",
     materials: "ペットボトル、水、自分の息",
@@ -152,13 +157,13 @@ export const THEMES: Theme[] = [
       },
     ],
   },
-  { id: "beat", title: "うなり", question: "二つの音の差を広げると、うなりは速くなる？", tagline: "スピーカーとマイク", materials: "スピーカー付きの端末をもう一台", sensors: ["speaker", "microphone"], seconds: 5, safety: "音量は小さく", enabledBy: "later", measureProfile: "later", variants: [] },
-  { id: "echo", title: "反響で音の速さ", question: "壁が遠いほど、音は遅れて返る？", tagline: "手を叩いて往復時間", materials: "壁のある廊下", sensors: ["speaker", "microphone"], seconds: 5, safety: "廊下では走らない", enabledBy: "later", measureProfile: "later", variants: [] },
-  { id: "coin_slip", title: "コインの滑り出し角", question: "ざらざらの面ほど、滑り出しは遅い？", tagline: "傾きは加速度で測る", materials: "コイン、下敷き", sensors: ["accelerometer", "gyroscope"], seconds: 10, safety: "机の上で", enabledBy: "later", measureProfile: "later", variants: [] },
-  { id: "jump", title: "ジャンプの滞空時間", question: "高く跳ぶほど、空中にいる時間は長い？", tagline: "ポケットに入れて跳ぶ", materials: "靴、周囲 1 m の余裕", sensors: ["accelerometer"], seconds: 10, safety: "室内、靴をはいて。周りに人がいないこと", enabledBy: "later", measureProfile: "later", variants: [] },
-  { id: "elevator", title: "エレベーターの見かけの重さ", question: "上に動き出すとき、体は重くなる？", tagline: "先生が有効化する拡張", materials: "エレベーター", sensors: ["accelerometer"], seconds: 20, safety: "先生と一緒に", enabledBy: "teacher", measureProfile: "later", variants: [] },
-  { id: "spin", title: "回転の減衰", question: "回転椅子は、どう遅くなっていく？", tagline: "先生が有効化する拡張", materials: "回転椅子", sensors: ["gyroscope"], seconds: 20, safety: "先生の目の前で", enabledBy: "teacher", measureProfile: "later", variants: [] },
-  { id: "pulse", title: "カメラで脈拍", question: "運動のあと、脈は何秒で戻る？", tagline: "先生が有効化する拡張。値は端末の外に出ない", materials: "自分の指", sensors: ["camera"], seconds: 20, safety: "無理に走らない", enabledBy: "teacher", measureProfile: "later", variants: [] },
+  { id: "beat", title: "うなり", build: ["先生と一緒に準備します"], question: "二つの音の差を広げると、うなりは速くなる？", tagline: "スピーカーとマイク", materials: "スピーカー付きの端末をもう一台", sensors: ["speaker", "microphone"], seconds: 5, safety: "音量は小さく", enabledBy: "later", measureProfile: "later", variants: [] },
+  { id: "echo", title: "反響で音の速さ", build: ["先生と一緒に準備します"], question: "壁が遠いほど、音は遅れて返る？", tagline: "手を叩いて往復時間", materials: "壁のある廊下", sensors: ["speaker", "microphone"], seconds: 5, safety: "廊下では走らない", enabledBy: "later", measureProfile: "later", variants: [] },
+  { id: "coin_slip", title: "コインの滑り出し角", build: ["先生と一緒に準備します"], question: "ざらざらの面ほど、滑り出しは遅い？", tagline: "傾きは加速度で測る", materials: "コイン、下敷き", sensors: ["accelerometer", "gyroscope"], seconds: 10, safety: "机の上で", enabledBy: "later", measureProfile: "later", variants: [] },
+  { id: "jump", title: "ジャンプの滞空時間", build: ["先生と一緒に準備します"], question: "高く跳ぶほど、空中にいる時間は長い？", tagline: "ポケットに入れて跳ぶ", materials: "靴、周囲 1 m の余裕", sensors: ["accelerometer"], seconds: 10, safety: "室内、靴をはいて。周りに人がいないこと", enabledBy: "later", measureProfile: "later", variants: [] },
+  { id: "elevator", title: "エレベーターの見かけの重さ", build: ["先生と一緒に準備します"], question: "上に動き出すとき、体は重くなる？", tagline: "先生が有効化する拡張", materials: "エレベーター", sensors: ["accelerometer"], seconds: 20, safety: "先生と一緒に", enabledBy: "teacher", measureProfile: "later", variants: [] },
+  { id: "spin", title: "回転の減衰", build: ["先生と一緒に準備します"], question: "回転椅子は、どう遅くなっていく？", tagline: "先生が有効化する拡張", materials: "回転椅子", sensors: ["gyroscope"], seconds: 20, safety: "先生の目の前で", enabledBy: "teacher", measureProfile: "later", variants: [] },
+  { id: "pulse", title: "カメラで脈拍", build: ["先生と一緒に準備します"], question: "運動のあと、脈は何秒で戻る？", tagline: "先生が有効化する拡張。値は端末の外に出ない", materials: "自分の指", sensors: ["camera"], seconds: 20, safety: "無理に走らない", enabledBy: "teacher", measureProfile: "later", variants: [] },
 ];
 
 export function themeById(id: string): Theme | undefined {

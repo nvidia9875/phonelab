@@ -66,3 +66,7 @@
 .kv { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; padding: 8px 0; border-bottom: 1px solid var(--sand); }
 .kv:last-child { border-bottom: 0; }
 .kv__k { color: var(--muted); font-weight: 700; }
+
+/* ---------- 予想 ---------- */
+.predict-art { max-width: 220px; margin: 0 auto; color: var(--ink); }
+.predict-art .theme-art { aspect-ratio: 4 / 3; }
