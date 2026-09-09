@@ -9,11 +9,6 @@
 .hero__title { font-size: 26px; font-weight: 900; line-height: 1.25; }
 .hero__sub { font-size: 13px; color: var(--muted); }
 
-.progress { display: flex; gap: 14px; align-items: baseline; background: var(--card); border: 2px solid var(--line); border-radius: var(--r-card); padding: 12px 14px; }
-.progress__n { font-family: var(--font-head); font-size: 22px; font-weight: 900; line-height: 1; }
-.progress__k { font-size: 12px; color: var(--muted); }
-.progress__item { display: flex; flex-direction: column; gap: 2px; }
-
 .halt-band { display: flex; align-items: center; gap: 10px; background: var(--ink); color: var(--paper); border-radius: var(--r-note); padding: 12px 14px; font-size: 13px; font-weight: 700; }
 
 .themes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }

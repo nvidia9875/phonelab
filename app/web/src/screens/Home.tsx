@@ -3,6 +3,7 @@ import { SENSOR_LABEL, THEMES, type Theme } from "../catalog/themes";
 import type { Student, StudyRecord } from "../store/records";
 import { themeStatus, type ClassPolicy, type DeviceCaps, type ThemeStatus } from "../store/status";
 import { ThemeArt } from "../components/ThemeArt";
+import { Progress } from "../components/Progress";
 import "./catalog.css";
 
 export interface HomeProps {
@@ -19,9 +20,7 @@ export interface HomeProps {
 /** トップ: 学級と番号、進み方、テーマのカタログ（状態つき）、記録 */
 export function Home({ student, records, caps, policy, halted, onOpenTheme, onOpenRecord, onMe }: HomeProps) {
   const statuses = THEMES.map((t) => ({ theme: t, status: themeStatus(t, records, caps, policy) }));
-  const available = statuses.filter((s) => s.status.kind !== "unavailable").length;
   const done = records.filter((r) => r.status === "signed").length;
-  const held = statuses.filter((s) => s.status.kind === "held").length;
   const signed = records.filter((r) => r.status === "signed" || r.status === "judged");
 
   return (
@@ -51,12 +50,7 @@ export function Home({ student, records, caps, policy, halted, onOpenTheme, onOp
         </div>
       )}
 
-      <div className="progress" aria-label="今日の進み方">
-        <div className="progress__item"><span className="progress__n">{done}</span><span className="progress__k">終わった実験</span></div>
-        <div className="progress__item"><span className="progress__n">{held}</span><span className="progress__k">保留中</span></div>
-        <div className="progress__item"><span className="progress__n">{available}</span><span className="progress__k">この端末で選べる</span></div>
-        <div className="progress__item"><span className="progress__n">{THEMES.length}</span><span className="progress__k">全テーマ</span></div>
-      </div>
+      <Progress cells={statuses} signedCount={done} onOpenTheme={onOpenTheme} />
 
       <Section label="テーマを選ぶ">
         <div className="themes">
