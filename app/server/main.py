@@ -8,9 +8,12 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
 
 from fastapi import FastAPI
-from fastapi.responses import HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse
+
+STATIC = Path(__file__).parent / "static"
 
 app = FastAPI(title="PhoneLab", version="0.0.1")
 
@@ -29,3 +32,9 @@ def index() -> str:
         "<h1>PhoneLab</h1><p>スマホが実験器具。AIは答えを言わない。</p>"
         "<p>準備中。</p>"
     )
+
+
+@app.get("/spike", response_class=HTMLResponse)
+def spike() -> FileResponse:
+    """スパイク B1: DeviceMotion で振り子の周期を二系統で測る検証ページ。"""
+    return FileResponse(STATIC / "spike.html", media_type="text/html")

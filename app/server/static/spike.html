@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="ja">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PhoneLab spike B1 — 振り子の周期</title>
+<style>
+  :root { --ink:#1f2a3a; --orange:#e8762d; --teal:#1d9a8a; --navy:#1f2a3a; --paper:#f6f1e9; }
+  body { margin:0; font: 16px/1.5 -apple-system, "Hiragino Sans", sans-serif; background:var(--paper); color:var(--ink); }
+  main { max-width: 480px; margin: 0 auto; padding: 20px; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  .sub { color:#667; font-size: 13px; margin-bottom: 16px; }
+  label { display:block; font-size: 13px; margin: 12px 0 4px; }
+  input { font-size: 18px; padding: 8px; width: 100px; }
+  button { display:block; width:100%; font-size:18px; padding:14px; margin:16px 0; border:0; border-radius:12px; background:var(--navy); color:#fff; }
+  button[disabled] { opacity:.5; }
+  .chip { display:inline-block; border:1px solid var(--teal); color:var(--teal); border-radius:8px; padding:4px 8px; font-size:13px; margin-bottom:8px; }
+  .big { font-size: 44px; font-weight: 700; text-align:center; margin: 8px 0; }
+  .grid { display:grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .card { background:#fff; border:2px solid var(--ink); border-radius:14px; padding:12px; }
+  .card h2 { font-size: 13px; margin:0 0 6px; color:#667; }
+  .card .v { font-size: 30px; font-weight:700; color: var(--teal); }
+  .card .v small { font-size: 14px; color:#667; }
+  pre { background:#fff; border:1px solid #ccc; border-radius:8px; padding:10px; font-size:11px; overflow:auto; }
+  .ok { color: var(--teal); } .ng { color: #b3261e; }
+  ul { padding-left: 18px; font-size: 14px; }
+</style>
+<main>
+  <h1>PhoneLab spike B1</h1>
+  <div class="sub">振り子の周期を、加速度とジャイロの二本の時計で測る。生データは端末の外に出ない。</div>
+
+  <label>糸の長さ（cm。理論値の比較用）</label>
+  <input id="len" type="number" value="50" inputmode="numeric">
+  <span id="theory" class="sub"></span>
+
+  <div class="chip" id="chip">加速度・ジャイロを 20 秒だけ</div>
+  <button id="go">許可して 20 秒測る</button>
+  <div class="big" id="count">—</div>
+
+  <div class="grid">
+    <div class="card"><h2>加速度（ノルム×2）</h2><div class="v" id="ta">—<small> s</small></div></div>
+    <div class="card"><h2>ジャイロ（分散最大軸）</h2><div class="v" id="tg">—<small> s</small></div></div>
+  </div>
+  <div class="card" style="margin-top:10px">
+    <h2>機械の検査</h2>
+    <ul id="checks"><li>未測定</li></ul>
+  </div>
+  <label>特徴量（サーバに送るのはこれだけ）</label>
+  <pre id="out">—</pre>
+  <button id="copy" disabled>特徴量をコピー</button>
+</main>
+<script>
+(function(){
+  const $ = id => document.getElementById(id);
+  const SECONDS = 20;
+  const g = 9.80665;
+  function theory(){ const L = (+$('len').value||0)/100; const T = 2*Math.PI*Math.sqrt(L/g); $('theory').textContent = L>0 ? `理論値 T = ${T.toFixed(3)} s` : ''; }
+  $('len').addEventListener('input', theory); theory();
+
+  let buf = null;
+  function onMotion(e){
+    if(!buf) return;
+    const a = e.accelerationIncludingGravity || {}, r = e.rotationRate || {};
+    buf.t.push(performance.now());
+    buf.ax.push(a.x||0); buf.ay.push(a.y||0); buf.az.push(a.z||0);
+    buf.gx.push(r.alpha||0); buf.gy.push(r.beta||0); buf.gz.push(r.gamma||0);
+    buf.interval = e.interval;
+  }
+
+  function median(arr){ const s=[...arr].sort((x,y)=>x-y); const m=s.length>>1; return s.length%2? s[m] : (s[m-1]+s[m])/2; }
+  function mean(a){ let s=0; for(const v of a) s+=v; return s/a.length; }
+  function variance(a){ const m=mean(a); let s=0; for(const v of a) s+=(v-m)*(v-m); return s/a.length; }
+  function detrend(a){ // linear detrend
+    const n=a.length; let sx=0,sy=0,sxx=0,sxy=0; for(let i=0;i<n;i++){sx+=i;sy+=a[i];sxx+=i*i;sxy+=i*a[i];}
+    const b=(n*sxy-sx*sy)/(n*sxx-sx*sx), c=(sy-b*sx)/n; return a.map((v,i)=>v-(b*i+c));
+  }
+  // first autocorrelation peak between minLag and maxLag (seconds); returns {tau, r}
+  function firstPeak(x, dt, minLagS, maxLagS){
+    const n=x.length; let e0=0; for(const v of x) e0+=v*v; if(e0===0) return {tau:NaN,r:0};
+    const kmin=Math.max(2, Math.round(minLagS/dt)), kmax=Math.min(n-3, Math.round(maxLagS/dt));
+    const r=new Float64Array(kmax+2);
+    for(let k=kmin-1;k<=kmax+1;k++){ let s=0; for(let i=0;i+k<n;i++) s+=x[i]*x[i+k]; r[k]=s/e0; }
+    for(let k=kmin;k<=kmax;k++){
+      if(r[k]>0.3 && r[k]>=r[k-1] && r[k]>r[k+1]){
+        const d=(r[k-1]-r[k+1])/(2*(r[k-1]-2*r[k]+r[k+1])); // parabolic interpolation
+        return {tau:(k+(isFinite(d)?d:0))*dt, r:r[k]};
+      }
+    }
+    return {tau:NaN, r:0};
+  }
+  function analyze(b){
+    const t=b.t; const n=t.length;
+    const dts=[]; for(let i=1;i<n;i++) dts.push(t[i]-t[i-1]);
+    const dtm=median(dts); const dt=dtm/1000;
+    const gaps=[]; let gapTotal=0; dts.forEach((d,i)=>{ if(d>3*dtm){ gaps.push([+((t[i]-t[0])/1000).toFixed(2), Math.round(d)]); gapTotal+=d; } });
+    const dur=(t[n-1]-t[0])/1000;
+    // skip first 1 s
+    let s0=0; while(s0<n && t[s0]-t[0]<1000) s0++;
+    const norm=[]; for(let i=s0;i<n;i++) norm.push(Math.hypot(b.ax[i],b.ay[i],b.az[i]));
+    const gaxes=[b.gx.slice(s0),b.gy.slice(s0),b.gz.slice(s0)];
+    const gv=gaxes.map(variance); const gi=gv.indexOf(Math.max(...gv)); const gyro=gaxes[gi];
+    const nd=detrend(norm), gd=detrend(gyro);
+    const pa=firstPeak(nd, dt, 0.1, 2.0), pg=firstPeak(gd, dt, 0.2, 4.0);
+    const half=Math.floor(nd.length/2);
+    const pa1=firstPeak(nd.slice(0,half),dt,0.1,2.0), pa2=firstPeak(nd.slice(half),dt,0.1,2.0);
+    const pg1=firstPeak(gd.slice(0,half),dt,0.2,4.0), pg2=firstPeak(gd.slice(half),dt,0.2,4.0);
+    // saturation: runs of identical values >=5
+    let runs=0, run=1; for(let i=1;i<norm.length;i++){ if(norm[i]===norm[i-1]) { run++; if(run===5) runs++; } else run=1; }
+    return {
+      profile:'pendulum_period', n_samples:n, duration_s:+dur.toFixed(2), rate_hz:+((n-1)/dur).toFixed(1),
+      interval_median_ms:+dtm.toFixed(2), max_gap_ms:Math.round(Math.max(...dts)), gaps:gaps.slice(0,10), gap_total_ms:Math.round(gapTotal),
+      T_accel_s:+(2*pa.tau).toFixed(3), T_gyro_s:+pg.tau.toFixed(3),
+      T_accel_first_half_s:+(2*pa1.tau).toFixed(3), T_accel_second_half_s:+(2*pa2.tau).toFixed(3),
+      T_gyro_first_half_s:+pg1.tau.toFixed(3), T_gyro_second_half_s:+pg2.tau.toFixed(3),
+      accel_norm_peak_ms2:+Math.max(...norm).toFixed(2), accel_norm_std_ms2:+Math.sqrt(variance(norm)).toFixed(3),
+      gyro_axis:['alpha','beta','gamma'][gi], gyro_peak_dps:+Math.max(...gyro.map(Math.abs)).toFixed(1), gyro_std_dps:+Math.sqrt(gv[gi]).toFixed(2),
+      saturation_runs:runs, autocorr_peak:{accel:+pa.r.toFixed(3), gyro:+pg.r.toFixed(3)},
+      device_interval_ms:b.interval, ua:navigator.userAgent
+    };
+  }
+  function checks(f){
+    const out=[]; const tol=0.05;
+    const add=(ok,msg)=>out.push(`<li class="${ok?'ok':'ng'}">${ok?'✓':'⚠'} ${msg}</li>`);
+    add(f.rate_hz>=30, `サンプリング ${f.rate_hz} Hz（30 以上）`);
+    add(f.max_gap_ms<250 && f.gap_total_ms<500, `欠測 最大 ${f.max_gap_ms} ms / 合計 ${f.gap_total_ms} ms（250 / 500 未満）`);
+    add(f.saturation_runs===0 && f.accel_norm_peak_ms2<39, `飽和なし（ピーク ${f.accel_norm_peak_ms2} m/s²）`);
+    add(f.accel_norm_std_ms2>=0.3 || f.gyro_std_dps>=5, `信号あり（加速度 std ${f.accel_norm_std_ms2}、ジャイロ std ${f.gyro_std_dps}）`);
+    const d=Math.abs(f.T_accel_s-f.T_gyro_s);
+    add(isFinite(d) && d<=tol, `二系統の周期が一致（差 ${isFinite(d)?d.toFixed(3):'—'} s、許容 ${tol} s）`);
+    const u1=Math.abs(f.T_accel_first_half_s-f.T_accel_second_half_s), u2=Math.abs(f.T_gyro_first_half_s-f.T_gyro_second_half_s);
+    add(u1<=tol && u2<=tol, `前半と後半が安定（加速度差 ${u1.toFixed(3)}、ジャイロ差 ${u2.toFixed(3)}）`);
+    add(f.autocorr_peak.accel>=0.3 && f.autocorr_peak.gyro>=0.3, `自己相関ピーク（加速度 ${f.autocorr_peak.accel}、ジャイロ ${f.autocorr_peak.gyro}）`);
+    return out.join('');
+  }
+
+  let lastFeatures=null;
+  $('go').addEventListener('click', async () => {
+    try{
+      if(typeof DeviceMotionEvent!=='undefined' && typeof DeviceMotionEvent.requestPermission==='function'){
+        const p = await DeviceMotionEvent.requestPermission();
+        if(p!=='granted'){ $('count').textContent='許可されませんでした'; return; }
+      }
+    }catch(err){ $('count').textContent='許可エラー: '+err; return; }
+    if(!window.DeviceMotionEvent){ $('count').textContent='この端末には加速度センサーがありません'; return; }
+    buf={t:[],ax:[],ay:[],az:[],gx:[],gy:[],gz:[],interval:null};
+    window.addEventListener('devicemotion', onMotion);
+    $('go').disabled=true; $('copy').disabled=true;
+    const t0=performance.now();
+    const timer=setInterval(()=>{ const s=Math.min(SECONDS, Math.floor((performance.now()-t0)/1000)); $('count').textContent=`${s} / ${SECONDS} s（${buf.t.length} サンプル）`; }, 200);
+    setTimeout(()=>{
+      clearInterval(timer);
+      window.removeEventListener('devicemotion', onMotion);   // 許可した秒数で読み取りは止まる
+      const b=buf; buf=null;
+      if(b.t.length<50){ $('count').textContent='サンプルが足りません（'+b.t.length+'）'; $('go').disabled=false; return; }
+      const f=analyze(b); lastFeatures=f;
+      $('count').textContent=`${SECONDS} / ${SECONDS} s 終了`;
+      $('ta').innerHTML=(isFinite(f.T_accel_s)?f.T_accel_s.toFixed(2):'—')+'<small> s</small>';
+      $('tg').innerHTML=(isFinite(f.T_gyro_s)?f.T_gyro_s.toFixed(2):'—')+'<small> s</small>';
+      $('checks').innerHTML=checks(f);
+      $('out').textContent=JSON.stringify(f,null,1);
+      $('go').disabled=false; $('copy').disabled=false;
+    }, SECONDS*1000);
+  });
+  $('copy').addEventListener('click', async ()=>{ try{ await navigator.clipboard.writeText(JSON.stringify(lastFeatures)); $('copy').textContent='コピーしました'; }catch(e){ $('copy').textContent='コピー失敗: 手動で選択してください'; } });
+})();
+</script>
+</html>
