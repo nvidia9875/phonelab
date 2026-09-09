@@ -2,6 +2,7 @@ import { Button, Card, Icon, Screen, Section } from "../components/ui";
 import { SENSOR_LABEL, THEMES, type Theme } from "../catalog/themes";
 import type { Student, StudyRecord } from "../store/records";
 import { themeStatus, type ClassPolicy, type DeviceCaps, type ThemeStatus } from "../store/status";
+import { ThemeArt } from "../components/ThemeArt";
 import "./catalog.css";
 
 export interface HomeProps {
@@ -94,34 +95,39 @@ export function Home({ student, records, caps, policy, halted, onOpenTheme, onOp
 
 function ThemeCard({ theme, status, disabled, onOpen }: { theme: Theme; status: ThemeStatus; disabled: boolean; onOpen: () => void }) {
   const off = status.kind === "unavailable";
-  const cls = ["theme", off && "theme--off", status.kind === "done" && "theme--done"].filter(Boolean).join(" ");
+  const cls = ["theme", off && "theme--off", status.kind === "done" && "theme--done", status.kind === "held" && "theme--held", (status.kind === "open" || status.kind === "judged") && "theme--open"]
+    .filter(Boolean)
+    .join(" ");
   const badge = (() => {
     switch (status.kind) {
       case "new": return <span className="theme__status">はじめる</span>;
       case "open": return <span className="theme__status theme__status--open">{status.label}</span>;
-      case "held": return <span className="theme__status theme__status--held">保留 再測定できます</span>;
-      case "judged": return <span className="theme__status theme__status--judged">次の予測を書く</span>;
+      case "held": return <span className="theme__status theme__status--held">保留中</span>;
+      case "judged": return <span className="theme__status theme__status--judged">次の予測</span>;
       case "done": return <span className="theme__status theme__status--done">✓ {status.count} / {status.total}</span>;
-      case "unavailable": return <span className="theme__status theme__status--off">選べない</span>;
+      case "unavailable": return <span className="theme__status theme__status--off">{theme.enabledBy === "teacher" ? "先生が有効化" : "準備中"}</span>;
     }
   })();
   return (
-    <button type="button" className={cls} disabled={off} onClick={onOpen} aria-disabled={off} title={disabled ? "先に学級と番号を入れてください" : undefined}>
-      <span>
+    <button type="button" className={cls} disabled={off} onClick={onOpen} aria-disabled={off} title={disabled ? "先に学級と番号を入れてください" : off ? status.reason : undefined}>
+      <span className="theme__art">
+        <ThemeArt id={theme.id} muted={off} />
+      </span>
+      <span className="theme__body">
         <span className="theme__title">{theme.title}</span>
-        <br />
         <span className="theme__tag">{theme.tagline}</span>
       </span>
-      {badge}
-      <span className="theme__meta">
-        {theme.sensors.map((s) => (
-          <span className="tag tag--teal" key={s}>{SENSOR_LABEL[s]}</span>
-        ))}
-        <span className="tag">{theme.seconds} 秒</span>
-        <span className="tag">{theme.materials}</span>
+      <span className="theme__foot">
+        {badge}
+        <span className="theme__meta">
+          {theme.sensors.filter((x) => x !== "speaker").map((x) => (
+            <span className="tag tag--teal" key={x}>{SENSOR_LABEL[x]}</span>
+          ))}
+          <span className="tag">{theme.seconds} 秒</span>
+        </span>
       </span>
-      {off && <span className="theme__reason">{status.reason}</span>}
-      {status.kind === "done" && status.labels.length > 0 && <span className="theme__reason">終わった実験: {status.labels.join("、")}</span>}
+      {off && status.reason !== "準備中" && <span className="theme__reason">{status.reason}</span>}
+      {status.kind === "done" && status.labels.length > 0 && <span className="theme__reason">終わった: {status.labels.join("、")}</span>}
     </button>
   );
 }
