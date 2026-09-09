@@ -1,0 +1,126 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700;900&amp;family=BIZ+UDPGothic:wght@400;700&amp;display=swap" rel="stylesheet">
+  <style>
+    body { margin: 0; background: #F7F3EA; color: #1E2A3A; font-family: "BIZ UDPGothic", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif; }
+    a { color: #B85C2A; } a:hover { color: #8F4620; }
+    h1, h2, h3 { font-family: "Zen Maru Gothic", "Hiragino Maru Gothic ProN", "Hiragino Sans", sans-serif; margin: 0; }
+    p { margin: 0; }
+    svg { display: block; }
+  </style>
+</helmet>
+<div style="width: 1200px; height: 760px; box-sizing: border-box; background: #F7F3EA; padding: 28px 32px; display: flex; flex-direction: column; gap: 20px;">
+  <div style="display: flex; flex-direction: row; align-items: center; justify-content: space-between;">
+    <div style="display: flex; flex-direction: row; align-items: baseline; gap: 14px;">
+      <h1 style="font-size: 24px; font-weight: 900;">PhoneLab</h1>
+      <p style="font-size: 14px; font-weight: 700; color: #5B6572;">教員画面 ／ 2年3組 ／ 振り子の周期</p>
+    </div>
+    <div style="display: flex; flex-direction: row; align-items: center; gap: 12px;">
+      <div style="display: flex; flex-direction: row; align-items: center; gap: 8px; padding: 10px 14px; border-radius: 12px; border: 2px solid #1E2A3A; font-size: 14px; font-weight: 700;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1E2A3A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"></rect><path d="M8 8h8M8 12h8M8 16h5"></path></svg>
+        トレース
+      </div>
+      <div style="display: flex; flex-direction: row; align-items: center; gap: 8px; padding: 10px 16px; border-radius: 12px; background: #1E2A3A; color: #F7F3EA; font-size: 14px; font-weight: 700;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#F7F3EA" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="6" width="12" height="12" rx="2"></rect></svg>
+        全端末の測定を止める
+      </div>
+    </div>
+  </div>
+
+  <div style="display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); gap: 20px; flex-grow: 1;">
+
+    <!-- Class overview -->
+    <div style="display: flex; flex-direction: column; gap: 12px; background: #FFFDF8; border: 2px solid #1E2A3A; border-radius: 18px; padding: 20px;">
+      <div style="display: flex; flex-direction: row; align-items: baseline; justify-content: space-between;">
+        <h2 style="font-size: 18px; font-weight: 700;">生徒の進み方</h2>
+        <p style="font-size: 12px; color: #5B6572;">名前は出さない。番号だけ</p>
+      </div>
+      <div style="display: grid; grid-template-columns: 70px minmax(0, 1fr) 120px 130px; gap: 0 12px; font-size: 12px; font-weight: 700; color: #5B6572; border-bottom: 1.5px solid #D9D2C3; padding-bottom: 8px;">
+        <p>番号</p><p>いまの予想</p><p>状態</p><p>検査</p>
+      </div>
+      <div style="display: grid; grid-template-columns: 70px minmax(0, 1fr) 120px 130px; gap: 0 12px; align-items: center; font-size: 14px; padding: 8px 0; border-bottom: 1px solid #EEE7D8;">
+        <p style="font-weight: 700;">S-04</p><p>重いほど速い</p>
+        <span style="font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 999px; background: #1FA39F; color: #1E2A3A; justify-self: start;">再測定中</span>
+        <p style="font-size: 12px; color: #5B6572;">前回 欠測 0.5 s で保留</p>
+      </div>
+      <div style="display: grid; grid-template-columns: 70px minmax(0, 1fr) 120px 130px; gap: 0 12px; align-items: center; font-size: 14px; padding: 8px 0; border-bottom: 1px solid #EEE7D8;">
+        <p style="font-weight: 700;">S-11</p><p>大きく振ると遅い</p>
+        <span style="font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 999px; background: #1E2A3A; color: #F7F3EA; justify-self: start;">保留</span>
+        <p style="font-size: 12px; font-weight: 700;">飽和。振りが強すぎる</p>
+      </div>
+      <div style="display: grid; grid-template-columns: 70px minmax(0, 1fr) 120px 130px; gap: 0 12px; align-items: center; font-size: 14px; padding: 8px 0; border-bottom: 1px solid #EEE7D8;">
+        <p style="font-weight: 700;">S-17</p><p>長いほど速い</p>
+        <span style="font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 999px; border: 1.5px solid #1E2A3A; justify-self: start;">次の予測待ち</span>
+        <p style="font-size: 12px; color: #5B6572;">二系統一致</p>
+      </div>
+      <div style="display: grid; grid-template-columns: 70px minmax(0, 1fr) 120px 130px; gap: 0 12px; align-items: center; font-size: 14px; padding: 8px 0; border-bottom: 1px solid #EEE7D8;">
+        <p style="font-weight: 700;">S-22</p><p>（理由がまだない）</p>
+        <span style="font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 999px; border: 1.5px solid #1E2A3A; justify-self: start;">Agent が質問中</span>
+        <p style="font-size: 12px; color: #5B6572;">センサー未使用</p>
+      </div>
+      <div style="display: grid; grid-template-columns: 70px minmax(0, 1fr) 120px 130px; gap: 0 12px; align-items: center; font-size: 14px; padding: 8px 0; border-bottom: 1px solid #EEE7D8;">
+        <p style="font-weight: 700;">S-29</p><p>スマホを落として測りたい</p>
+        <span style="font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 999px; background: #1E2A3A; color: #F7F3EA; justify-self: start;">Policy が拒否</span>
+        <p style="font-size: 12px; color: #5B6572;">代替実験を提示</p>
+      </div>
+      <div style="display: flex; flex-direction: row; gap: 18px; margin-top: auto; padding-top: 8px; font-size: 13px; color: #5B6572;">
+        <p><span style="font-weight: 700; color: #1E2A3A;">31</span> 人が接続</p>
+        <p><span style="font-weight: 700; color: #1E2A3A;">6</span> 件 保留中</p>
+        <p><span style="font-weight: 700; color: #1E2A3A;">0</span> 件 危険実験の提示</p>
+        <p><span style="font-weight: 700; color: #1E2A3A;">0</span> 件 答えの漏えい</p>
+      </div>
+    </div>
+
+    <!-- Policy and trace -->
+    <div style="display: flex; flex-direction: column; gap: 20px;">
+      <div style="display: flex; flex-direction: column; gap: 12px; background: #FFFDF8; border: 2px solid #1E2A3A; border-radius: 18px; padding: 20px;">
+        <h2 style="font-size: 18px; font-weight: 700;">この学級の許可</h2>
+        <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px;">
+          <div style="display: flex; flex-direction: row; align-items: center; justify-content: space-between; border: 1.5px solid #D9D2C3; border-radius: 10px; padding: 10px 12px;">
+            <p style="font-size: 13px; font-weight: 700;">加速度・ジャイロ</p>
+            <div style="width: 40px; height: 22px; border-radius: 11px; background: #1FA39F; display: flex; align-items: center; justify-content: flex-end; padding: 2px; box-sizing: border-box;"><div style="width: 18px; height: 18px; border-radius: 9px; background: #FFFDF8;"></div></div>
+          </div>
+          <div style="display: flex; flex-direction: row; align-items: center; justify-content: space-between; border: 1.5px solid #D9D2C3; border-radius: 10px; padding: 10px 12px;">
+            <p style="font-size: 13px; font-weight: 700;">マイク（特徴量のみ）</p>
+            <div style="width: 40px; height: 22px; border-radius: 11px; background: #1FA39F; display: flex; align-items: center; justify-content: flex-end; padding: 2px; box-sizing: border-box;"><div style="width: 18px; height: 18px; border-radius: 9px; background: #FFFDF8;"></div></div>
+          </div>
+          <div style="display: flex; flex-direction: row; align-items: center; justify-content: space-between; border: 1.5px solid #D9D2C3; border-radius: 10px; padding: 10px 12px;">
+            <p style="font-size: 13px; font-weight: 700;">カメラ（端末内処理）</p>
+            <div style="width: 40px; height: 22px; border-radius: 11px; background: #D9D2C3; display: flex; align-items: center; justify-content: flex-start; padding: 2px; box-sizing: border-box;"><div style="width: 18px; height: 18px; border-radius: 9px; background: #FFFDF8;"></div></div>
+          </div>
+          <div style="display: flex; flex-direction: row; align-items: center; justify-content: space-between; border: 1.5px solid #D9D2C3; border-radius: 10px; padding: 10px 12px;">
+            <p style="font-size: 13px; font-weight: 700; color: #8A93A0;">位置情報</p>
+            <p style="font-size: 12px; font-weight: 700; color: #8A93A0;">常に不可</p>
+          </div>
+        </div>
+        <div style="display: flex; flex-direction: row; gap: 10px; align-items: center;">
+          <p style="font-size: 13px; font-weight: 700;">ヒントの上限</p>
+          <span style="font-size: 13px; font-weight: 700; padding: 4px 10px; border-radius: 8px; border: 1.5px solid #1E2A3A;">3回 / 実験</span>
+          <p style="font-size: 13px; font-weight: 700; margin-left: 8px;">測定の上限</p>
+          <span style="font-size: 13px; font-weight: 700; padding: 4px 10px; border-radius: 8px; border: 1.5px solid #1E2A3A;">30秒</span>
+        </div>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 10px; background: #1E2A3A; color: #F7F3EA; border-radius: 18px; padding: 20px; flex-grow: 1;">
+        <h2 style="font-size: 16px; font-weight: 700; color: #F7F3EA;">S-29 のトレース</h2>
+        <div style="display: flex; flex-direction: column; gap: 8px; font-size: 13px; line-height: 1.5;">
+          <div style="display: flex; flex-direction: row; gap: 10px;"><p style="color: #B8C0CA; width: 44px; flex-shrink: 0;">10:12</p><p>予想「スマホを落として重力を測りたい」を受理</p></div>
+          <div style="display: flex; flex-direction: row; gap: 10px;"><p style="color: #B8C0CA; width: 44px; flex-shrink: 0;">10:12</p><p style="color: #F7F3EA; font-weight: 700; text-decoration: underline;">Policy が要望を却下：forbidden_action drop_phone</p></div>
+          <div style="display: flex; flex-direction: row; gap: 10px;"><p style="color: #B8C0CA; width: 44px; flex-shrink: 0;">10:12</p><p>Planner はカタログ外の要望を実験にしない。最も近い「撮って聞く自由落下」を候補に</p></div>
+          <div style="display: flex; flex-direction: row; gap: 10px;"><p style="color: #B8C0CA; width: 44px; flex-shrink: 0;">10:13</p><p>代替「撮って聞く自由落下」を提示。カメラは学級で不可のため、振り子へ再提案</p></div>
+          <div style="display: flex; flex-direction: row; gap: 10px;"><p style="color: #B8C0CA; width: 44px; flex-shrink: 0;">10:14</p><p>生徒が承認。加速度・ジャイロ 20秒</p></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

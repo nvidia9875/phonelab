@@ -1,0 +1,403 @@
+# PhoneLab — 実装までの流れ（トップ）
+
+> 第5回 Agentic AI Hackathon with Google Cloud に出す **PhoneLab** の、今日（2026-09-09）から提出（10/14 目標、締切 10/15 23:59）までの TODO と依存関係。
+> 迷ったらこのファイルに戻る。詳細は各ドキュメントへリンクする。
+>
+> - 公式 LP: https://zenn.dev/hackathons/google-cloud-japan-ai-hackathon-vol5
+> - ダッシュボード: https://zenn.dev/hackathons/google-cloud-japan-ai-hackathon-vol5/dashboard
+> - 公式 coding agent スキル（このフォルダの `.claude/skills/` に導入済み）: https://github.com/zenn-dev/hackathon-agent-skills
+>   - `gc-hackathon-vol5` … 「提出前チェックをして」「この構成でレギュレーションを満たす？」で発動
+>   - `gc-hackathon-vol5-ideation` … 「この案どう思う？」で発動。アイデアシートの公式テンプレあり
+
+---
+
+## 0. 現在地
+
+| 項目 | 状態 |
+|---|---|
+| 今日 | 2026-09-09（水） |
+| 提出締切 | 2026-10-15（木）23:59 → 内部目標 **10/14** |
+| 残り | **35 日（5 週間）** |
+| アイデア | **PhoneLab に決定**（`/Users/shun/Desktop/phonelab/idea/phonelab-idea-sheet.pdf`） |
+| 設計 | **B0 完了**（`docs/` 6 本。9/9。アーキテクチャは公式ドキュメントで裏取り済み） |
+| コード | フェーズ A 進行中（GCP `phonelab-2026`、GitHub `nvidia9875/phonelab`、`app/` に Hello Cloud Run） |
+| 参加形態 | 個人（想定。`context/10-idea-analysis.md` の前提） |
+
+公式の逆算マイルストーン（`context/02-schedule.md`）では「9/中旬までにコアループ実装＋デプロイ」だったので、**約 1 週間遅れ**からのスタート。ハード調達ゼロの案を選んだ分、その遅れは吸収できる。
+
+---
+
+## 1. 決まったこと（PhoneLab の骨格）
+
+一行で: **スマホが実験器具。AI は答えを言わない。** 生徒が予想を書くと、Agent がその予想を壊せる実験を選び、スマホのセンサーが正誤を決める。
+
+### 1.1 固定した設計判断（変えない）
+
+| # | 判断 | 理由 / 出典 |
+|---|---|---|
+| D1 | 生徒側は **PWA（Web だけ）**。インストール不要、URL 一つで配布 | 審査員が自分の端末で試せる。ネイティブ不可の制約回避（`context/03` FAQ） |
+| D2 | **生データは端末から出ない**。送るのは周期・周波数などの特徴量とハッシュ | セキュリティ（審査軸②）。位置情報は永久に要求しない |
+| D3 | Agent の役割は **Planner だけが LLM**。Policy と Verifier は決定論（LLM は読まない） | 権限分離。「Agent は提案、検査は機械」（UX 型 5） |
+| D4 | **許可は実験単位・秒数付き**。承認ボタンの真上に許可チップ | Human-in-the-loop（UX 型 1） |
+| D5 | **保留は第一級の状態**。欠測・飽和・二系統不一致なら結論を出さない | 信頼できる動作（UX 型 3, 4） |
+| D6 | **予想ゲート**。予想を書くまで実験もヒントもセンサーも出ない | 自律性の従属（UX 型 2） |
+| D7 | 危険実験（落とす・高所・水・交通）は **候補にも出さない**。メモ内の命令は無視 | プロンプトインジェクション対策（UX 型 6） |
+| D8 | 停止は人。生徒「測定をやめる」、教師「全端末を止める」 | 停止・実行上限（UX 型 7） |
+| D9 | 記録は **署名付き**。許可→計画→承認→測定→検査→判定→次の予測を一本に | 可観測性（UX 型 8） |
+| D10 | 言葉のルール: 「正解」「間違い」「安全です」と言わない | 審査軸②を UI で語る |
+| D11 | 色: 橙＝予想、青緑＝測定、紺＝保留・却下・停止 | `idea/UXPrinciples.dc.html` |
+| D12 | 認証は **学級コード＋出席番号**（ソーシャルログイン・メール受信を使わない） | 審査要件（テストアカウントが要る） |
+| D13 | 統制層は **ADK の `PolicyPlugin`**（Runner 登録）。Model Armor は `on_user_message`、停止と上限は `before_run` / `before_model`、漏えい検知と Policy は `after_model`、ツール制限は `before_tool` | 「統制は ADK のコールバックそのもの」と言える。`docs/architecture.md` 2.1 |
+| D14 | **ClassAgent**（教員側の観察エージェント）を置く。ツール 3 つで観察→判断→提案。提案は教師の承認で反映、停止は提案できない | 軸②を二層に。`docs/architecture.md` 2.3 |
+| D15 | Model Armor のテンプレートは **`us-central1`**（東京は多言語検出なし）。注入対策は三層（Model Armor → 決定論パターン → 構造化出力） | 公式の Feature availability by region。`docs/architecture.md` 4.1 |
+| D16 | 全端末停止は **ポーリング**（測定中 2 秒ごと）。PWA は Firestore に触らない。生データは IndexedDB に残し「端末で再検証」を置く。署名は「特徴量が正直に計算された」ことを保証しないと明記 | 矛盾の解消と信頼境界の正直な記述。`docs/architecture.md` 4.3, 4.4 |
+
+### 1.2 実験カタログ（既定 10 ＋ 教師有効化 3）
+
+| 種別 | 実験 | 使うセンサー | 二本目の時計 |
+|---|---|---|---|
+| 既定・**MVP** | 振り子の周期（重さ / 長さ / 振れ幅） | 加速度・ジャイロ | 加速度 vs ジャイロ |
+| 既定 | 自由落下（撮って、聞く。スマホは落とさない） | カメラ・マイク | 着地コマ vs 着地音 |
+| 既定 | ペットボトルの音（基本周波数） | マイク | — （倍音で確認） |
+| 既定 | うなり / 反響で音の速さ / コインの滑り出し角 / ジャンプの滞空時間 | マイク・加速度 | 実験ごとに定義 |
+| 拡張 | エレベーター / 回転の減衰 / カメラ脈拍 | 加速度・カメラ | 教師が有効化 |
+
+**MVP は「振り子の周期」一本**。デモ動画の 6 画面（承認チップ→二本目の時計→保留→却下→停止→署名）は振り子だけで全部見せられる。
+
+### 1.3 アーキテクチャ（`idea/Main.dc.html` の分担図）
+
+```mermaid
+flowchart LR
+  subgraph phone["生徒のスマホ（PWA）"]
+    S1[DeviceMotion<br/>加速度・ジャイロ] --> C[端末内計算<br/>周期・周波数・落下時間]
+    S2[getUserMedia + Web Audio<br/>マイク・カメラ] --> C
+    C --> L[(生データは端末内のみ)]
+    C -->|特徴量 + ハッシュ| API
+  end
+  subgraph gcp["Google Cloud（Cloud Run asia-northeast1）"]
+    API[FastAPI /api/*]
+    API --> RUN[ADK Runner<br/>PolicyPlugin = 統制層<br/>on_user_message / before_run / before_model / after_model / before_tool]
+    RUN --> P[StudentAgent Planner<br/>Gemini・構造化出力・ツールなし]
+    RUN --> CA[ClassAgent<br/>Gemini・ツール 3 つ<br/>観察→判断→提案]
+    MA[Model Armor<br/>template @ us-central1] -.-> RUN
+    API --> V[Verifier / Judge<br/>純関数・LLM なし]
+    V --> SG[署名<br/>Cloud KMS EC P-256]
+    RUN & V & SG --> T[Cloud Trace / Logging<br/>本文はスパンに入れない]
+    SG --> FS[(Firestore<br/>classes / records / proposals)]
+    CA -->|提案のみ| FS
+  end
+  subgraph teacher["教員画面（Web）"]
+    TD[許可・上限・全端末停止<br/>トレース閲覧・提案の承認]
+  end
+  API -->|実験計画・判定・署名<br/>停止フラグは 2 秒ポーリング| phone
+  FS --> TD
+  TD -->|学級ポリシー・承認| API
+```
+
+詳細（Plugin の各コールバックの役割、信頼境界、費用）は `/Users/shun/Desktop/phonelab/docs/architecture.md`。
+
+---
+
+## 2. 公式要件との対応表
+
+「公式に乗っかる」ための逆引き。左が公式、右が PhoneLab の何で答えるか。
+
+### 2.1 必須要件
+
+| 公式 | PhoneLab | 状態 |
+|---|---|---|
+| 必須①: Google Cloud 実行プロダクト | **Cloud Run**（API + ADK エージェント + PWA 配信） | ✅ デプロイ済み（Hello） |
+| 必須②: Google Cloud AI 技術 | **Gemini API（Gemini Enterprise Agent Platform 経由推奨）+ ADK** | 未 |
+| Google Cloud にデプロイ済み（ローカル不可） | https://phonelab-1094091671194.asia-northeast1.run.app | ✅ |
+| 8/20 以降に着手 | アイデア決定 9/9、GCP プロジェクト・リポジトリ作成 9/9 | ✅ |
+
+### 2.2 審査軸 → 見せ方
+
+| 審査軸 | PhoneLab の答え | 証拠になる画面・成果物 |
+|---|---|---|
+| ① 課題の新規性と有効性 | 実験機器不足が 12 年連続で理科の最大の困りごと。スマホは 97.1% の高校生が持っている。専用センサーは 1 台 $99〜119 | 説明文冒頭、`idea/WhyPhone.dc.html` の 5 つの根拠 |
+| ② 自律性・エージェントらしさ | 予想→実験選択→許可→測定→検査→保留/反証→次の予測、の自律ループ。統制は骨格 | **8 つの型**（`idea/UXPrinciples.dc.html`）。デモ動画は 6 画面の順番で答える |
+| ②-可観測性 | ADK 組み込みトレース → Cloud Trace。教員画面のトレース | 教員画面「S-29 のトレース」 |
+| ②-セキュリティ | Model Armor、生データ非送信、位置情報不要、Policy の決定論的却下 | 画面 5「Policy 却下」 |
+| ②-管理・制御 | 許可チップ、ヒント上限、測定上限、全端末停止 | 画面 1、教員画面 |
+| ③ 実装品質と拡張性 | Cloud Run min-instances=0 でアイドル課金ゼロ。Verifier は LLM 不使用で安く速い。実験カタログは JSON で拡張 | README の構成説明、アーキ図、費用の説明 |
+
+### 2.3 提出物
+
+| 提出物 | 作るもの | 担当フェーズ |
+|---|---|---|
+| GitHub リポジトリ連携（GitHub App、公開/非公開どちらでも可） | `phonelab` リポジトリ。**審査はデフォルトブランチ** | F |
+| デプロイ URL | Cloud Run の URL | C, F |
+| 説明文（ユーザー像・課題・ソリューション・特徴、**日本語**） | 公式アイデアシートのテンプレで下書き→ダッシュボードへ | F |
+| システムアーキテクチャ図の画像 | 上の mermaid を図に起こす（PNG） | F |
+| 3 分デモ動画（YouTube 公開） | 6 画面＋教員画面＋実機の振り子 | F |
+| テストアカウント＋サンプルデータ | 学級コード＋番号、サンプル学級（生徒 5〜6 人分の記録） | E |
+| OSS ライセンス情報の明記 | LICENSE + README の依存一覧 | F |
+| （任意）Zenn 記事（カテゴリ Idea） | 時間があれば | F |
+
+> ⚠️ `context/03-rules-requirements.md` には「公開リポジトリ」「タグ URL を提出」とあるが、**公式スキルの `submission.md` では「公開/非公開を問わない」「審査はデフォルトブランチ」**。公式スキルの方が新しいので、提出直前に LP で再確認する。
+
+---
+
+## 3. 全体フロー（フェーズの依存関係）
+
+```mermaid
+flowchart TD
+  A[A. 足場<br/>エントリー確認・GCP・リポジトリ<br/>〜9/11] --> B
+  A --> B0
+  B0[B0. 設計ドキュメント<br/>実験カタログ / Policy / Verifier / 記録スキーマ<br/>〜9/13]
+  B[B. 技術スパイク（Go/No-Go）<br/>iOS DeviceMotion 許可・周期算出・ADK on Cloud Run<br/>〜9/14]
+  B -->|Go| C
+  B -->|No-Go| B2[縮退: マイク/カメラ実験へ寄せる<br/>or 加速度は Android 限定]
+  B2 --> C
+  B0 --> C
+  C[C. コアループ<br/>予想→Planner→許可→測定→Verifier→判定→次の予測<br/>Cloud Run に常時デプロイ<br/>〜9/24] --> D
+  D[D. 統制層<br/>Policy 却下・Model Armor・Trace・署名・停止・上限<br/>教員画面<br/>〜10/1] --> E
+  E[E. 審査対応<br/>テスト学級・サンプルデータ・実機 3 機種検証・費用確認<br/>〜10/6] --> F
+  F[F. 提出物<br/>アーキ図・デモ動画・説明文・README・Zenn<br/>〜10/13] --> G
+  G[G. 提出<br/>公式スキルで提出前チェック→ダッシュボード提出<br/>10/14] --> H
+  H[H. 維持<br/>12/1 まで Cloud Run とデフォルトブランチを凍結<br/>10/28 ファイナリスト発表]
+```
+
+**クリティカルパス**: A → B（スパイク） → C（コアループ） → D（統制層） → F（動画）。
+B で iOS の DeviceMotion が動かないと実験カタログの前提が崩れるので、**B が最初の 1 週間の全て**。
+
+---
+
+## 4. フェーズ別 TODO
+
+### A. 足場（〜9/11）
+
+```mermaid
+flowchart LR
+  A1[エントリー済みか確認<br/>ダッシュボードで参加者情報フォーム完了？] --> A2[GCP プロジェクト作成<br/>個人 Google アカウント]
+  A2 --> A3[クーポン $300 有効化<br/>期限 10/20・再発行なし]
+  A3 --> A4[予算アラート設定<br/>$50 / $150 / $250]
+  A2 --> A5[API 有効化<br/>Cloud Run / Gemini Enterprise Agent Platform / Firestore / Cloud Trace / Model Armor / KMS]
+  A1 --> A6[GitHub リポジトリ作成<br/>ダッシュボードから GitHub App で連携]
+  A6 --> A7[ダッシュボードでプロジェクト作成<br/>名前: PhoneLab]
+  A5 --> A8[Hello Cloud Run<br/>空の FastAPI を deploy して HTTPS URL を得る]
+```
+
+- [x] A1 エントリー・参加者情報フォームが完了（9/9 本人確認）
+- [x] A2 GCP プロジェクト **`phonelab-2026`**（番号 1094091671194、個人アカウント、9/9 作成）。請求先 `ai_agent_hackathon_2026_08`（010A3E-54DA90-8A0880）に紐づけ済み
+- [x] A3 クレジット確認済み（9/9 コンソール）。`ai_agent_hackathon_2026_08` に **¥49,124（残り 100%）**、状態「利用可能」、`phonelab-2026` はこの請求先に紐づいているので消費される。**終了日 2026-10-19**（8/20 有効化から 2 ヶ月）。10/20〜12/1 の稼働は自己負担になるが、min-instances=0 なのでほぼ 0 円
+- [x] A4 予算アラート（請求アカウント通貨は JPY。45,000 円で 50% / 90% に通知。9/9）
+- [x] A5 API 有効化（run / cloudbuild / artifactregistry / aiplatform / firestore / cloudtrace / logging / monitoring / modelarmor / cloudkms / billingbudgets）。Firestore native を asia-northeast1 に作成済み。デフォルト compute SA に cloudbuild.builds.builder 等を付与（新規プロジェクトはこれが無いとソースデプロイが失敗する）
+- [x] A6 GitHub リポジトリ **nvidia9875/phonelab（private）** 作成（9/9）。このフォルダがそのままリポジトリ。**ダッシュボードの GitHub App 連携は未**
+- [ ] A7 ダッシュボードにプロジェクト作成（説明文は後で）＋ GitHub App でリポジトリ連携
+- [x] A8 Cloud Run `phonelab` を asia-northeast1 にデプロイ済み（9/9）。URL: **https://phonelab-1094091671194.asia-northeast1.run.app** 。ヘルスチェックは `/api/status`（`/healthz` は Google Front End が手前で 404 を返す）
+
+### B0. 設計ドキュメント（〜9/13、B と並行）
+
+コードを書く前に「Agent が持つのは仮説の候補、許可された実験、検査の基準、問い返し方だけ」を文書にする。これがそのまま Planner のプロンプトと Policy/Verifier の仕様になる。
+
+```mermaid
+flowchart LR
+  S1[docs/experiments.md<br/>実験カタログ JSON<br/>各実験: 変える/一定にする/センサー/秒数/部品/安全条件/許容誤差] --> S4
+  S2[docs/policy.md<br/>禁止動作一覧・学級許可・上限<br/>却下メッセージの型: 禁止動作名+無視した文+代替] --> S4
+  S3[docs/verifier.md<br/>欠測・飽和・二系統一致の閾値<br/>周期算出アルゴリズム] --> S4
+  S4[docs/record-schema.md<br/>一本の記録の JSON と署名対象<br/>Trace のスパン設計]
+  S5[docs/idea-sheet.md<br/>公式テンプレで書く<br/>→ ダッシュボード説明文の下書き]
+```
+
+- [x] S1 実験カタログ → `docs/experiments.md`（振り子 3 種が MVP、既定 10 ＋ 拡張 3、Planner に渡す形、端末能力での絞り込み）
+- [x] S2 Policy 仕様 → `docs/policy.md`（停止・禁止動作・最小集合・注入・漏えい・上限・予想ゲート、却下の出力、学級ポリシー、テスト表）
+- [x] S3 Verifier 仕様 → `docs/verifier.md`（自己相関で周期、加速度ノルム×2 とジャイロ符号付き軸の二系統、欠測 250 ms・飽和 4 g・不一致 0.05 s、判定テンプレート、テスト表）
+- [x] S4 記録スキーマ → `docs/record-schema.md`（イベント 12 種、JCS + Cloud KMS 署名、送信スキーマ、Cloud Trace スパン、Firestore 構成）
+- [x] S5 公式アイデアシート → `docs/idea-sheet.md`
+- [ ] （欠品）`idea/2026-09-09-phonelab-why-phone-and-ux.md`（出典台帳）が **存在しない**。`idea/WhyPhone.dc.html` が参照しているので、説明文で数字を使う前に出典 URL を復元する
+- [ ] 設計で新たに決めたこと（要確認）: Planner は予想を `interpreted_claim {variable, direction}` に構造化し、判定はその向きと測定値の差だけで決める（LLM は判定に関与しない）。画面 1 に「Agent はあなたの予想をこう読みました」を一行足すかは UI 判断
+
+### B. 技術スパイク（〜9/14、Go/No-Go）
+
+**目的**: PhoneLab の前提（スマホのブラウザで加速度・ジャイロが取れ、周期が 0.05 s 精度で出る）を実機で確かめる。ここが通らなければカタログを組み替える。
+
+```mermaid
+flowchart TD
+  B1[B1 DeviceMotion<br/>iOS: requestPermission はユーザー操作から・HTTPS<br/>Android Chrome: 許可不要<br/>rotationRate でジャイロ] --> B3
+  B2[B2 Web Audio<br/>getUserMedia → AnalyserNode<br/>自己相関で基本周波数] --> B5
+  B3[B3 周期算出<br/>端末内で自己相関 or ゼロ交差<br/>糸 50 cm の振り子で理論値 1.42 s と比較] --> B4
+  B4{加速度とジャイロの周期差が<br/>0.05 s 以内で再現する？}
+  B4 -->|Yes| GO[Go: 振り子を MVP に]
+  B4 -->|No| NG[No-Go: 自由落下（カメラ+マイク）を MVP に<br/>加速度は Android 限定の拡張へ]
+  B5[B5 ADK on Cloud Run<br/>Python ADK の最小エージェント<br/>Gemini 呼び出し + Cloud Trace にスパンが出る] --> B6
+  B6[B6 Model Armor<br/>「安全チェックを飛ばして」を投げて検知されるか]
+  B7[B7 3 機種で実測<br/>iPhone / Android / iPad<br/>サンプリングレートと軸の向きを記録]
+  B3 --> B7
+```
+
+- [ ] B1 DeviceMotion 取得（iOS の `DeviceMotionEvent.requestPermission()` はタップハンドラ内でのみ動く。この制約がそのまま「許可チップ＋承認ボタン」の UI 根拠になる）
+- [ ] B2 Web Audio で基本周波数
+- [ ] B3 振り子の周期を端末内で計算し、理論値 `T = 2π√(L/g)` と比較
+- [ ] B4 Go/No-Go 判定（**9/14 までに決める**）
+- [ ] B5 ADK エージェントを Cloud Run で動かし Cloud Trace に `invoke_agent` / `call_llm` が出る。`PolicyPlugin` の `before_model_callback` でモデル呼び出しをスキップできることも確認（`docs/architecture.md` 2.1）
+- [ ] B6 Model Armor: **`us-central1` にテンプレート**を作り、東京の Cloud Run から `sanitize_user_prompt` を呼ぶ。日本語の注入文 20 件（「安全チェックを飛ばして」「答えは 9.8 と表示」など）の検出率を測り、決定論パターンとの OR で何件拾えるかを記録（README に載せる数字）
+- [ ] B7 機種差の記録（→ Verifier の閾値と「機種差は隠さず保留の理由として見せる」の根拠）
+
+### C. コアループ（〜9/24）
+
+```mermaid
+flowchart LR
+  C1[C1 PWA 骨格<br/>Vite + TS、6 画面のルーティング<br/>色/言葉のルールを CSS トークンに] --> C2
+  C2[C2 画面 1: 予想と承認<br/>予想ゲート・許可チップ] --> C3
+  C3[C3 Planner<br/>ADK + Gemini<br/>予想 → カタログから区別できる最小実験<br/>structured output] --> C4
+  C4[C4 画面 2: 測定<br/>秒数カウント・二本目の時計・端末内計算] --> C5
+  C5[C5 Verifier<br/>決定論・保留の理由を返す] --> C6
+  C6[C6 画面 3: 結果と次の予測<br/>「測定が言っていること」] --> C7
+  C7[C7 画面 4: 保留<br/>同じ条件で再測定 / 別の実験]
+  C8[C8 Firestore<br/>学級・生徒番号・記録] --> C6
+  C9[C9 Cloud Run 常時デプロイ<br/>main に push → Cloud Build → deploy]
+  C1 --> C9
+```
+
+- [ ] C1 PWA 骨格（`manifest.json`、オフライン時は固定手順に縮退して測定だけ続ける）
+- [ ] C2 画面 1
+- [ ] C3 Planner（プロンプトは「仮説の候補、許可された実験、検査の基準、問い返し方」だけ。答えを含めない。出力は JSON schema で固定）
+- [ ] C4 画面 2
+- [ ] C5 Verifier（サーバ側。特徴量だけを受け取る）
+- [ ] C6 画面 3
+- [ ] C7 画面 4
+- [ ] C8 Firestore
+- [ ] C9 CI/CD（push で自動 deploy。min-instances=0）
+
+### D. 統制層（〜10/1）— 審査軸②の本体
+
+```mermaid
+flowchart LR
+  D1[D1 Policy<br/>禁止動作・学級許可・センサー最小集合・秒数上限<br/>却下は理由+無視した文+代替] --> D2
+  D2[D2 画面 5: Policy 却下<br/>メモ貼り付け→却下→代替実験] --> D6
+  D3[D3 Model Armor<br/>生徒テキストを Planner の前で検査] --> D1
+  D4[D4 Trace<br/>ADK トレース→Cloud Trace<br/>1 実験 = 1 トレース、各段階 = スパン] --> D5
+  D5[D5 署名<br/>検査を通った記録だけ Cloud KMS で署名<br/>画面 6: 署名付き実験記録・QR] --> D6
+  D6[D6 教員画面<br/>学級の許可トグル・上限・全端末停止・トレース閲覧]
+  D7[D7 停止と上限<br/>生徒: 測定をやめる / 教師: 全端末停止<br/>ヒント 3 回/実験・測定 30 秒・Planner 呼び出し上限] --> D6
+  D8[D8 ヒント漏えい検知<br/>Planner 出力に答えの数値/結論が含まれたら失敗として数える] --> D6
+  D9[D9 ClassAgent<br/>get_class_snapshot / get_student_trace / propose_action<br/>before_tool_callback で提案の種類と件数を制限] --> D10
+  D10[D10 提案の承認 UI<br/>教員画面に pending 提案を並べ、承認で学級ポリシーに反映] --> D6
+  D4 --> D9
+```
+
+- [ ] D1 Policy（決定論。テストを先に書く: `drop_phone` を含む要望は必ず却下）
+- [ ] D2 画面 5
+- [ ] D3 Model Armor（B6 の結果次第）
+- [ ] D4 Trace
+- [ ] D5 署名＋画面 6（PDF 書き出しは時間があれば）
+- [ ] D6 教員画面（`/teacher`、学級コードで入る）
+- [ ] D7 停止と上限（全端末停止は `GET /api/class/{code}/status` を測定中 2 秒ごとにポーリング。`halt_latency_ms` を Trace に）
+- [ ] D8 答えの漏えい検知（教員画面「0 件 答えの漏えい」の裏側。`after_model_callback`）
+- [ ] D9 ClassAgent（`docs/architecture.md` 2.3。時間が無ければ「要約だけ・提案なし」に縮退）
+- [ ] D10 提案の承認 UI（`classes/{code}/proposals`。承認したときだけサーバが学級ポリシーを書く）
+
+### E. 審査対応（〜10/6）
+
+- [ ] E1 テスト学級 `DEMO-2026` と生徒番号 S-01〜S-06 のサンプル記録（保留・却下・署名済みを各 1 件以上含める）
+- [ ] E2 「動作確認の方法」の文章（学級コード、番号、教員画面の入り方、審査員が自分のスマホで振り子を測る手順）
+- [ ] E3 実機 3 機種で 6 画面を通す（iOS Safari / Android Chrome / iPad）
+- [ ] E4 費用確認: 1 実験あたりの Gemini 呼び出し回数とコスト、Cloud Run のアイドル課金ゼロを数字で
+- [ ] E5 負荷: 31 端末同時（教員画面の想定値）で Cloud Run が耐えるか軽く確認
+- [ ] E6 公式スキルで「この構成でレギュレーションを満たす？」を実行
+
+### F. 提出物（〜10/13）
+
+```mermaid
+flowchart LR
+  F1[F1 アーキ図 PNG<br/>スマホ/Cloud/教員の 3 領域<br/>Planner/Policy/Verifier/Trace を明示] --> F5
+  F2[F2 デモ動画 3 分<br/>0:00 課題 20 秒 → 6 画面を順に → 教員画面 → 費用/拡張 10 秒] --> F5
+  F3[F3 説明文<br/>冒頭 3 行で「スマホが実験器具、AI は答えを言わない」<br/>ユーザー像・課題・ソリューション・特徴] --> F5
+  F4[F4 README<br/>今回開発した範囲・構成・OSS ライセンス一覧・動作確認の方法] --> F5
+  F5[F5 公式スキルで提出前チェック] --> F6[F6 Zenn 記事（任意、Idea カテゴリ）]
+```
+
+- [ ] F1 アーキ図
+- [ ] F2 デモ動画の絵コンテ → 撮影（実機の振り子を机で撮る） → 編集 → YouTube 公開
+- [ ] F3 説明文（S5 のアイデアシートから）
+- [ ] F4 README（LICENSE を置く。OSS ライセンス情報の明記は規約要件）
+- [ ] F5 提出前チェック（`.claude/skills/gc-hackathon-vol5/references/checklist.md`）
+- [ ] F6 Zenn 記事
+
+### G. 提出（10/14）
+
+- [ ] ダッシュボード「提出」タブから提出（締切当日のフォーム混雑を避けて前日）
+- [ ] 提出後は記事・リポジトリ・動画を修正しない
+
+### H. 維持（〜12/1）
+
+- [ ] デフォルトブランチを凍結。続きは `dev` ブランチ
+- [ ] Cloud Run を止めない（min-instances=0 なので放置でほぼ無料）
+- [ ] 10/28 ファイナリスト発表を確認
+- [ ] クレジットは **10/19 で失効**（8/20 有効化）。10/20 以降は自己負担。Cloud Run min-instances=0、Firestore 無料枠、Trace 無料枠なので月数十円の見込み。10/19 に請求画面で残高と当月費用を確認する
+
+---
+
+## 5. 週カレンダー
+
+| 週 | 期間 | フェーズ | 週末に出来ているもの |
+|---|---|---|---|
+| W1 | 9/9–9/14 | A, B0, B | Cloud Run が HTTPS で動く。実機で振り子の周期が出る。**Go/No-Go 判定済み** |
+| W2 | 9/15–9/21 | C | 画面 1〜3 が Cloud Run 上で通しで動く（Planner が実験を選び、測って、判定する） |
+| W3 | 9/22–9/28 | C 仕上げ, D 前半 | 保留（画面 4）、Policy 却下（画面 5）、Trace |
+| W4 | 9/29–10/5 | D 後半, E | 署名（画面 6）、教員画面、停止、ClassAgent と提案 UI、テスト学級、3 機種検証。**9/29 オフィスアワーで質問** |
+| W5 | 10/6–10/13 | F | アーキ図、動画、説明文、README、提出前チェック |
+| — | 10/14 | G | **提出** |
+
+---
+
+## 6. リスクと逃げ道
+
+| リスク | 兆候 | 逃げ道 |
+|---|---|---|
+| iOS で DeviceMotion の許可が通らない / レートが低い | B1 で失敗 | 自由落下（カメラ＋マイク）を MVP に。加速度は Android 拡張 |
+| 加速度とジャイロの周期が一致しない機種がある | B7 で差 > 0.05 s | Verifier の閾値を機種別にせず「保留」で見せる（設計どおり） |
+| Model Armor が日本語の注入文を拾わない | B6 の検出率が低い | 三層のうち第 2 層（決定論パターン）と第 3 層（構造化出力）で守られている。検出率は隠さず README に数字で書く |
+| ClassAgent まで手が回らない | W4 中盤で D9 未着手 | 「要約だけ」に縮退（ツールなし、提案なし）。統制の説明は StudentAgent 側の Plugin だけでも成立する |
+| Planner が答えを漏らす | D8 で検知 | プロンプトに答えを持たせない構造（カタログに「現実」欄を渡さない） |
+| 時間切れ | W3 末で画面 4 まで無い | 画面 6（署名）と教員画面のトレース閲覧を優先し、PDF 書き出し・拡張実験・Zenn 記事を捨てる |
+| 費用超過 | 予算アラート | Gemini は Flash 系、Planner 呼び出しは 1 実験 1 回 |
+
+---
+
+## 7. 未確認・要確認（人が決めること）
+
+- [x] エントリー済み、クーポン受領済み（9/9 確認）
+- [x] クレジットは載っている（¥49,124、10/19 まで）。**開発中の Gemini 呼び出しは 10/19 までに使い切る前提で計画**する
+- [ ] 個人参加で行くか（チームなら 10/15 までにメンバー全員のエントリーが要る）
+- [ ] 出典台帳 `idea/2026-09-09-phonelab-why-phone-and-ux.md` がどこかにあるか（無ければ再作成）
+- [ ] 実機: iPhone / Android / iPad の 3 機種が手元にあるか（B7 と E3 に必要）
+- [ ] 公式スキルとの差分（リポジトリ公開/非公開、タグ vs デフォルトブランチ）を LP で再確認
+
+---
+
+## 8. ファイル構成（現在と予定）
+
+```
+/Users/shun/Desktop/phonelab/
+├── flow.md                      ← このファイル（トップ）
+├── .claude/skills/              ← 公式スキル（導入済み）
+│   ├── gc-hackathon-vol5/
+│   └── gc-hackathon-vol5-ideation/
+├── context/                     ← 公式ルールの整理（8/20 取得）
+│   ├── README.md                   サマリと見落としポイント
+│   ├── 02-schedule.md              逆算マイルストーン
+│   ├── 03-rules-requirements.md    必須要件・提出物・審査基準
+│   ├── 09-submission-checklist.md  フェーズ別チェックリスト
+│   └── 10-idea-analysis.md         没案の分析（軸②の実装要素表は流用）
+├── app/                         ← 実装（Cloud Run にデプロイするもの）
+│   ├── server/                     FastAPI + ADK
+│   ├── pyproject.toml / uv.lock
+│   └── Dockerfile
+├── idea/                        ← アイデアシート（決定版）
+│   ├── phonelab-idea-sheet.pdf     11 ページ（一枚もの・6 画面・教員・8 つの型・根拠・対案 B）
+│   ├── *.dc.html                   各アートボードのソース
+│   └── canvas.json
+└── docs/                        ← B0 設計ドキュメント（作成済み 9/9）
+    ├── README.md                   読む順と実装対応表
+    ├── architecture.md             ADK の構造・信頼境界・Model Armor のリージョン・費用（一次情報の URL つき）
+    ├── idea-sheet.md               公式テンプレ版（説明文の下書き）
+    ├── experiments.md              実験カタログ
+    ├── policy.md                   統制層の検査ルール
+    ├── verifier.md                 端末内計算と検査・判定
+    └── record-schema.md            記録・署名・Trace・Firestore
+```
+
+このフォルダがそのまま提出リポジトリ（GitHub `nvidia9875/phonelab`、private）。コードは `app/`、企画は `docs/` `idea/` `context/`。README は提出時に「どこを開発したか」の構成説明として書く。

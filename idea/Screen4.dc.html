@@ -1,0 +1,66 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700;900&amp;family=BIZ+UDPGothic:wght@400;700&amp;display=swap" rel="stylesheet">
+  <style>
+    body { margin: 0; background: #F7F3EA; color: #1E2A3A; font-family: "BIZ UDPGothic", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif; }
+    a { color: #B85C2A; } a:hover { color: #8F4620; }
+    h1, h2, h3 { font-family: "Zen Maru Gothic", "Hiragino Maru Gothic ProN", "Hiragino Sans", sans-serif; margin: 0; }
+    p { margin: 0; }
+    svg { display: block; }
+  </style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; background: #F7F3EA; padding: 60px 20px 24px 20px; display: flex; flex-direction: column; gap: 16px;">
+  <div style="display: flex; flex-direction: row; align-items: center; justify-content: space-between;">
+    <h1 style="font-size: 22px; font-weight: 900;">PhoneLab</h1>
+    <span style="font-size: 12px; font-weight: 700; padding: 6px 10px; border-radius: 999px; background: #1E2A3A; color: #F7F3EA;">検査：保留</span>
+  </div>
+
+  <div style="display: flex; flex-direction: column; gap: 8px; background: #1E2A3A; color: #F7F3EA; border-radius: 16px; padding: 18px;">
+    <p style="font-size: 12px; font-weight: 700; color: #B8C0CA;">機械の検査</p>
+    <h2 style="font-size: 24px; font-weight: 700; line-height: 1.3; color: #F7F3EA;">このデータでは、結論を出しません</h2>
+    <p style="font-size: 13px; line-height: 1.6; color: #B8C0CA;">あなたの予想が正しいか間違いかは、まだ決まっていません。データの方が信用できないからです。</p>
+  </div>
+
+  <div style="display: flex; flex-direction: column; gap: 10px; background: #FFFDF8; border: 2px solid #1E2A3A; border-radius: 14px; padding: 14px;">
+    <p style="font-size: 12px; font-weight: 700; color: #5B6572;">見つかった問題</p>
+    <div style="display: flex; flex-direction: row; align-items: flex-start; gap: 10px;">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1E2A3A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0; margin-top: 1px;"><path d="M12 3l10 18H2z"></path><path d="M12 10v5"></path><path d="M12 18v.5"></path></svg>
+      <p style="font-size: 14px; line-height: 1.5;"><span style="font-weight: 700;">0.5 秒の欠測</span>　8 秒目あたりで加速度が途切れました。画面を切り替えたか、通知が出た可能性があります</p>
+    </div>
+    <svg width="100%" height="56" viewBox="0 0 320 56" fill="none" stroke="#1FA39F" stroke-width="2" stroke-linecap="round">
+      <path d="M2 28 C 10 8, 18 8, 26 28 S 42 48, 50 28 S 66 8, 74 28 S 90 48, 98 28 S 114 8, 122 28"></path>
+      <rect x="126" y="6" width="46" height="44" rx="6" fill="#EEE7D8" stroke="#1E2A3A" stroke-dasharray="4 3" stroke-width="1.5"></rect>
+      <path d="M176 28 C 184 8, 192 8, 200 28 S 216 48, 224 28 S 240 8, 248 28 S 264 48, 272 28 S 288 8, 296 28 S 312 44, 318 34"></path>
+      <text x="149" y="32" text-anchor="middle" font-family="BIZ UDPGothic, sans-serif" font-size="11" font-weight="700" fill="#1E2A3A" stroke="none">欠測</text>
+    </svg>
+    <div style="display: flex; flex-direction: row; align-items: center; gap: 8px;">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1FA39F" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l4 4 10-10"></path></svg>
+      <p style="font-size: 13px;">飽和なし</p>
+    </div>
+    <div style="display: flex; flex-direction: row; align-items: center; gap: 8px;">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1FA39F" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l4 4 10-10"></path></svg>
+      <p style="font-size: 13px;">ジャイロは連続。加速度だけが欠けている</p>
+    </div>
+  </div>
+
+  <div style="display: flex; flex-direction: column; gap: 8px; background: #FFFDF8; border: 2px solid #D9D2C3; border-radius: 14px; padding: 14px;">
+    <p style="font-size: 12px; font-weight: 700; color: #5B6572;">Agent の提案</p>
+    <p style="font-size: 14px; line-height: 1.6;">画面を開いたまま、同じ条件でもう一度 20 秒。今度は加速度とジャイロの両方が揃うはずです。二回目も欠けたら、この端末では加速度を使わず、ジャイロ 2 回の一致で判定に切り替えます。</p>
+  </div>
+
+  <div style="display: flex; flex-direction: column; gap: 10px; margin-top: auto;">
+    <div style="height: 52px; border-radius: 14px; background: #1E2A3A; color: #F7F3EA; display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: 700;">同じ条件で再測定する</div>
+    <div style="height: 48px; border-radius: 14px; border: 2px solid #1E2A3A; display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 700;">別の実験にする</div>
+    <p style="font-size: 12px; color: #5B6572; text-align: center;">保留は失敗ではありません。データを信じない、という判断です。</p>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

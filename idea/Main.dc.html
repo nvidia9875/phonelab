@@ -1,0 +1,359 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700;900&amp;family=BIZ+UDPGothic:wght@400;700&amp;display=swap" rel="stylesheet">
+  <style>
+    body { margin: 0; background: #F7F3EA; color: #1E2A3A; font-family: "BIZ UDPGothic", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif; }
+    a { color: #B85C2A; } a:hover { color: #8F4620; }
+    h1, h2, h3 { font-family: "Zen Maru Gothic", "Hiragino Maru Gothic ProN", "Hiragino Sans", sans-serif; margin: 0; }
+    p { margin: 0; }
+    svg { display: block; }
+  </style>
+</helmet>
+<div style="width: 1200px; min-height: 2560px; box-sizing: border-box; background: #F7F3EA; padding: 56px 64px 64px 64px; display: flex; flex-direction: column; gap: 44px;">
+
+  <!-- Header -->
+  <div style="display: flex; flex-direction: row; gap: 40px; align-items: flex-start;">
+    <div style="display: flex; flex-direction: column; gap: 14px; flex-grow: 1;">
+      <p style="font-size: 13px; letter-spacing: 0.12em; color: #5B6572; font-weight: 700;">第5回 Agentic AI Hackathon with Google Cloud ／ 提案</p>
+      <h1 style="font-size: 76px; line-height: 1; font-weight: 900; letter-spacing: -0.01em; color: #1E2A3A;">PhoneLab</h1>
+      <h2 style="font-size: 30px; line-height: 1.3; font-weight: 700; color: #1E2A3A;">スマホが実験器具。<span style="color: #E27A3F;">AIは答えを言わない。</span></h2>
+      <p style="font-size: 17px; line-height: 1.75; color: #3A4552; max-width: 640px; text-wrap: pretty;">「重い振り子ほど速く振れる」と予想したら、Agent がその予想を壊せる実験を選び、あなたのスマホのセンサーが正誤を決める。器具は買わない。答えは最後まで出ない。</p>
+      <div style="display: flex; flex-direction: row; gap: 8px; flex-wrap: wrap;">
+        <span style="font-size: 13px; font-weight: 700; padding: 6px 12px; border-radius: 999px; background: #1E2A3A; color: #F7F3EA;">中高生</span>
+        <span style="font-size: 13px; font-weight: 700; padding: 6px 12px; border-radius: 999px; background: #1E2A3A; color: #F7F3EA;">理科・探究</span>
+        <span style="font-size: 13px; font-weight: 700; padding: 6px 12px; border-radius: 999px; border: 2px solid #1E2A3A; color: #1E2A3A;">実機調達ゼロ</span>
+        <span style="font-size: 13px; font-weight: 700; padding: 6px 12px; border-radius: 999px; border: 2px solid #1E2A3A; color: #1E2A3A;">Webだけで動く</span>
+      </div>
+    </div>
+    <!-- Hero illustration: phone as pendulum -->
+    <div style="width: 300px; flex-shrink: 0;">
+      <svg width="300" height="260" viewBox="0 0 300 260" fill="none" stroke="#1E2A3A" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="40" y1="26" x2="260" y2="26"></line>
+        <circle cx="150" cy="26" r="5" fill="#1E2A3A"></circle>
+        <path d="M 62 150 A 100 100 0 0 0 238 150" stroke="#1FA39F" stroke-dasharray="6 7" stroke-width="2"></path>
+        <line x1="150" y1="26" x2="196" y2="132"></line>
+        <g transform="rotate(23 196 132)">
+          <rect x="178" y="132" width="36" height="66" rx="7" fill="#FFFDF8"></rect>
+          <line x1="190" y1="140" x2="202" y2="140"></line>
+          <rect x="184" y="148" width="24" height="40" rx="2" fill="#1FA39F" fill-opacity="0.18" stroke="none"></rect>
+        </g>
+        <path d="M 96 62 Q 124 50 150 60" stroke="#E27A3F" stroke-width="2"></path>
+        <path d="M 150 60 L 140 54 M 150 60 L 142 66" stroke="#E27A3F" stroke-width="2"></path>
+        <rect x="46" y="216" width="112" height="40" rx="8" fill="#FFFDF8"></rect>
+        <text x="102" y="242" text-anchor="middle" font-family="Zen Maru Gothic, Hiragino Maru Gothic ProN, sans-serif" font-size="18" font-weight="700" fill="#1E2A3A" stroke="none">T = 1.42 s</text>
+      </svg>
+    </div>
+  </div>
+
+  <!-- Section 1: what you can do -->
+  <div style="display: flex; flex-direction: column; gap: 20px;">
+    <div style="display: flex; flex-direction: row; align-items: baseline; gap: 16px;">
+      <h2 style="font-size: 26px; font-weight: 900;">これでできること</h2>
+      <p style="font-size: 14px; color: #5B6572;">生徒の「思い込み」を、スマホの測定で壊す。既定で使える10実験と、教師が有効化する拡張3つのうち代表3つ。</p>
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px;">
+
+      <!-- Card 1: pendulum -->
+      <div style="display: flex; flex-direction: column; gap: 14px; background: #FFFDF8; border: 2px solid #1E2A3A; border-radius: 18px; padding: 22px;">
+        <svg width="100%" height="150" viewBox="0 0 300 150" fill="none" stroke="#1E2A3A" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="40" y1="16" x2="260" y2="16"></line>
+          <circle cx="110" cy="16" r="4" fill="#1E2A3A"></circle>
+          <circle cx="200" cy="16" r="4" fill="#1E2A3A"></circle>
+          <line x1="110" y1="16" x2="110" y2="86"></line>
+          <line x1="200" y1="16" x2="200" y2="86"></line>
+          <rect x="97" y="86" width="26" height="46" rx="5" fill="#FFFDF8"></rect>
+          <rect x="187" y="86" width="26" height="46" rx="5" fill="#FFFDF8"></rect>
+          <rect x="182" y="100" width="36" height="26" rx="4" fill="#E27A3F" fill-opacity="0.25" stroke="#E27A3F"></rect>
+          <path d="M 74 108 A 48 48 0 0 0 146 108" stroke="#1FA39F" stroke-dasharray="5 6" stroke-width="2"></path>
+          <path d="M 164 108 A 48 48 0 0 0 236 108" stroke="#1FA39F" stroke-dasharray="5 6" stroke-width="2"></path>
+          <text x="110" y="146" text-anchor="middle" font-family="BIZ UDPGothic, sans-serif" font-size="12" fill="#5B6572" stroke="none">重さ 1倍</text>
+          <text x="200" y="146" text-anchor="middle" font-family="BIZ UDPGothic, sans-serif" font-size="12" fill="#5B6572" stroke="none">重さ 2倍</text>
+        </svg>
+        <h3 style="font-size: 20px; font-weight: 700;">振り子の周期</h3>
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <p style="font-size: 14px; line-height: 1.6;"><span style="font-weight: 700; color: #E27A3F;">予想</span>　重いほど速く振れる</p>
+          <p style="font-size: 14px; line-height: 1.6;"><span style="font-weight: 700; color: #1FA39F;">現実</span>　加速度とジャイロが同じ周期を返す。重さを変えても周期は変わらない</p>
+        </div>
+        <p style="font-size: 12px; color: #5B6572; border-top: 1px solid #D9D2C3; padding-top: 10px;">用意するもの：糸、袋、消しゴム</p>
+      </div>
+
+      <!-- Card 2: free fall -->
+      <div style="display: flex; flex-direction: column; gap: 14px; background: #FFFDF8; border: 2px solid #1E2A3A; border-radius: 18px; padding: 22px;">
+        <svg width="100%" height="150" viewBox="0 0 300 150" fill="none" stroke="#1E2A3A" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <g transform="rotate(-10 70 90)">
+            <rect x="54" y="52" width="34" height="64" rx="6" fill="#FFFDF8"></rect>
+            <circle cx="71" cy="62" r="4" fill="#1E2A3A"></circle>
+          </g>
+          <line x1="60" y1="130" x2="82" y2="130"></line>
+          <line x1="71" y1="118" x2="71" y2="130"></line>
+          <line x1="190" y1="28" x2="190" y2="112" stroke="#D9D2C3" stroke-dasharray="4 5" stroke-width="2"></line>
+          <text x="198" y="74" font-family="BIZ UDPGothic, sans-serif" font-size="12" fill="#5B6572" stroke="none">1 m</text>
+          <circle cx="160" cy="44" r="10" fill="#E27A3F" fill-opacity="0.3" stroke="#E27A3F"></circle>
+          <rect x="216" y="36" width="22" height="16" rx="3" fill="#FFFDF8"></rect>
+          <line x1="160" y1="62" x2="160" y2="76"></line>
+          <line x1="152" y1="66" x2="152" y2="76"></line>
+          <line x1="168" y1="66" x2="168" y2="76"></line>
+          <line x1="227" y1="60" x2="227" y2="74"></line>
+          <line x1="219" y1="64" x2="219" y2="74"></line>
+          <line x1="235" y1="64" x2="235" y2="74"></line>
+          <rect x="140" y="112" width="110" height="18" rx="9" fill="#D9D2C3" stroke="none"></rect>
+          <path d="M 128 104 Q 118 96 108 104" stroke="#1FA39F" stroke-width="2"></path>
+          <path d="M 122 92 Q 108 80 94 92" stroke="#1FA39F" stroke-width="2"></path>
+          <text x="196" y="146" text-anchor="middle" font-family="BIZ UDPGothic, sans-serif" font-size="12" fill="#5B6572" stroke="none">コマ と 着地音、二つの時計</text>
+        </svg>
+        <h3 style="font-size: 20px; font-weight: 700;">自由落下 ― 撮って、聞く</h3>
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <p style="font-size: 14px; line-height: 1.6;"><span style="font-weight: 700; color: #E27A3F;">予想</span>　重いものほど速く落ちる</p>
+          <p style="font-size: 14px; line-height: 1.6;"><span style="font-weight: 700; color: #1FA39F;">現実</span>　コインと消しゴムを同時に落とすと、着地のコマも音も同じ瞬間を指す。スマホは落とさず、撮って聞く</p>
+        </div>
+        <p style="font-size: 12px; color: #5B6572; border-top: 1px solid #D9D2C3; padding-top: 10px;">用意するもの：コイン、消しゴム、クッション</p>
+      </div>
+
+      <!-- Card 3: bottle resonance -->
+      <div style="display: flex; flex-direction: column; gap: 14px; background: #FFFDF8; border: 2px solid #1E2A3A; border-radius: 18px; padding: 22px;">
+        <svg width="100%" height="150" viewBox="0 0 300 150" fill="none" stroke="#1E2A3A" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M 96 20 h 22 v 14 q 22 10 22 34 v 54 q 0 10 -10 10 h -46 q -10 0 -10 -10 v -54 q 0 -24 22 -34 z" fill="#FFFDF8"></path>
+          <path d="M 76 92 h 60 v 30 q 0 10 -10 10 h -40 q -10 0 -10 -10 z" fill="#1FA39F" fill-opacity="0.28" stroke="none"></path>
+          <line x1="76" y1="92" x2="136" y2="92" stroke="#1FA39F" stroke-width="2"></line>
+          <path d="M 122 18 q 8 -8 16 0" stroke="#E27A3F" stroke-width="2"></path>
+          <path d="M 130 12 q 12 -10 24 0" stroke="#E27A3F" stroke-width="2"></path>
+          <rect x="196" y="40" width="40" height="76" rx="7" fill="#FFFDF8"></rect>
+          <circle cx="216" cy="106" r="3" fill="#1E2A3A"></circle>
+          <path d="M 176 70 q -8 8 0 16" stroke="#1FA39F" stroke-width="2"></path>
+          <path d="M 166 62 q -14 16 0 32" stroke="#1FA39F" stroke-width="2"></path>
+          <text x="216" y="140" text-anchor="middle" font-family="BIZ UDPGothic, sans-serif" font-size="12" fill="#5B6572" stroke="none">マイクで基本周波数</text>
+        </svg>
+        <h3 style="font-size: 20px; font-weight: 700;">ペットボトルの音（口に息を吹く）</h3>
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <p style="font-size: 14px; line-height: 1.6;"><span style="font-weight: 700; color: #E27A3F;">予想</span>　水が多いほど低い音になる</p>
+          <p style="font-size: 14px; line-height: 1.6;"><span style="font-weight: 700; color: #1FA39F;">現実</span>　空気の柱が短くなるので、水が増えると音は高くなる</p>
+        </div>
+        <p style="font-size: 12px; color: #5B6572; border-top: 1px solid #D9D2C3; padding-top: 10px;">用意するもの：ペットボトル、水、自分の息</p>
+      </div>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 6px;">
+      <p style="font-size: 13px; color: #5B6572;">ほかに：うなり／反響で音の速さ／コインの滑り出し角／ジャンプの滞空時間／振り子の振れ幅と長さ　など。エレベーター、回転の減衰、カメラ脈拍は教師が有効化する拡張。</p>
+      <p style="font-size: 13px; color: #5B6572;">ストップウォッチで測れる実験もある。違いは、二つのセンサーを機械が突き合わせて怪しいデータを止めることと、予想を区別できる実験を Agent が選ぶこと。自由落下の 0.45 秒や音の高さは、そもそも手では測れない。</p>
+    </div>
+  </div>
+
+  <!-- Section 2: the loop -->
+  <div style="display: flex; flex-direction: column; gap: 20px; background: #1E2A3A; color: #F7F3EA; border-radius: 22px; padding: 30px 32px;">
+    <div style="display: flex; flex-direction: row; align-items: baseline; gap: 16px;">
+      <h2 style="font-size: 24px; font-weight: 900; color: #F7F3EA;">生徒が回すループ</h2>
+      <p style="font-size: 14px; color: #B8C0CA;">AI は実験助手。判断と解釈は、いつも生徒。</p>
+    </div>
+    <div style="display: flex; flex-direction: row; align-items: flex-start; gap: 6px;">
+
+      <div style="display: flex; flex-direction: column; align-items: center; gap: 10px; flex-grow: 1; flex-basis: 0;">
+        <div style="width: 56px; height: 56px; border-radius: 50%; background: #E27A3F; display: flex; align-items: center; justify-content: center;">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#1E2A3A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4l10-10-4-4L4 16z"></path><path d="M13 7l4 4"></path></svg>
+        </div>
+        <p style="font-size: 14px; font-weight: 700; text-align: center;">予想を書く</p>
+        <p style="font-size: 12px; color: #B8C0CA; text-align: center; line-height: 1.5;">自分の言葉で、理由も</p>
+      </div>
+      <svg width="20" height="56" viewBox="0 0 20 56" fill="none" stroke="#B8C0CA" stroke-width="2" stroke-linecap="round"><path d="M3 28h12M11 23l5 5-5 5"></path></svg>
+
+      <div style="display: flex; flex-direction: column; align-items: center; gap: 10px; flex-grow: 1; flex-basis: 0;">
+        <div style="width: 56px; height: 56px; border-radius: 50%; background: #F7F3EA; display: flex; align-items: center; justify-content: center;">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#1E2A3A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"></circle><path d="M12 4v4M12 16v4M4 12h4M16 12h4"></path></svg>
+        </div>
+        <p style="font-size: 14px; font-weight: 700; text-align: center;">Agent が実験を選ぶ</p>
+        <p style="font-size: 12px; color: #B8C0CA; text-align: center; line-height: 1.5;">予想を区別できる、最小の実験</p>
+      </div>
+      <svg width="20" height="56" viewBox="0 0 20 56" fill="none" stroke="#B8C0CA" stroke-width="2" stroke-linecap="round"><path d="M3 28h12M11 23l5 5-5 5"></path></svg>
+
+      <div style="display: flex; flex-direction: column; align-items: center; gap: 10px; flex-grow: 1; flex-basis: 0;">
+        <div style="width: 56px; height: 56px; border-radius: 50%; background: #F7F3EA; display: flex; align-items: center; justify-content: center;">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#1E2A3A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"></rect><path d="M8 11V8a4 4 0 018 0v3"></path><path d="M12 15v3"></path></svg>
+        </div>
+        <p style="font-size: 14px; font-weight: 700; text-align: center;">許可して承認</p>
+        <p style="font-size: 12px; color: #B8C0CA; text-align: center; line-height: 1.5;">どのセンサーを何秒、を見て一回タップ</p>
+      </div>
+      <svg width="20" height="56" viewBox="0 0 20 56" fill="none" stroke="#B8C0CA" stroke-width="2" stroke-linecap="round"><path d="M3 28h12M11 23l5 5-5 5"></path></svg>
+
+      <div style="display: flex; flex-direction: column; align-items: center; gap: 10px; flex-grow: 1; flex-basis: 0;">
+        <div style="width: 56px; height: 56px; border-radius: 50%; background: #1FA39F; display: flex; align-items: center; justify-content: center;">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#1E2A3A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="3" width="10" height="18" rx="2"></rect><path d="M2 12q3-4 6 0t6 0t6 0"></path></svg>
+        </div>
+        <p style="font-size: 14px; font-weight: 700; text-align: center;">スマホで測る</p>
+        <p style="font-size: 12px; color: #B8C0CA; text-align: center; line-height: 1.5;">計算は端末の中。送るのは数値だけ</p>
+      </div>
+      <svg width="20" height="56" viewBox="0 0 20 56" fill="none" stroke="#B8C0CA" stroke-width="2" stroke-linecap="round"><path d="M3 28h12M11 23l5 5-5 5"></path></svg>
+
+      <div style="display: flex; flex-direction: column; align-items: center; gap: 10px; flex-grow: 1; flex-basis: 0;">
+        <div style="width: 56px; height: 56px; border-radius: 50%; background: #F7F3EA; display: flex; align-items: center; justify-content: center;">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#1E2A3A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"></path><path d="M9 12l2 2 4-4"></path></svg>
+        </div>
+        <p style="font-size: 14px; font-weight: 700; text-align: center;">機械が検査</p>
+        <p style="font-size: 12px; color: #B8C0CA; text-align: center; line-height: 1.5;">欠測、飽和、二つのセンサーの一致</p>
+      </div>
+      <svg width="20" height="56" viewBox="0 0 20 56" fill="none" stroke="#B8C0CA" stroke-width="2" stroke-linecap="round"><path d="M3 28h12M11 23l5 5-5 5"></path></svg>
+
+      <div style="display: flex; flex-direction: column; align-items: center; gap: 10px; flex-grow: 1; flex-basis: 0;">
+        <div style="width: 56px; height: 56px; border-radius: 50%; background: #F7F3EA; display: flex; align-items: center; justify-content: center;">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#1E2A3A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h16"></path><path d="M13 5l7 7-7 7"></path><path d="M4 5v14" stroke-dasharray="2 3"></path></svg>
+        </div>
+        <p style="font-size: 14px; font-weight: 700; text-align: center;">反証 か 保留</p>
+        <p style="font-size: 12px; color: #B8C0CA; text-align: center; line-height: 1.5;">データが怪しければ結論を出さない</p>
+      </div>
+      <svg width="20" height="56" viewBox="0 0 20 56" fill="none" stroke="#B8C0CA" stroke-width="2" stroke-linecap="round"><path d="M3 28h12M11 23l5 5-5 5"></path></svg>
+
+      <div style="display: flex; flex-direction: column; align-items: center; gap: 10px; flex-grow: 1; flex-basis: 0;">
+        <div style="width: 56px; height: 56px; border-radius: 50%; background: #E27A3F; display: flex; align-items: center; justify-content: center;">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#1E2A3A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 21h4"></path><path d="M12 3a6 6 0 00-4 10.5c.8.7 1 1.5 1 2.5h6c0-1 .2-1.8 1-2.5A6 6 0 0012 3z"></path></svg>
+        </div>
+        <p style="font-size: 14px; font-weight: 700; text-align: center;">次を予測する</p>
+        <p style="font-size: 12px; color: #B8C0CA; text-align: center; line-height: 1.5;">未知の条件で自分の説明を試す</p>
+      </div>
+    </div>
+    <p style="font-size: 13px; color: #B8C0CA; border-top: 1px solid #3A4757; padding-top: 14px;">Agent が持つのは、仮説の候補、許可された実験、検査の基準、問い返し方だけ。正解はどこにも書いていない。</p>
+  </div>
+
+  <!-- Section 3: phone-only three layers -->
+  <div style="display: flex; flex-direction: column; gap: 20px;">
+    <div style="display: flex; flex-direction: row; align-items: baseline; gap: 16px;">
+      <h2 style="font-size: 26px; font-weight: 900;">スマホだけで完結する</h2>
+      <p style="font-size: 14px; color: #5B6572;">器具も、操作も、証拠も。Cloud に残るのは Agent の判断だけ。</p>
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px;">
+      <div style="display: flex; flex-direction: row; gap: 16px; background: #FFFDF8; border: 2px solid #1E2A3A; border-radius: 18px; padding: 20px;">
+        <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#1E2A3A" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0;"><rect x="6" y="2" width="12" height="20" rx="2.5"></rect><path d="M10 5h4"></path><path d="M9 14q3-3 6 0"></path><path d="M12 11v-1"></path></svg>
+        <div style="display: flex; flex-direction: column; gap: 6px;">
+          <h3 style="font-size: 18px; font-weight: 700;">器具</h3>
+          <p style="font-size: 13px; line-height: 1.6; color: #3A4552;">加速度、ジャイロ、マイク、スピーカー、カメラ。あとは糸、コイン、ペットボトル。</p>
+        </div>
+      </div>
+      <div style="display: flex; flex-direction: row; gap: 16px; background: #FFFDF8; border: 2px solid #1E2A3A; border-radius: 18px; padding: 20px;">
+        <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#1E2A3A" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0;"><path d="M9 12V6a1.5 1.5 0 013 0v6"></path><path d="M12 11a1.5 1.5 0 013 0v2"></path><path d="M15 12a1.5 1.5 0 013 0v4c0 3-2 5-5 5h-2c-2 0-3-1-4-3l-2-4a1.4 1.4 0 012.4-1.4L9 14"></path></svg>
+        <div style="display: flex; flex-direction: column; gap: 6px;">
+          <h3 style="font-size: 18px; font-weight: 700;">操作</h3>
+          <p style="font-size: 13px; line-height: 1.6; color: #3A4552;">予想から記録の書き出しまで、全部スマホの画面で。通信が切れても測定は続く。</p>
+        </div>
+      </div>
+      <div style="display: flex; flex-direction: row; gap: 16px; background: #FFFDF8; border: 2px solid #1E2A3A; border-radius: 18px; padding: 20px;">
+        <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#1E2A3A" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0;"><circle cx="12" cy="9" r="6"></circle><path d="M9 9l2 2 4-4"></path><path d="M8 14l-1 8 5-3 5 3-1-8"></path></svg>
+        <div style="display: flex; flex-direction: column; gap: 6px;">
+          <h3 style="font-size: 18px; font-weight: 700;">証拠</h3>
+          <p style="font-size: 13px; line-height: 1.6; color: #3A4552;">いつ、どのセンサーを何秒使い、どんな検査を通ったかを署名付きで記録。文章だけのレポートとは区別がつく。</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Section 4: governance -->
+  <div style="display: flex; flex-direction: column; gap: 20px;">
+    <div style="display: flex; flex-direction: row; align-items: baseline; gap: 16px;">
+      <h2 style="font-size: 26px; font-weight: 900;">野良エージェントにしない</h2>
+      <p style="font-size: 14px; color: #5B6572;">生徒の端末のセンサーに触る Agent を、生徒と教師が管理する。統制は後付けでなく骨格。</p>
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px;">
+      <div style="display: flex; flex-direction: column; gap: 12px; background: #FFFDF8; border: 2px solid #D9D2C3; border-radius: 16px; padding: 18px;">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#1FA39F" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="8"></circle><path d="M12 9v4l3 2"></path><path d="M9 2h6"></path></svg>
+        <h3 style="font-size: 16px; font-weight: 700;">許可は実験単位、秒数付き</h3>
+        <p style="font-size: 13px; line-height: 1.6; color: #3A4552;">「加速度とジャイロを20秒」だけ。終われば読み取りは止まる。位置情報は永久に求めない。</p>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 12px; background: #FFFDF8; border: 2px solid #D9D2C3; border-radius: 16px; padding: 18px;">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#1FA39F" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="2" width="12" height="20" rx="2.5"></rect><path d="M12 15V8"></path><path d="M9 11l3-3 3 3"></path><path d="M4 4l16 16"></path></svg>
+        <h3 style="font-size: 16px; font-weight: 700;">生データは端末から出ない</h3>
+        <p style="font-size: 13px; line-height: 1.6; color: #3A4552;">音声も画像も加速度の波形も送らない。送るのは周期や周波数の数値と、そのハッシュ。</p>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 12px; background: #FFFDF8; border: 2px solid #D9D2C3; border-radius: 16px; padding: 18px;">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#1E2A3A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l10 18H2z"></path><path d="M12 10v5"></path><path d="M12 18v.5"></path></svg>
+        <h3 style="font-size: 16px; font-weight: 700;">危ない実験は候補にも出さない</h3>
+        <p style="font-size: 13px; line-height: 1.6; color: #3A4552;">スマホを落とす、高い所、水、交通のある場所。「安全チェックを飛ばせ」と書かれても Policy が拒否する。</p>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 12px; background: #FFFDF8; border: 2px solid #D9D2C3; border-radius: 16px; padding: 18px;">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#1E2A3A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v11H9l-5 4z"></path><path d="M10 9h4M10 12h2"></path></svg>
+        <h3 style="font-size: 16px; font-weight: 700;">答えは証拠の前に出さない</h3>
+        <p style="font-size: 13px; line-height: 1.6; color: #3A4552;">「答えだけ教えて」には予想を返してもらう。ヒントは回数に上限。漏らしたら失敗として数える。</p>
+      </div>
+    </div>
+    <div style="display: flex; flex-direction: row; gap: 24px; align-items: center; background: #EEE7D8; border-radius: 14px; padding: 14px 20px;">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#1E2A3A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0;"><rect x="3" y="3" width="18" height="18" rx="3"></rect><path d="M8 8h8M8 12h8M8 16h5"></path></svg>
+      <p style="font-size: 14px; line-height: 1.6;"><span style="font-weight: 700;">全部トレースに残る。</span>許可、計画、承認、測定、検査、保留の理由、却下の理由、署名。教師は学級の全端末をいつでも止められる。</p>
+    </div>
+  </div>
+
+  <!-- Section 5: architecture -->
+  <div style="display: flex; flex-direction: column; gap: 20px;">
+    <div style="display: flex; flex-direction: row; align-items: baseline; gap: 16px;">
+      <h2 style="font-size: 26px; font-weight: 900;">スマホと Cloud の分担</h2>
+      <p style="font-size: 14px; color: #5B6572;">測るのはスマホ、考えて記録するのは Google Cloud。</p>
+    </div>
+    <div style="display: flex; flex-direction: row; gap: 0; align-items: stretch;">
+      <div style="display: flex; flex-direction: column; gap: 12px; flex-grow: 1; flex-basis: 0; background: #FFFDF8; border: 2px solid #1E2A3A; border-radius: 18px; padding: 22px;">
+        <div style="display: flex; flex-direction: row; align-items: center; gap: 10px;">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#1E2A3A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="2" width="12" height="20" rx="2.5"></rect><path d="M10 5h4"></path></svg>
+          <h3 style="font-size: 20px; font-weight: 700;">生徒のスマホ（PWA）</h3>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <p style="font-size: 14px; line-height: 1.6;"><span style="font-weight: 700; color: #1FA39F;">測る</span>　加速度・ジャイロ・マイク・カメラ</p>
+          <p style="font-size: 14px; line-height: 1.6;"><span style="font-weight: 700; color: #1FA39F;">計算する</span>　周期、周波数、落下時間を端末内で</p>
+          <p style="font-size: 14px; line-height: 1.6;"><span style="font-weight: 700; color: #1FA39F;">保管する</span>　生データは端末の中だけ</p>
+          <p style="font-size: 13px; line-height: 1.6; color: #5B6572;">通信が切れたら固定手順に縮退し、測定だけ続ける</p>
+        </div>
+      </div>
+      <div style="display: flex; flex-direction: column; justify-content: center; gap: 18px; width: 200px; flex-shrink: 0; padding: 0 12px;">
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 4px;">
+          <p style="font-size: 12px; font-weight: 700; color: #5B6572; text-align: center;">特徴量とハッシュだけ</p>
+          <svg width="160" height="20" viewBox="0 0 160 20" fill="none" stroke="#1E2A3A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10h148M146 5l6 5-6 5"></path></svg>
+        </div>
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 4px;">
+          <svg width="160" height="20" viewBox="0 0 160 20" fill="none" stroke="#1E2A3A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M156 10H8M14 5l-6 5 6 5"></path></svg>
+          <p style="font-size: 12px; font-weight: 700; color: #5B6572; text-align: center;">実験計画・判定・署名</p>
+        </div>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 12px; flex-grow: 1; flex-basis: 0; background: #FFFDF8; border: 2px solid #1E2A3A; border-radius: 18px; padding: 22px;">
+        <div style="display: flex; flex-direction: row; align-items: center; gap: 10px;">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#1E2A3A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 18a4 4 0 010-8 5.5 5.5 0 0110.5-1.5A4 4 0 0117 18z"></path></svg>
+          <h3 style="font-size: 20px; font-weight: 700;">Google Cloud</h3>
+        </div>
+        <div style="display: flex; flex-direction: row; flex-wrap: wrap; gap: 8px;">
+          <span style="font-size: 12px; font-weight: 700; padding: 6px 10px; border-radius: 8px; background: #1E2A3A; color: #F7F3EA;">Cloud Run ＋ ADK</span>
+          <span style="font-size: 12px; font-weight: 700; padding: 6px 10px; border-radius: 8px; background: #1E2A3A; color: #F7F3EA;">Gemini</span>
+          <span style="font-size: 12px; font-weight: 700; padding: 6px 10px; border-radius: 8px; border: 1.5px solid #1E2A3A;">Cloud Trace / Logging</span>
+          <span style="font-size: 12px; font-weight: 700; padding: 6px 10px; border-radius: 8px; border: 1.5px solid #1E2A3A;">Model Armor</span>
+          <span style="font-size: 12px; font-weight: 700; padding: 6px 10px; border-radius: 8px; border: 1.5px solid #1E2A3A;">Firestore</span>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <p style="font-size: 14px; line-height: 1.6;"><span style="font-weight: 700; color: #E27A3F;">Planner</span>　予想を読み、区別できる実験を選ぶ（Gemini）</p>
+          <p style="font-size: 14px; line-height: 1.6;"><span style="font-weight: 700; color: #E27A3F;">Policy</span>　安全、センサーの最小集合、時間の上限を決定論で検査</p>
+          <p style="font-size: 14px; line-height: 1.6;"><span style="font-weight: 700; color: #E27A3F;">Verifier</span>　欠測、飽和、二系統の一致。LLM は読まない</p>
+          <p style="font-size: 14px; line-height: 1.6;"><span style="font-weight: 700; color: #E27A3F;">Trace</span>　全部を一本の記録に。署名して返す</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer numbers -->
+  <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; border-top: 2px solid #1E2A3A; padding-top: 24px;">
+    <div style="display: flex; flex-direction: column; gap: 4px;">
+      <p style="font-family: Zen Maru Gothic, Hiragino Maru Gothic ProN, sans-serif; font-size: 40px; font-weight: 900; line-height: 1;">97.1<span style="font-size: 20px;">%</span></p>
+      <p style="font-size: 12px; line-height: 1.5; color: #5B6572;">高校生のスマホ利用率（うち自分専用 99.1%）<br>こども家庭庁 令和7年度速報</p>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 4px;">
+      <p style="font-family: Zen Maru Gothic, Hiragino Maru Gothic ProN, sans-serif; font-size: 40px; font-weight: 900; line-height: 1;">38.4<span style="font-size: 20px;">%</span></p>
+      <p style="font-size: 12px; line-height: 1.5; color: #5B6572;">実験結果から関係を見いだす問題の通過率（物理基礎）<br>文科省 令和6年度 高校学習指導要領実施状況調査</p>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 4px;">
+      <p style="font-family: Zen Maru Gothic, Hiragino Maru Gothic ProN, sans-serif; font-size: 40px; font-weight: 900; line-height: 1;">13</p>
+      <p style="font-size: 12px; line-height: 1.5; color: #5B6572;">スマホと身の回りの物だけで組める実験</p>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 4px;">
+      <p style="font-family: Zen Maru Gothic, Hiragino Maru Gothic ProN, sans-serif; font-size: 40px; font-weight: 900; line-height: 1; color: #E27A3F;">0</p>
+      <p style="font-size: 12px; line-height: 1.5; color: #5B6572;">買う実験器具の数。審査員も自分のスマホで試せる</p>
+    </div>
+  </div>
+
+</div>
+</x-dc>
+</body>
+</html>
