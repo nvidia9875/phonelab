@@ -83,8 +83,8 @@ export function Home({ student, records, caps, policy, halted, school, onOpenThe
 
       <Section label={hero.section}>
         <div className="themes">
-          {statuses.map(({ theme, status }) => (
-            <ThemeCard key={theme.id} theme={theme} status={status} disabled={!student} onOpen={() => onOpenTheme(theme)} />
+          {statuses.map(({ theme, status }, i) => (
+            <ThemeCard key={theme.id} no={i + 1} theme={theme} status={status} disabled={!student} onOpen={() => onOpenTheme(theme)} />
           ))}
         </div>
       </Section>
@@ -116,7 +116,8 @@ export function Home({ student, records, caps, policy, halted, school, onOpenThe
   );
 }
 
-function ThemeCard({ theme, status, disabled, onOpen }: { theme: Theme; status: ThemeStatus; disabled: boolean; onOpen: () => void }) {
+/** no は進み方の区画と同じ番号（教科書の流れの順） */
+function ThemeCard({ no, theme, status, disabled, onOpen }: { no: number; theme: Theme; status: ThemeStatus; disabled: boolean; onOpen: () => void }) {
   const off = status.kind === "unavailable";
   const cls = ["theme", off && "theme--off", status.kind === "done" && "theme--done", status.kind === "held" && "theme--held", (status.kind === "open" || status.kind === "judged") && "theme--open"]
     .filter(Boolean)
@@ -137,7 +138,10 @@ function ThemeCard({ theme, status, disabled, onOpen }: { theme: Theme; status: 
         <ThemeArt id={theme.id} muted={off} />
       </span>
       <span className="theme__body">
-        <span className="theme__title">{theme.title}</span>
+        <span className="theme__title">
+          <span className="theme__no">{no}</span>
+          {theme.title}
+        </span>
         <span className="theme__tag">{theme.course}　{theme.tagline}</span>
       </span>
       <span className="theme__foot">

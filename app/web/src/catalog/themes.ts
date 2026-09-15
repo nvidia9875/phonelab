@@ -77,7 +77,7 @@ function later(t: Later): Theme {
   return { build: ["先生と一緒に準備します"], example: "たとえば：〇〇を変えると、△△になると思う。理由は…", measureHint: "準備中です", enabledBy: "later", measureProfile: "later", variants: [], ...t };
 }
 
-export const THEMES: Theme[] = [
+const CATALOG: Theme[] = [
   /* ---------- 中学 ---------- */
   {
     id: "energy",
@@ -291,6 +291,21 @@ export const THEMES: Theme[] = [
   later({ id: "spin", school: "hs", course: "物理 円運動", curriculumRef: ["高校 物理 (1)(ｳ)㋐"], minTier: "T1", title: "回転の減衰", question: "回転椅子は、どう遅くなっていく？", tagline: "先生が有効化する拡張", materials: "回転椅子", sensors: ["gyroscope"], seconds: 20, safety: "先生の目の前で", enabledBy: "teacher" }),
   later({ id: "pulse", school: "hs", course: "生物基礎 体内環境", curriculumRef: ["H-BB-10"], minTier: "T0", title: "カメラで脈拍", question: "運動のあと、脈は何秒で戻る？", tagline: "先生が有効化する拡張。値は端末の外に出ない", materials: "自分の指", sensors: ["camera"], seconds: 20, safety: "無理に走らない", enabledBy: "teacher" }),
 ];
+
+/**
+ * 教科書の流れ。トップの番号と並びはこの順。
+ * 中学: 東京書籍『新編 新しい科学』令和7年度版の 学年 → 単元 → 章（中1 単元3「身のまわりの現象」は 光 → 音 → 力、音の章は 伝わり方 → 大きさと高さ）。
+ * 高校: 科目は 物理基礎 → 物理 → 生物基礎、科目の中は教科書の章の順（物理基礎は 落下運動 → 運動の法則 → 音、物理は 円運動 → 単振動）。
+ * ここに無いテーマは消さずに末尾へ回す。
+ */
+const TEXTBOOK_ORDER = ["echo", "sound", "bottle", "coin_slip", "energy", "freefall", "jump", "elevator", "beat", "spin", "pendulum", "pulse"];
+
+function textbookRank(id: string): number {
+  const i = TEXTBOOK_ORDER.indexOf(id);
+  return i < 0 ? TEXTBOOK_ORDER.length : i;
+}
+
+export const THEMES: Theme[] = [...CATALOG].sort((a, b) => textbookRank(a.id) - textbookRank(b.id));
 
 export function themesFor(school: School): Theme[] {
   return THEMES.filter((t) => t.school === school);

@@ -53,11 +53,13 @@ export function Progress({ cells, signedCount, onOpenTheme }: { cells: Cell[]; s
       <ol className="prog__track" aria-label="テーマごとの状態">
         {cells.map(({ theme, status }, i) => {
           const k = kinds[i];
-          const label = `${theme.title}: ${KIND_LABEL[k]}${status.kind === "done" ? ` ${status.count}/${status.total}` : ""}`;
+          const no = i + 1;
+          const label = `${no}. ${theme.title}: ${KIND_LABEL[k]}${status.kind === "done" ? ` ${status.count}/${status.total}` : ""}`;
           return (
             <li key={theme.id} className={`prog__cell prog__cell--${k}`}>
               <button type="button" className="prog__btn" title={label} aria-label={label} disabled={k === "off"} onClick={() => onOpenTheme(theme)}>
                 {k === "off" ? <svg className="prog__hatch" aria-hidden><rect width="100%" height="100%" fill="url(#prog-hatch)" /></svg> : null}
+                <span className="prog__num" aria-hidden>{no}</span>
                 {k === "done" && <span className="prog__mark">✓</span>}
                 {k === "active" && <span className="prog__mark">…</span>}
                 {k === "held" && <span className="prog__mark">!</span>}
