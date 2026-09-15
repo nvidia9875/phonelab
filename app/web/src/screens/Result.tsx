@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Button, Card, CardBody, CardLabel, CardTitle, Choices, Eyebrow, Field, Foot, FootNote, Grid2, Link, LinkRow, Screen, Section, Stat } from "../components/ui";
+import { QUANTITY, formatNumber } from "../catalog/quantity";
 import type { Variant } from "../catalog/themes";
 import type { Direction, Judgement } from "../store/records";
 
@@ -22,12 +23,12 @@ export function Result({ variant, judgement, explain, nextVariant, nextDirection
   const [text, setText] = useState(explain);
   const j = judgement;
   const unit = variant.unit;
-  const fmt = (v: number) => (unit === "s" ? v.toFixed(2) : String(Math.round(v)));
+  const nextQ = QUANTITY[nextVariant?.unit ?? unit];
   return (
     <Screen badge="3 結果" tone="orange" onHome={onHome}>
       <Grid2>
-        <Stat label={variant.conditions[0].label} value={fmt(j.a)} unit={unit} />
-        <Stat label={variant.conditions[1].label} value={fmt(j.b)} unit={unit} />
+        <Stat label={variant.conditions[0].label} value={formatNumber(j.a, unit)} unit={unit} />
+        <Stat label={variant.conditions[1].label} value={formatNumber(j.b, unit)} unit={unit} />
       </Grid2>
 
       <Card variant="navy">
@@ -37,7 +38,7 @@ export function Result({ variant, judgement, explain, nextVariant, nextDirection
       </Card>
 
       <Section label="なぜそうなったと思う？　自分の言葉で">
-        <Field value={text} onChange={(e) => setText(e.target.value)} onBlur={() => onExplain(text)} placeholder="たとえば：引っ張る力は強くなるけど、動かしにくさも…" />
+        <Field value={text} onChange={(e) => setText(e.target.value)} onBlur={() => onExplain(text)} placeholder="たとえば：変えたのは〇〇だけなのに、△△が変わらなかったのは…" />
       </Section>
 
       {nextVariant ? (
@@ -46,22 +47,14 @@ export function Result({ variant, judgement, explain, nextVariant, nextDirection
             次の予測
           </CardLabel>
           <p className="card__text" style={{ fontWeight: 700, lineHeight: 1.5 }}>
-            では、{nextVariant.changes.split("（")[0]}を変えたら{unit === "s" ? "周期" : "音の高さ"}はどうなる？
+            では、{nextVariant.changes.split("（")[0]}を変えたら{nextQ.name}はどうなる？
           </p>
           <Choices
-            options={
-              unit === "s"
-                ? [
-                    { v: "faster", label: "速くなる" },
-                    { v: "same", label: "変わらない" },
-                    { v: "slower", label: "遅くなる" },
-                  ]
-                : [
-                    { v: "faster", label: "高くなる" },
-                    { v: "same", label: "変わらない" },
-                    { v: "slower", label: "低くなる" },
-                  ]
-            }
+            options={[
+              { v: "faster", label: nextQ.choiceFaster },
+              { v: "same", label: "変わらない" },
+              { v: "slower", label: nextQ.choiceSlower },
+            ]}
             value={nextDirection}
             onChange={onNext}
           />

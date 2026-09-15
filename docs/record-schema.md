@@ -112,6 +112,8 @@ POST /api/records/{record_id}/measure
 
 画面 2 の「送信したのは数値 5 つとフラグ 3 つ、約 100 バイト」は、生徒向けには要約（周期 2 つ、半分ずつ 4 つ…を「数値」とまとめ、欠測・飽和・一致を「フラグ」）。実際のバイト数を画面に出す（嘘にならないように、送信直前に `JSON.stringify(body).length` を表示）。
 
+`features` の形は `profile` ごとに違う（`pendulum_speed` / `pitch` / `pendulum_period` / `freefall_time`。定義は [verifier.md](verifier.md) 1 章）。上の例は高校の振り子の周期。
+
 ## 5. Cloud Trace のスパン設計
 
 ADK の組み込みトレース（自動スパン名は `invoke_agent`、`call_llm`、`execute_tool`、`generate_content`）をそのまま使い、その上に自前のスパンを足す。**1 実験記録 = 1 トレース**。`record_id` を trace 属性に付けて教員画面から引く。本文（予想文・Planner の出力文）はスパンに入れない（`ADK_CAPTURE_MESSAGE_CONTENT_IN_SPANS=false`。→ architecture.md 4.5）。

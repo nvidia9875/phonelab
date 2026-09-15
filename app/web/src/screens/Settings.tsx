@@ -15,6 +15,15 @@ export function Settings({ settings, onChange, onMe, onTeacher, onHome }: Settin
   return (
     <Screen badge="設定" tone="outline" onHome={onHome}>
       <Card>
+        <Eyebrow>入口</Eyebrow>
+        <p className="card__text">中学校と高校で、並ぶテーマと言葉を分けます。学級コードに学校種を持たせるまでは、ここで切り替えます。</p>
+        <div style={{ display: "flex", gap: 8 }}>
+          <Button sm secondary={settings.school !== "jhs"} aria-pressed={settings.school === "jhs"} onClick={() => onChange({ school: "jhs" })}>中学校</Button>
+          <Button sm secondary={settings.school !== "hs"} aria-pressed={settings.school === "hs"} onClick={() => onChange({ school: "hs" })}>高校</Button>
+        </div>
+      </Card>
+
+      <Card>
         <Eyebrow>テスト</Eyebrow>
         <label className="switch-row">
           <span>
@@ -35,7 +44,7 @@ export function Settings({ settings, onChange, onMe, onTeacher, onHome }: Settin
 
       <Foot>
         <Button onClick={onHome}>トップへ</Button>
-        <FootNote>テストモードは端末ごとの設定です。学級の許可や先生の停止より優先はしません。</FootNote>
+        <FootNote>テストモードと入口は端末ごとの設定です。学級の許可や先生の停止より優先はしません。</FootNote>
       </Foot>
     </Screen>
   );

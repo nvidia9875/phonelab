@@ -1,5 +1,5 @@
 import { Button, Card, CardBody, CardTitle, Check, Checks, Eyebrow, Foot, FootNote, Screen, Wave } from "../components/ui";
-import type { LocalCheck } from "../measure/pendulum";
+import type { CheckCode, LocalCheck } from "../measure/checks";
 
 export interface HoldProps {
   checks: LocalCheck[];
@@ -11,15 +11,20 @@ export interface HoldProps {
   onHome: () => void;
 }
 
-const PROPOSAL: Record<string, string> = {
-  gap: "画面を開いたまま、同じ条件でもう一度。今度は加速度とジャイロの両方が揃うはずです。二回目も欠けたら、この端末では加速度を使わず、ジャイロ 2 回の一致で判定に切り替えます。",
-  saturation: "振れ幅を小さく（20° 以内）して、同じ条件でもう一度。",
+/** 保留のあとの提案（Planner ではなく検査コードごとのテンプレート。docs/verifier.md 4 章） */
+const PROPOSAL: Record<CheckCode, string> = {
+  gap: "画面を開いたまま、同じ条件でもう一度。通知や画面の切り替えで読み取りが途切れた可能性があります。",
+  saturation: "振りが強すぎました。押さずにそっと放すか、振れ幅を小さくして、同じ条件でもう一度。",
   no_signal: "振り子が止まっていました。振ってから「測る」を押してください。",
-  two_clocks_disagree: "二つのセンサーの周期が合いませんでした。袋の中でスマホが回っていないか確かめて、もう一度。",
-  unstable: "前半と後半で周期が変わりました。途中で触ったか、糸が絡んだかもしれません。もう一度。",
+  no_release: "振り子が動き出していませんでした。袋の底をものさしで高さに合わせ、「測る」を押してから押さずに放してください。",
+  two_clocks_disagree: "二つの独立した測り方が合いませんでした。振り子なら袋の中で端末が回っていないか、音ならほかの音が入っていないかを確かめて、もう一度。",
+  unstable: "前半と後半で値が変わりました。途中で触ったか、糸が絡んだかもしれません。もう一度。",
   weak_autocorr: "周期がはっきり出ませんでした。もう少し大きく、でも 30° 以内で振って、もう一度。",
-  low_rate: "この端末のサンプリングが遅く、周期を決められません。別の端末で試すか、別の実験へ。",
-  out_of_range: "振り子の周期として考えにくい値でした。糸の長さを確かめて、もう一度。",
+  low_rate: "この端末のサンプリングが遅く、値を決められません。別の端末で試すか、別の実験へ。",
+  out_of_range: "この実験の値として考えにくい値でした。糸の長さや高さなど、準備の手順を確かめて、もう一度。",
+  low_voiced: "音のあるところが短すぎました。「測る」を押して少し待ってから、はっきり何回か鳴らしてください。",
+  low_snr: "音が小さく、まわりの雑音と区別できませんでした。端末を音の近くに置いて、もう一度。",
+  clipping: "音が大きすぎて割れました。端末を少し離して、同じ強さでもう一度。",
 };
 
 /** 画面 4: 保留。理由と再測定の提案。上限に達したら別の実験へ */

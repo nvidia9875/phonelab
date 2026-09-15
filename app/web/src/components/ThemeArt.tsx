@@ -16,6 +16,32 @@ function Frame({ children, muted }: { children: React.ReactNode; muted?: boolean
 
 export function ThemeArt({ id, muted }: { id: string; muted?: boolean }) {
   switch (id) {
+    case "energy":
+      return (
+        <Frame muted={muted}>
+          <path {...S} d="M20 12h80" />
+          <circle cx="60" cy="12" r="3" fill="currentColor" />
+          <path {...S} d="M60 12 L34 50" strokeDasharray="3 4" opacity="0.5" />
+          <rect {...S} x="26" y="48" width="14" height="18" rx="3" opacity="0.5" />
+          <path {...S} d="M60 12 L60 60" />
+          <rect {...S} x="52" y="58" width="16" height="22" rx="4" fill="var(--card)" />
+          <path {...S} d="M18 70 V50" stroke={ORANGE} />
+          <path {...S} d="M14 54 l4 -4 4 4" stroke={ORANGE} />
+          <path {...S} d="M74 74 h26" stroke={TEAL} />
+          <path {...S} d="M94 70 l6 4 -6 4" stroke={TEAL} />
+          <text x="78" y="66" fontSize="9" fontWeight="700" fill={TEAL} fontFamily="var(--font-head)">v</text>
+        </Frame>
+      );
+    case "sound":
+      return (
+        <Frame muted={muted}>
+          <rect {...S} x="22" y="44" width="68" height="34" rx="4" />
+          <ellipse {...S} cx="56" cy="58" rx="14" ry="5" />
+          <path {...S} d="M16 52 H96" stroke={ORANGE} />
+          <path {...S} d="M24 30 q5 -10 10 0 t10 0 t10 0 t10 0 t10 0" stroke={TEAL} />
+          <path {...S} d="M102 40 q6 6 0 12 M108 34 q10 12 0 24" stroke={TEAL} />
+        </Frame>
+      );
     case "pendulum":
       return (
         <Frame muted={muted}>

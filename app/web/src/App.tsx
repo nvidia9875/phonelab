@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Home } from "./screens/Home";
 import { Me } from "./screens/Me";
 import { Predict } from "./screens/Predict";
@@ -15,9 +15,11 @@ import { Settings } from "./screens/Settings";
 import { themeById, variantById, type Theme } from "./catalog/themes";
 import { matchRoute, nav, usePath, type Route } from "./router";
 import { activeRecordForTheme, clearAll, createRecord, recordById, setHalted, setSettings, setStudent, useStore, type StudyRecord } from "./store/records";
-import { DEFAULT_CLASS_POLICY, detectCaps } from "./store/status";
+import { DEFAULT_CLASS_POLICY, detectCaps, type DeviceCaps } from "./store/status";
 import { useMeasurement } from "./measure/useMeasurement";
-import { analyze, localChecks, type PendulumFeatures } from "./measure/pendulum";
+import { checksFor, clockLabels, clocksOf, type Features } from "./measure/features";
+import { demoFeatures } from "./measure/demo";
+import { probeMotionEvents } from "./measure/pendulum";
 import * as flow from "./flow/useFlow";
 
 const goHome = () => nav("/");
@@ -67,9 +69,22 @@ export function App() {
   const path = usePath();
   const route = matchRoute(path);
   const store = useStore();
-  const caps = useMemo(detectCaps, []);
+  const [caps, setCaps] = useState<DeviceCaps>(detectCaps);
   const policy = { ...DEFAULT_CLASS_POLICY, halted: store.halted };
-  const m = useMeasurement();
+  const markNoMotion = useCallback(() => setCaps((c) => ({ ...c, motionEvents: "no" })), []);
+  const m = useMeasurement({ onMotionUnavailable: markNoMotion });
+
+  // 加速度の値が本当に届くかを起動時に確かめる。何も来なければ（iOS など許可が要る端末）測るときに確かめる
+  useEffect(() => {
+    if (!caps.motion) return;
+    let alive = true;
+    void probeMotionEvents().then((support) => {
+      if (alive && support !== "unknown") setCaps((c) => ({ ...c, motionEvents: support }));
+    });
+    return () => {
+      alive = false;
+    };
+  }, [caps.motion]);
 
   const themeId = "theme" in route ? route.theme : null;
   const theme = themeId ? themeById(themeId) : undefined;
@@ -94,6 +109,7 @@ export function App() {
     caps,
     policy,
     halted: store.halted,
+    school: store.settings.school,
     onOpenTheme: (t: Theme) => {
       if (!store.student) return nav("/me");
       const r = activeRecordForTheme(t.id, store.records);
@@ -194,9 +210,15 @@ export function App() {
           onReady={() => {
             flow.startMeasure(r, route.cond);
             nav(`/x/${t.id}/measure/${route.cond}`);
-            const canSense = t.measureProfile === "pendulum_period" && !store.settings.testMode;
-            if (canSense) void m.start({ sensors: ["accelerometer", "gyroscope"], seconds: t.seconds }); // iOS の許可はこのタップの中で
-            else m.markUnsupported(store.settings.testMode ? "テストモード: サンプルの測定で進めます" : "この実験の測定はまだ実装中です。サンプルで進めます");
+            const profile = t.measureProfile;
+            if (store.settings.testMode) {
+              m.markUnsupported("テストモード: サンプルの測定で進めます");
+            } else if (profile === "pendulum_period" || profile === "pendulum_speed" || profile === "pitch") {
+              // iOS の許可はこのタップの中で求める
+              void m.start({ profile, sensors: t.sensors, seconds: t.seconds, lengthM: variant!.lengthM }, variant!);
+            } else {
+              m.markUnsupported("この実験の測定はまだ実装中です。サンプルで進めます");
+            }
           }}
           onBack={() => nav(`/x/${t.id}/plan`)}
           onHome={goHome}
@@ -206,16 +228,21 @@ export function App() {
     case "measure": {
       const idx = route.cond === "A" ? 0 : 1;
       const label = variant!.conditions[idx].label;
+      const unit = variant!.unit;
       const s = m.state;
+      const emptyClocks = clockLabels(t.measureProfile).map((l) => ({ label: l, value: null }));
+      const cannotRead = t.measureProfile === "pitch" ? "この端末ではマイクが使えません" : "この端末では加速度センサーが読めません";
       const view: MeasureView =
         s.phase === "measuring"
-          ? { phase: "measuring", elapsed: s.elapsed, seconds: s.seconds, conditionLabel: label, tAccel: null, tGyro: null, checks: [], sentBytes: null, allOk: false }
+          ? { phase: "measuring", elapsed: s.elapsed, seconds: s.seconds, conditionLabel: label, clocks: emptyClocks, unit, checks: [], sentBytes: null, allOk: false }
+          : s.phase === "requesting"
+            ? { phase: "requesting", elapsed: 0, seconds: s.seconds, conditionLabel: label, clocks: emptyClocks, unit, checks: [], sentBytes: null, allOk: false, waitingFor: s.sensor === "microphone" ? "マイクの許可を待っています。ブラウザの確認で「許可」を押してください" : "センサーの許可を待っています。確認で「許可」を押してください" }
           : s.phase === "done"
-            ? { phase: "done", elapsed: s.seconds, seconds: s.seconds, conditionLabel: label, tAccel: s.features.T_accel_s, tGyro: s.features.T_gyro_s, checks: checksToRows(s.checks), sentBytes: JSON.stringify(s.features).length, allOk: s.checks.every((c) => c.ok), previousHold: r.retries[route.cond] > 0 ? "前回の測定は検査で保留になりました。今回はその再測定です。" : undefined }
-            : { phase: "denied", elapsed: 0, seconds: t.seconds, conditionLabel: label, tAccel: null, tGyro: null, checks: [], sentBytes: null, allOk: false, deniedReason: s.phase === "denied" ? (s.message ?? (s.reason === "denied" ? "センサーの許可がありませんでした" : "この端末では加速度センサーが読めません")) : "測定が始まっていません。準備画面から「測る」を押してください" };
-      const finish = (features: PendulumFeatures, demo: boolean) => {
+            ? { phase: "done", elapsed: s.seconds, seconds: s.seconds, conditionLabel: label, clocks: clocksOf(s.features), unit, checks: checksToRows(s.checks), sentBytes: JSON.stringify(s.features).length, allOk: s.checks.every((c) => c.ok), previousHold: r.retries[route.cond] > 0 ? "前回の測定は検査で保留になりました。今回はその再測定です。" : undefined }
+            : { phase: "denied", elapsed: 0, seconds: t.seconds, conditionLabel: label, clocks: emptyClocks, unit, checks: [], sentBytes: null, allOk: false, deniedReason: s.phase === "denied" ? (s.message ?? (s.reason === "denied" ? "センサーの許可がありませんでした" : cannotRead)) : "測定が始まっていません。準備画面から「測る」を押してください" };
+      const finish = (features: Features, demo: boolean) => {
         const hash = s.phase === "done" ? s.rawHash : "sha256:demo";
-        const outcome = flow.finishMeasure(r, route.cond, features, localChecks(features), hash, demo);
+        const outcome = flow.finishMeasure(r, route.cond, features, checksFor(features, variant!), hash, demo);
         m.reset();
         if (outcome === "hold") nav(`/x/${t.id}/hold`);
         else if (route.cond === "A") nav(`/x/${t.id}/setup/B`);
@@ -226,7 +253,7 @@ export function App() {
           view={view}
           onStop={() => { m.stop(); m.reset(); flow.stopMeasure(r, route.cond); nav(`/x/${t.id}/setup/${route.cond}`); }}
           onContinue={() => { if (s.phase === "done") finish(s.features, false); }}
-          onDemo={s.phase === "denied" ? () => finish(demoFeatures(idx, variant!.variable), true) : undefined}
+          onDemo={s.phase === "denied" || s.phase === "requesting" ? () => finish(demoFeatures(t, variant!, idx), true) : undefined}
         />
       );
     }
@@ -265,19 +292,4 @@ export function App() {
     }
   }
   return <Home {...homeProps} />;
-}
-
-/** センサーの無い端末（審査員の PC など）用のサンプル特徴量。demo フラグ付きで記録に残る */
-function demoFeatures(idx: number, variable: string): PendulumFeatures {
-  const T = variable === "length" && idx === 1 ? 2.01 : variable === "amplitude" && idx === 1 ? 1.44 : idx === 1 ? 1.43 : 1.42;
-  const n = 1200, dt = 1000 / 60;
-  const t: number[] = [], ax: number[] = [], ay: number[] = [], az: number[] = [], gx: number[] = [], gy: number[] = [], gz: number[] = [];
-  for (let i = 0; i < n; i++) {
-    const s = (i * dt) / 1000;
-    const th = 0.3 * Math.sin((2 * Math.PI * s) / T);
-    t.push(i * dt);
-    ax.push(9.8 * Math.sin(th)); ay.push(0.1 * Math.sin(3 * s)); az.push(9.8 * Math.cos(th) + 0.5 * Math.cos((4 * Math.PI * s) / T));
-    gx.push(0.5 * Math.sin(5 * s)); gy.push(17.2 * ((2 * Math.PI) / T) * Math.cos((2 * Math.PI * s) / T)); gz.push(0.2 * Math.cos(7 * s));
-  }
-  return analyze({ t, ax, ay, az, gx, gy, gz, interval: dt });
 }

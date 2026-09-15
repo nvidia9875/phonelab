@@ -53,7 +53,7 @@ export function Predict({ theme, initialText, questionBack, hintMessage, onSubmi
           ref={fieldRef}
           value={text}
           onChange={(e) => setText(e.target.value)}
-          placeholder="たとえば：重くすると引っ張られる力が強いから、速く振れると思う"
+          placeholder={theme.example}
           rows={4}
           style={{ borderColor: "var(--orange)" }}
         />

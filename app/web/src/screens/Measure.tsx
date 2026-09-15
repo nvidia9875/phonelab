@@ -1,29 +1,41 @@
 import { Button, Card, Check, Checks, Counter, Eyebrow, Foot, FootNote, Grid2, Note, Screen, Stat, Wave } from "../components/ui";
-import type { LocalCheck } from "../measure/pendulum";
+import { formatNumber, type Unit } from "../catalog/quantity";
+import type { CheckCode, LocalCheck } from "../measure/checks";
 
 export interface MeasureView {
-  phase: "measuring" | "done" | "denied";
+  phase: "requesting" | "measuring" | "done" | "denied";
   elapsed: number;
   seconds: number;
   conditionLabel: string;
-  tAccel: number | null;
-  tGyro: number | null;
+  /** 二本の時計（測定中は値なし） */
+  clocks: { label: string; value: number | null }[];
+  unit: Unit;
   checks: { ok: boolean; text: string }[];
   previousHold?: string;
   sentBytes: number | null;
   allOk: boolean;
   deniedReason?: string;
+  /** 許可の確認を待っているときに出す一文 */
+  waitingFor?: string;
 }
 
+type Row = { ok: boolean; text: string };
+
+/** 画面に出す 3 行: 途切れ・音の量 / 飽和・動き出し / 二本の時計 */
+const ROW_GROUPS: CheckCode[][] = [
+  ["low_rate", "gap", "low_voiced", "low_snr"],
+  ["saturation", "clipping", "no_signal", "no_release"],
+  ["two_clocks_disagree"],
+];
+
 /** 端末内検査の結果を画面の 3 行に要約する（詳細は保留画面で出す） */
-export function checksToRows(checks: LocalCheck[]): { ok: boolean; text: string }[] {
-  const pick = (code: LocalCheck["code"]) => checks.find((c) => c.code === code)!;
-  const rate = pick("low_rate"), gap = pick("gap"), sat = pick("saturation"), two = pick("two_clocks_disagree");
-  return [
-    { ok: rate.ok && gap.ok, text: rate.ok && gap.ok ? `欠測なし（${rate.text.replace("サンプリング ", "")} で連続）` : gap.ok ? rate.text : gap.text },
-    { ok: sat.ok, text: sat.text },
-    { ok: two.ok, text: two.text },
-  ];
+export function checksToRows(checks: LocalCheck[]): Row[] {
+  return ROW_GROUPS.flatMap((codes) => {
+    const group = checks.filter((c) => codes.includes(c.code));
+    if (group.length === 0) return [];
+    const bad = group.find((c) => !c.ok);
+    return [{ ok: !bad, text: bad ? bad.text : group.map((c) => c.text).join("、") }];
+  });
 }
 
 export interface MeasureProps {
@@ -35,25 +47,26 @@ export interface MeasureProps {
 
 /** 画面 2: 測定と検査。測定中はトップへのリンクを出さない */
 export function Measure({ view, onStop, onContinue, onDemo }: MeasureProps) {
-  const fmt = (v: number | null) => (v !== null && Number.isFinite(v) ? v.toFixed(2) : "—");
   const done = view.phase === "done";
+  const waiting = view.phase === "requesting";
   const sub =
     view.phase === "measuring"
       ? `${view.conditionLabel}を測っています。画面はこのまま`
       : view.phase === "done"
         ? `${view.conditionLabel}の測定が終わりました。検査の結果です`
-        : view.deniedReason ?? "測れませんでした";
+        : waiting
+          ? view.waitingFor ?? "許可を待っています"
+          : view.deniedReason ?? "測れませんでした";
   return (
-    <Screen badge={done ? "2 検査" : view.phase === "denied" ? "測れません" : "2 測定中"} tone={view.phase === "denied" ? "ink" : "teal"}>
+    <Screen badge={done ? "2 検査" : view.phase === "denied" ? "測れません" : waiting ? "許可の確認" : "2 測定中"} tone={view.phase === "denied" || waiting ? "ink" : "teal"}>
       <Counter value={Math.floor(view.elapsed)} of={view.seconds} sub={sub} />
 
       <Grid2>
-        <Stat label="加速度" value={fmt(view.tAccel)} md>
-          <Wave />
-        </Stat>
-        <Stat label="ジャイロ（独立した2本目）" value={fmt(view.tGyro)} md>
-          <Wave dashed />
-        </Stat>
+        {view.clocks.map((c, i) => (
+          <Stat key={c.label} label={c.label} value={c.value !== null ? formatNumber(c.value, view.unit) : "—"} unit={view.unit} md>
+            <Wave dashed={i === 1} />
+          </Stat>
+        ))}
       </Grid2>
 
       <Card variant="line">
@@ -67,6 +80,8 @@ export function Measure({ view, onStop, onContinue, onDemo }: MeasureProps) {
             ))
           ) : view.phase === "denied" ? (
             <Check warn>{view.deniedReason}</Check>
+          ) : waiting ? (
+            <Check>許可のあとで測り始めます。許可するまでセンサーは読みません</Check>
           ) : (
             <Check>測定が終わってから検査します</Check>
           )}
@@ -76,10 +91,10 @@ export function Measure({ view, onStop, onContinue, onDemo }: MeasureProps) {
       {view.previousHold && <Note>{view.previousHold}</Note>}
 
       <Foot>
-        <FootNote>{view.sentBytes !== null ? `送るのは特徴量だけ、約 ${view.sentBytes} バイト。波形は端末の中` : "波形は端末の中。送るのは周期などの数値だけ"}</FootNote>
+        <FootNote>{view.sentBytes !== null ? `送るのは特徴量だけ、約 ${view.sentBytes} バイト。波形は端末の中` : "波形は端末の中。送るのは速さや高さなどの数値だけ"}</FootNote>
         {done && <Button onClick={onContinue}>{view.allOk ? "次へ" : "検査の結果を見る"}</Button>}
-        {view.phase === "denied" && onDemo && (
-          <Button onClick={onDemo}>この端末では測れないので、サンプルの測定で進む（デモ）</Button>
+        {(view.phase === "denied" || waiting) && onDemo && (
+          <Button secondary={waiting} onClick={onDemo}>{waiting ? "許可を出せない端末なら、サンプルの測定で進む（デモ）" : "この端末では測れないので、サンプルの測定で進む（デモ）"}</Button>
         )}
         <Button secondary onClick={onStop}>{view.phase === "measuring" ? "測定をやめる" : "準備に戻る"}</Button>
       </Foot>

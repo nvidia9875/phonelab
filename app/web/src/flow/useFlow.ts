@@ -3,8 +3,10 @@
  * サーバ実装後は、choosePlan / checkPolicy / judge / sign の呼び先を API に差し替える。
  */
 import { checkPolicy, choosePlan, judge, readClaim } from "../agent/stub";
+import { QUANTITY, formatQuantity, type Unit } from "../catalog/quantity";
 import { SENSOR_LABEL, themeById, variantById, variantsOf, type Theme } from "../catalog/themes";
-import type { LocalCheck, PendulumFeatures } from "../measure/pendulum";
+import type { LocalCheck } from "../measure/checks";
+import { clocksSummary, measuredValue, type Features } from "../measure/features";
 import { activeRecordForTheme, addEvent, createRecord, recordsForTheme, updateRecord, type CondKey, type Direction, type StudyRecord } from "../store/records";
 
 export const MAX_RETRY = 3;
@@ -14,6 +16,12 @@ function doneVariantIds(themeId: string): string[] {
     .filter((r) => r.status === "signed" || r.status === "judged")
     .map((r) => r.variantId)
     .filter((v): v is string => !!v);
+}
+
+/** 予想の向きを、測る量に合わせた言葉にする（音は「高くなる」） */
+function directionWord(unit: Unit, direction: Direction): string {
+  const q = QUANTITY[unit];
+  return { faster: q.choiceFaster, same: "変わらない", slower: q.choiceSlower, unknown: "" }[direction];
 }
 
 export function openTheme(theme: Theme): StudyRecord {
@@ -40,7 +48,7 @@ export function submitPrediction(rec: StudyRecord, theme: Theme, text: string): 
     updateRecord(rec.id, (r) => ({ ...r, prediction: { ...r.prediction, text, questionBack: plan.questionBack } }));
     return "predict";
   }
-  const claim = readClaim(text);
+  const claim = readClaim(text, theme);
   updateRecord(rec.id, (r) => {
     let n: StudyRecord = { ...r, prediction: { ...r.prediction, text, claim, questionBack: null }, rejection: null, variantId: plan.variant.id, stage: "plan" };
     n = addEvent(n, "予想", `${text}（証拠を見る前に記入）`, "orange");
@@ -73,14 +81,14 @@ export function stopMeasure(rec: StudyRecord, cond: CondKey): void {
 }
 
 /** 測定が終わった。検査を通れば次の条件へ、通らなければ保留 */
-export function finishMeasure(rec: StudyRecord, cond: CondKey, features: PendulumFeatures, checks: LocalCheck[], rawHash: string, demo = false): "next" | "hold" {
+export function finishMeasure(rec: StudyRecord, cond: CondKey, features: Features, checks: LocalCheck[], rawHash: string, demo = false): "next" | "hold" {
   const pass = checks.every((c) => c.ok);
   const idx = cond === "A" ? 0 : 1;
   updateRecord(rec.id, (r) => {
     const m = { condition: cond, features, checks, rawHash, pass, at: new Date().toISOString(), demo };
     let n: StudyRecord = { ...r, measurements: [...r.measurements, m] };
     if (pass) {
-      n = addEvent(n, `測定 ${idx + 1}`, `${features.T_accel_s.toFixed(2)} s と ${features.T_gyro_s.toFixed(2)} s。二系統一致、欠測なし、飽和なし${demo ? "（サンプル）" : ""}`, "teal");
+      n = addEvent(n, `測定 ${idx + 1}`, `${clocksSummary(features)}。二本の時計が一致し、検査を通過${demo ? "（サンプル）" : ""}`, "teal");
       n = { ...n, status: "open", stage: cond === "A" ? "setup_B" : "result", holdCodes: [] };
     } else {
       const codes = checks.filter((c) => !c.ok).map((c) => c.code);
@@ -103,13 +111,14 @@ export function ensureJudged(rec: StudyRecord, theme: Theme): StudyRecord | null
   const a = [...rec.measurements].reverse().find((m) => m.condition === "A" && m.pass);
   const b = [...rec.measurements].reverse().find((m) => m.condition === "B" && m.pass);
   if (!variant || !a || !b) return null;
-  const va = (a.features.T_accel_s + a.features.T_gyro_s) / 2;
-  const vb = (b.features.T_accel_s + b.features.T_gyro_s) / 2;
-  const unc = Math.abs(a.features.T_accel_s - a.features.T_gyro_s) + Math.abs(b.features.T_accel_s - b.features.T_gyro_s);
-  const result = judge(va, vb, variant.tolerance, unc, rec.prediction.claim, variant, variant.unit);
+  const ma = measuredValue(a.features);
+  const mb = measuredValue(b.features);
+  const result = judge(ma.value, mb.value, ma.unc + mb.unc, rec.prediction.claim, variant);
   return updateRecord(rec.id, (r) => {
+    const within = Math.abs(result.delta) <= result.tolerance ? "内側" : "外側";
+    const verdict = result.consistent === null ? "予想の向きが読めず判定なし" : result.consistent ? "予想は成り立った" : "予想は成り立たず";
     let n: StudyRecord = { ...r, result, status: "judged", stage: "result" };
-    n = addEvent(n, "判定", `${result.consistent === null ? "予想の向きが読めず判定なし" : result.consistent ? "予想は成り立った" : "予想は成り立たず"}。差 ${Math.abs(result.delta).toFixed(2)} s は許容 ${result.tolerance.toFixed(2)} s の${Math.abs(result.delta) <= result.tolerance ? "内側" : "外側"}`);
+    n = addEvent(n, "判定", `${verdict}。差 ${formatQuantity(Math.abs(result.delta), variant.unit)} は許容 ${formatQuantity(result.tolerance, variant.unit)} の${within}`);
     return n;
   });
 }
@@ -134,11 +143,11 @@ export async function closeAndNext(rec: StudyRecord, theme: Theme): Promise<Stud
   await sealRecord(rec);
   const nv = nextVariantFor(rec, theme);
   if (!nv || !rec.nextPrediction) return null;
-  const dirWord = { faster: "速くなる", same: "変わらない", slower: "遅くなる", unknown: "" }[rec.nextPrediction.direction];
+  const direction = rec.nextPrediction.direction;
   const next = createRecord(theme.id);
   updateRecord(next.id, (r) => {
-    const text = `${nv.changes.split("（")[0]}を変えたら、${dirWord}と思う`;
-    let n: StudyRecord = { ...r, variantId: nv.id, stage: "plan", prediction: { ...r.prediction, text, claim: { variable: nv.variable, direction: rec.nextPrediction!.direction }, questionBack: null } };
+    const text = `${nv.changes.split("（")[0]}を変えたら、${directionWord(nv.unit, direction)}と思う`;
+    let n: StudyRecord = { ...r, variantId: nv.id, stage: "plan", prediction: { ...r.prediction, text, claim: { variable: nv.variable, direction }, questionBack: null } };
     n = addEvent(n, "予想", `${text}（前の実験の結果を見て記入）`, "orange");
     n = addEvent(n, "計画", `${nv.title}。AI 提案`);
     return n;
@@ -152,9 +161,12 @@ export async function sealRecord(rec: StudyRecord): Promise<void> {
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(payload));
   const hex = [...new Uint8Array(digest)].map((x) => x.toString(16).padStart(2, "0")).join("");
   updateRecord(rec.id, (r) => {
-    const dirWord = r.nextPrediction ? { faster: "速くなる", same: "変わらない", slower: "遅くなる", unknown: "" }[r.nextPrediction.direction] : "";
     let n: StudyRecord = { ...r, status: "signed", signature: { signer: "端末（サーバ署名は未）", hash: `${hex.slice(0, 4)}…${hex.slice(-4)}`, server: false } };
-    if (r.nextPrediction) n = addEvent(n, "次の予測", `「${dirWord}」と記入。次の実験へ`, "orange");
+    if (r.nextPrediction) {
+      const theme = themeById(r.themeId);
+      const unit = (theme && variantById(theme, r.nextPrediction.variantId ?? r.variantId)?.unit) ?? "s";
+      n = addEvent(n, "次の予測", `「${directionWord(unit, r.nextPrediction.direction)}」と記入。次の実験へ`, "orange");
+    }
     return n;
   });
 }

@@ -1,5 +1,5 @@
 import { Button, Card, Icon, Screen, Section } from "../components/ui";
-import { SENSOR_LABEL, THEMES, type Theme } from "../catalog/themes";
+import { SENSOR_LABEL, THEMES, themesFor, type School, type Theme } from "../catalog/themes";
 import type { Student, StudyRecord } from "../store/records";
 import { themeStatus, type ClassPolicy, type DeviceCaps, type ThemeStatus } from "../store/status";
 import { ThemeArt } from "../components/ThemeArt";
@@ -12,6 +12,7 @@ export interface HomeProps {
   caps: DeviceCaps;
   policy: ClassPolicy;
   halted: boolean;
+  school: School;
   onOpenTheme: (theme: Theme) => void;
   onOpenRecord: (id: string) => void;
   onMe: () => void;
@@ -19,11 +20,26 @@ export interface HomeProps {
   testMode: boolean;
 }
 
+/** 入口の言葉。中学は興味と理解、高校は点数につながる練習（docs/curriculum-coverage.md §5） */
+const HERO: Record<School, { title: [string, string]; sub: string; section: string }> = {
+  jhs: {
+    title: ["ふしぎを、", "手元の端末でたしかめよう。"],
+    sub: "テーマを選んで「こうなると思う」を書くと、AI がそれを試せる実験をいっしょに考えます。答えは測って、自分で見つける。",
+    section: "ふしぎから選ぶ",
+  },
+  hs: {
+    title: ["自分で測ったグラフで、", "実験問題に強くなる。"],
+    sub: "予想を書くと、AI が確かめる実験を考えます。測った値から関係を読む練習は、共通テストの実験・グラフの問題につながります。",
+    section: "科目と単元から選ぶ",
+  },
+};
+
 /** トップ: 学級と番号、進み方、テーマのカタログ（状態つき）、記録 */
-export function Home({ student, records, caps, policy, halted, onOpenTheme, onOpenRecord, onMe, onSettings, testMode }: HomeProps) {
-  const statuses = THEMES.map((t) => ({ theme: t, status: themeStatus(t, records, caps, policy, testMode) }));
+export function Home({ student, records, caps, policy, halted, school, onOpenTheme, onOpenRecord, onMe, onSettings, testMode }: HomeProps) {
+  const statuses = themesFor(school).map((t) => ({ theme: t, status: themeStatus(t, records, caps, policy, testMode) }));
   const done = records.filter((r) => r.status === "signed").length;
   const signed = records.filter((r) => r.status === "signed" || r.status === "judged");
+  const hero = HERO[school];
 
   return (
     <Screen
@@ -39,8 +55,8 @@ export function Home({ student, records, caps, policy, halted, onOpenTheme, onOp
       }
     >
       <div className="hero">
-        <h2 className="hero__title">スマホが実験器具。<br />AI といっしょに、たしかめよう。</h2>
-        <p className="hero__sub">テーマを選んで「こうなると思う」を書くと、AI がそれを試せる実験をいっしょに考えます。答えは測って、自分で見つける。</p>
+        <h2 className="hero__title">{hero.title[0]}<br />{hero.title[1]}</h2>
+        <p className="hero__sub">{hero.sub}</p>
       </div>
 
       {!student && (
@@ -65,7 +81,7 @@ export function Home({ student, records, caps, policy, halted, onOpenTheme, onOp
 
       <Progress cells={statuses} signedCount={done} onOpenTheme={onOpenTheme} />
 
-      <Section label="テーマを選ぶ">
+      <Section label={hero.section}>
         <div className="themes">
           {statuses.map(({ theme, status }) => (
             <ThemeCard key={theme.id} theme={theme} status={status} disabled={!student} onOpen={() => onOpenTheme(theme)} />
@@ -112,7 +128,7 @@ function ThemeCard({ theme, status, disabled, onOpen }: { theme: Theme; status: 
       case "held": return <span className="theme__status theme__status--held">保留中</span>;
       case "judged": return <span className="theme__status theme__status--judged">次の予測</span>;
       case "done": return <span className="theme__status theme__status--done">✓ {status.count} / {status.total}</span>;
-      case "unavailable": return <span className="theme__status theme__status--off">{theme.enabledBy === "teacher" ? "先生が有効化" : "準備中"}</span>;
+      case "unavailable": return <span className="theme__status theme__status--off">{theme.enabledBy === "teacher" ? "先生が有効化" : theme.enabledBy === "later" ? "準備中" : "この端末では不可"}</span>;
     }
   })();
   return (
@@ -122,7 +138,7 @@ function ThemeCard({ theme, status, disabled, onOpen }: { theme: Theme; status: 
       </span>
       <span className="theme__body">
         <span className="theme__title">{theme.title}</span>
-        <span className="theme__tag">{theme.tagline}</span>
+        <span className="theme__tag">{theme.course}　{theme.tagline}</span>
       </span>
       <span className="theme__foot">
         {badge}

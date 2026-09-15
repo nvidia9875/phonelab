@@ -3,6 +3,7 @@
 > Planner（Gemini）が「予想を区別できる最小の実験」を選ぶときの唯一の候補集合。
 > **Planner に渡すのはこのカタログだけ**で、「現実（答え）」は渡さない（→ `answer_key` は別ファイル、[policy.md](policy.md) の漏えい検知だけが読む）。
 > 実装では `catalog/experiments.json` と `catalog/answers.json` に分けて置く。
+> **2026-09-15 改訂**: 中学を先に作る（[curriculum-coverage.md](curriculum-coverage.md)）。MVP は中 3「振り子と力学的エネルギー」と中 1「音の高さ」。振り子の周期は高校（物理）に回した。
 
 ## 1. 設計原則
 
@@ -11,21 +12,27 @@
 | 予想を区別する | 実験は「予想 A と予想 B で測定結果が違う」ように定義する。区別できない実験は候補にしない |
 | 一つだけ変える | `changes` は 1 変数、`holds` はそれ以外。生徒に「変えるもの / 一定にするもの」として見せる |
 | 二本目の時計 | 各実験は独立した 2 系統の推定量（`clocks`）を持つ。1 系統しか無い実験は「保留が出やすい」と明記 |
-| 手で測れない順 | 自由落下 0.45 s、音の高さ、うなり、を優先。振り子は入口 |
+| 手で測れないもの | 最下点の速さ、音の高さ（振動数）、自由落下 0.45 s。ストップウォッチや目では決められない量を選ぶ |
+| 教科書につなぐ | 各実験に学習指導要領と教科書の対応（`curriculum_ref`）を書く。対応の無い実験は既定にしない |
+| カメラ・マイクだけの版 | 中学のテーマは T0（カメラ・マイク）で成り立つものを必ず 1 つ以上並べる（Chromebook の学校で詰まないため） |
 | 安全条件はカタログに書く | Policy はカタログの `safety` を検査するだけ。Planner の判断に安全を任せない |
-| スマホは落とさない | `sensors` にカメラを使う実験でも、スマホは机の上に置く |
+| 端末は落とさない | `sensors` にカメラを使う実験でも、端末は机の上に置く |
 
 ## 2. スキーマ
 
 ```jsonc
 {
-  "id": "pendulum_mass",                 // 一意。snake_case
-  "family": "pendulum",                  // 同じ器具を使う実験のまとまり
-  "title": "同じ長さの糸で、重さだけ2倍にする",
-  "enabled_by": "default",               // "default" | "teacher"
+  "id": "energy_mass",                   // 一意。snake_case
+  "family": "pendulum_energy",           // 同じ器具を使う実験のまとまり（トップのテーマ）
+  "school": "jhs",                       // "jhs" | "hs"。トップの入口で絞る
+  "grade": 3,
+  "curriculum_ref": ["中学 第1分野(5)ア(ｳ)㋑ 力学的エネルギーの保存", "J3-15"],   // curriculum-coverage.md の ID
+  "min_tier": "T1",                      // "T0" カメラ・マイク / "T1" ＋加速度 / "T2" ＋方位（curriculum-coverage.md 2.3）
+  "title": "同じ高さから、重さだけ2倍にして放す",
+  "enabled_by": "default",               // "default" | "teacher" | "later"
   "variable": "mass",                    // 変えるもの（1 つ）
   "changes": "重さ（消しゴム 1 個から 2 個へ）",
-  "holds": ["糸の長さ", "振れ幅"],
+  "holds": ["放す高さ 15 cm", "糸の長さ 80 cm"],
   "conditions": [                        // 測る条件。順に測る
     { "key": "A", "label": "重さ 1倍" },
     { "key": "B", "label": "重さ 2倍" }
@@ -35,28 +42,30 @@
     "directions": ["faster", "same", "slower"]
   },
   "sensors": ["accelerometer", "gyroscope"],   // 必要な最小集合。Policy が ⊆ を検査
-  "seconds": 20,                          // 1 条件あたりの測定秒数。Policy が学級上限 ≤ を検査
-  "materials": ["糸（1 m 以下）", "袋", "消しゴム 2 個"],
+  "seconds": 10,                          // 1 条件あたりの測定秒数。Policy が学級上限 ≤ を検査
+  "materials": ["糸（80 cm）", "袋", "消しゴム 2 個", "ものさし"],
   "safety": {
     "max_height_m": 1.0,
-    "phone_in_hand": false,               // スマホを落とす・投げる実験は存在しない
+    "max_amplitude_deg": 45,
+    "phone_in_hand": false,               // 端末を落とす・投げる実験は存在しない
     "near_water": false,
     "near_traffic": false,
-    "note": "糸は 1 m 以下、机の上で。スマホはケースに入れて袋に"
+    "note": "糸は 1 m 以下、机の上で。端末はケースに入れて袋に。押さずに放す"
   },
   "measure": {                            // 端末内計算のプロファイル（→ verifier.md）
-    "quantity": "period_s",
-    "profile": "pendulum_period",
-    "tolerance_s": 0.05
+    "quantity": "speed_ms",
+    "profile": "pendulum_speed",
+    "length_m": 0.8,
+    "tolerance": 0.15,
+    "tolerance_kind": "abs"               // "abs" 単位そのまま | "rel" 条件 A の値に対する割合（音）
   },
-  "clocks": ["accel_norm_x2", "gyro_signed_axis"],   // 二本目の時計（→ verifier.md 3 章）
+  "clocks": ["gyro_omega_x_length", "accel_centripetal"],   // 二本目の時計（→ verifier.md 1.2b）
   "procedure": [
-    "糸の端にスマホを入れた袋を結び、机の端から垂らす",
-    "消しゴム 1 個を袋に入れる",
-    "小さく（20° 以内）振って、承認ボタンを押す",
-    "20 秒待つ。終わったら消しゴムを 2 個にして同じ振れ幅でもう一度"
+    "糸（80 cm）の端に、端末と消しゴム 1 個を入れた袋を結び、机の端から垂らす",
+    "袋の底をものさしで 15 cm 持ち上げ、「測る」を押してから、押さずに放す",
+    "10 秒待つ。終わったら消しゴムを 2 個にして、同じ 15 cm から放す"
   ],
-  "next_predictions": ["pendulum_length", "pendulum_amplitude"]   // 画面 3 の「次の予測」候補
+  "next_predictions": ["energy_height"]   // 画面 3 の「次の予測」候補
 }
 ```
 
@@ -64,19 +73,37 @@
 
 ```jsonc
 {
-  "pendulum_mass": {
+  "energy_mass": {
     "expected_direction": "same",
-    "reality": "加速度とジャイロが同じ周期を返す。重さを変えても周期は変わらない",
-    "leak_phrases": ["周期は変わらない", "重さに関係ない", "重さは関係"]   // Planner 出力の漏えい検知に使う
+    "reality": "ジャイロと加速度が同じ速さを返す。同じ高さから放せば、重さを変えても最下点の速さは変わらない",
+    "leak_phrases": ["速さは変わらない", "重さに関係ない", "重さは関係", "√(2gh)"]   // Planner 出力の漏えい検知に使う
   }
 }
 ```
 
-## 3. 既定の実験（10）
+## 3. 実験
 
-### 3.1 振り子（family: pendulum）— MVP
+### 3.1 振り子と力学的エネルギー（family: pendulum_energy）— 中 3・MVP
 
-理論値 `T = 2π√(L/g)`。L = 0.50 m → T = 1.42 s。L = 1.00 m → 2.01 s。
+- 対応: 中学 第 1 分野(5)ア(ｳ)㋑ 力学的エネルギーの保存（解説が「振り子」を例示。東京書籍の一覧に番号付きの保存実験は無い → curriculum-coverage.md 3.4）、J3-15 仕事とエネルギー（小球の速さ）
+- `school: "jhs"`、`grade: 3`、`min_tier: "T1"`
+- 理論値 v = √(2gh)。糸 L = 0.80 m で h = 10 cm → 1.40 m/s、h = 15 cm → 1.71 m/s、h = 20 cm → 1.98 m/s（振れ角 41°）
+
+| id | 変える | 一定 | センサー | 秒 | 区別できる予想 | 二本目の時計 |
+|---|---|---|---|---|---|---|
+| `energy_height` | 放す高さ（10 cm → 20 cm） | 重さ、糸の長さ 80 cm | 加速度・ジャイロ | 10 × 2 | 高いほど速い / 変わらない / 遅い | ジャイロの角速度 × 糸の長さ vs 加速度の向心成分 |
+| `energy_mass` | 重さ（消しゴム 1 個 → 2 個） | 放す高さ 15 cm、糸の長さ 80 cm | 加速度・ジャイロ | 10 × 2 | 重いほど速い / 変わらない / 遅い | 同上 |
+
+- 中学の「力学的エネルギー」の問いは「いちばん下での速さ」。周期は扱わない（周期は小 5「振り子の運動」と高校「物理」の内容）
+- 端末が受ける信号（→ [verifier.md](verifier.md) 1.2b）: 最下点でジャイロの角速度が最大になり、加速度の大きさも g + v²/L で最大になる。2 系統が独立に v を出す
+- `energy_mass` の「測定が言っていること」は「同じ高さから放すと、重さを変えても速さは変わらなかった」。重いほど速いという思い込みを壊す入口
+- 放すときに押すと速くなる。`procedure` に「押さずに放す」を書き、Verifier の `two_clocks_disagree` で拾う
+- 学校の iPad を袋に入れて吊るすかは先生が決める。**端末を机に置いて振り子を撮る動画版（T0）** を後で足す
+
+### 3.2 振り子の周期（family: pendulum_period）— 高校（物理）、`enabled_by: "later"`
+
+- 対応: 高校「物理」(1)(ｳ)㋑ 単振動（啓林館「物理」探究「単振り子の周期」）、共通テスト 令和 7 年度 物理 第 2 問。中学から見ると小 5 の復習
+- 理論値 `T = 2π√(L/g)`。L = 0.50 m → T = 1.42 s。L = 1.00 m → 2.01 s
 
 | id | 変える | 一定 | センサー | 秒 | 区別できる予想 | 二本目の時計 |
 |---|---|---|---|---|---|---|
@@ -85,9 +112,28 @@
 | `pendulum_amplitude` | 振れ幅（10°→30°） | 長さ、重さ | 加速度・ジャイロ | 20 × 2 | 大きく振ると速い / 変わらない / 遅い | 同上 |
 
 - `pendulum_amplitude` の注意: 30° でも周期の伸びは約 1.7%（1.42 s → 1.44 s）で **許容誤差 0.05 s の内側**。この実験の「測定が言っていること」は「この振れ幅の範囲では変わらなかった」。カタログの `note` に書き、Planner がその文を使う。60° 以上は飽和と糸の絡まりが増えるので `safety.max_amplitude_deg: 45`。
-- 振り子でスマホが受ける信号（→ [verifier.md](verifier.md) 3 章）: 加速度の大きさ |a| は **周期 T/2** で脈動する（最下点通過ごとに最大）。ジャイロの振り軸まわりの角速度は **周期 T** の符号付き正弦波。だから「加速度は ×2、ジャイロはそのまま」で 2 系統が独立に T を出す。
+- 振り子で端末が受ける信号（→ [verifier.md](verifier.md) 1.2）: 加速度の大きさ |a| は **周期 T/2** で脈動する（最下点通過ごとに最大）。ジャイロの振り軸まわりの角速度は **周期 T** の符号付き正弦波。だから「加速度は ×2、ジャイロはそのまま」で 2 系統が独立に T を出す。
 
-### 3.2 自由落下（family: freefall）— スマホは落とさない
+### 3.3 音の高さ（family: sound）— 中 1・MVP
+
+- 対応: 中学 第 1 分野(1)ア(ｱ)㋒ 音の性質、J1-16「弦の振動による音の大きさと高さ」（教科書の器具欄に「音の振動を測れるコンピュータでもよい」）
+- `school: "jhs"`、`grade: 1`、`min_tier: "T0"`（マイクだけ。Chromebook でも動く）
+
+| id | 学校 | 変える | 一定 | センサー | 秒 | 区別できる予想 | 二本目の時計 |
+|---|---|---|---|---|---|---|---|
+| `sound_pluck_strength` | 中 1 | はじく強さ（弱く → 強く） | 輪ゴムの長さと張り | マイク | 5 × 2 | 強くはじくと高くなる / 変わらない / 低くなる | 基本周波数 vs 第 2 倍音 ÷ 2 |
+| `sound_string_length` | 中 1 | 震える部分の長さ（輪ゴムの真ん中を指で押さえる） | 輪ゴム、はじく強さ | マイク | 5 × 2 | 短いと高くなる / 変わらない / 低くなる | 同上 |
+| `bottle_water` | 中 1（発展） | 水の量（空 / 半分） | ボトル、吹き方 | マイク | 5 × 2 | 水が多いほど低い / 変わらない / 高い | 同上 |
+| `echo_speed_of_sound` | 中 1（音の伝わり方） | 壁までの距離（2 m / 4 m） | 音源 | スピーカー・マイク | 5 × 2 | 遠いほど遅れる（比例） / 変わらない | 往復時間 vs 距離から逆算の一致 |
+| `beat_two_tones` | 高校（物理基礎） | 2 音の周波数差（スピーカーから 440 と 442 / 445 Hz） | 音量 | スピーカー・マイク | 5 × 2 | うなりは速くなる / 変わらない / 遅くなる | 包絡線の周期 vs スペクトルの差 |
+
+- 器具: 輪ゴム（同じ太さ）とティッシュの空き箱。教室にモノコードがあればそれでもよい
+- `sound_pluck_strength` は「強くはじくと高くなる」という思い込みを壊す。振動数は変わらず、大きさ（`rms_db`）だけが変わる。画面 3 に大きさの変化を添える。輪ゴムは強くはじくとわずかに高くなることがあるので、3% の許容誤差に収まるかを B7 で確かめる
+- 二本目の時計は倍音構造。基本周波数 f0 と第 2 倍音 f2 で f2/2 ≒ f0 なら信頼、ずれたら保留（別の音や雑音を拾った）
+- 基本周波数は Web Audio の `AnalyserNode` 時間領域データを自己相関。許容誤差は相対 3%（半音の半分）。`tolerance_kind: "rel"`
+- 承認のあと最初の 0.5 秒は鳴らさない（雑音の大きさを測る。[verifier.md](verifier.md) 1.4）
+
+### 3.4 自由落下（family: freefall）— 高校（物理基礎）、`enabled_by: "later"`
 
 | id | 変える | 一定 | センサー | 秒 | 区別できる予想 | 二本目の時計 |
 |---|---|---|---|---|---|---|
@@ -96,27 +142,17 @@
 
 - 1 m の落下時間は 0.45 s。手のストップウォッチでは測れない（反応時間 0.2 s）。
 - カメラは `requestVideoFrameCallback` のタイムスタンプで手放しコマと着地コマ、マイクは振幅の立ち上がりで着地音。映像も音も端末から出さない（→ policy.md 3 章、送るのは時刻差だけ）。
-- 安全: `max_height_m: 1.2`、クッションの上に落とす、スマホは机に置く。
+- 安全: `max_height_m: 1.2`、クッションの上に落とす、端末は机に置く。
+- 中学の「運動の規則性」は斜面に沿った運動を中心に扱うので、中学では補助的。
 
-### 3.3 音（family: sound）
+### 3.5 運動（family: motion）— `enabled_by: "later"`
 
-| id | 変える | 一定 | センサー | 秒 | 区別できる予想 | 二本目の時計 |
-|---|---|---|---|---|---|---|
-| `bottle_water` | 水の量（空 / 半分） | ボトル、吹き方 | マイク | 5 × 2 | 水が多いほど低い / 変わらない / 高い | 基本周波数 vs 第 2 倍音 ÷ 2 |
-| `beat_two_tones` | 2 音の周波数差（スピーカーから 440 と 442 / 445 Hz） | 音量 | スピーカー・マイク | 5 × 2 | うなりは速くなる / 変わらない / 遅くなる | 包絡線の周期 vs スペクトルの差 |
-| `echo_speed_of_sound` | 壁までの距離（2 m / 4 m） | 音源 | スピーカー・マイク | 5 × 2 | 遠いほど遅れる（比例） / 変わらない | 往復時間 vs 距離から逆算の一致 |
+| id | 学校 | 変える | 一定 | センサー | 秒 | 区別できる予想 | 二本目の時計 |
+|---|---|---|---|---|---|---|---|
+| `coin_slip_angle` | 中 1 力（摩擦は発展）/ 高校 物理基礎 | 面の材質（机 / 下敷き） | コイン | 加速度（傾き） | 10 × 2 | ざらざらほど早く滑る / 変わらない / 遅い | 傾き角（加速度） vs ジャイロ積分 |
+| `jump_airtime` | 高校（発展的） | ジャンプの高さ（軽く / 高く） | 着地の仕方 | 加速度（ポケットで） | 10 × 2 | 高いほど長い / 変わらない | 無重力区間の長さ vs 着地衝撃の間隔 |
 
-- `bottle_water` の「二本目の時計」は倍音構造。基本周波数 f0 と第 2 倍音 f2 で f2/2 ≒ f0 なら信頼、ずれたら保留（口笛や雑音を拾った）。
-- 基本周波数は Web Audio の `AnalyserNode` 時間領域データを自己相関。許容誤差は 3%（半音の半分）。
-
-### 3.4 運動（family: motion）
-
-| id | 変える | 一定 | センサー | 秒 | 区別できる予想 | 二本目の時計 |
-|---|---|---|---|---|---|---|
-| `coin_slip_angle` | 面の材質（机 / 下敷き） | コイン | 加速度（傾き） | 10 × 2 | ざらざらほど早く滑る / 変わらない / 遅い | 傾き角（加速度） vs ジャイロ積分 |
-| `jump_airtime` | ジャンプの高さ（軽く / 高く） | 着地の仕方 | 加速度（ポケットで） | 10 × 2 | 高いほど長い / 変わらない | 無重力区間の長さ vs 着地衝撃の間隔 |
-
-- `jump_airtime` はスマホをポケットに入れる。手に持たない（`phone_in_hand: false` は「手に持って動かす」を禁じる）。ジャンプ自体の安全条件: 室内、靴、周囲 1 m。**学級許可で教師が切れる**（`teacher_can_disable: true`）。
+- `jump_airtime` は端末をポケットに入れる。手に持たない（`phone_in_hand: false` は「手に持って動かす」を禁じる）。ジャンプ自体の安全条件: 室内、靴、周囲 1 m。**学級許可で教師が切れる**（`teacher_can_disable: true`）。
 
 ## 4. 教師が有効化する拡張（3）
 
@@ -128,33 +164,36 @@
 
 ## 5. Planner に渡す形
 
-Planner の入力は `experiments.json` から次のフィールドだけを抜いた **候補リスト**（学級許可とセンサー検出でフィルタ済み）:
+Planner の入力は `experiments.json` から次のフィールドだけを抜いた **候補リスト**（学校種・端末のティア・学級許可でフィルタ済み）:
 
 ```
-id, title, variable, changes, holds, conditions, distinguishes, sensors, seconds, materials, safety.note, procedure, note
+id, school, grade, title, variable, changes, holds, conditions, distinguishes, sensors, seconds, materials, safety.note, procedure, note
 ```
 
-渡さないもの: `answers.json` 全部、`clocks`、`measure.tolerance_s`（判定は Verifier がやる。Planner が数値で答えを匂わせないため）。
+`school` と `grade` は、問い返しの言葉の調子を学年に合わせるために渡す。
+
+渡さないもの: `answers.json` 全部、`clocks`、`measure.tolerance`、`curriculum_ref`、`min_tier`（判定は Verifier がやる。Planner が数値で答えを匂わせないため）。
 
 Planner の出力は [policy.md](policy.md) 2 章の `plan` スキーマ。**Planner はカタログ外の実験を作れない**（`experiment_id` は候補リストの id に限る。外れたら Policy が却下し「カタログ外の要望は実験にしない。最も近い候補を」と再提案させる）。
 
-## 6. 端末能力とカタログの絞り込み
+## 6. 学校種・端末とカタログの絞り込み
 
-| 端末 | 使えるセンサー | 残る実験 |
+候補リスト = カタログ ∩ 学級の学校種（`school`）∩ 端末のティア（`min_tier` ≦ 端末）∩ 学級許可。
+
+| 端末 | ティア | 残る実験（中学） |
 |---|---|---|
-| iPhone / Android（加速度あり） | 全部 | 全部 |
-| iPad | 全部 | 全部（大きいので振り子は袋が要る） |
-| ChromeOS（GIGA の 6 割、加速度なし） | マイク・カメラ・スピーカー | `freefall_*`, `bottle_water`, `beat_two_tones`, `echo_speed_of_sound` |
-| 学級許可でマイク不可 | 加速度・ジャイロ | `pendulum_*`, `coin_slip_angle`, `jump_airtime` |
+| iPad、iPhone、Android、加速度のある Chromebook | T1 以上 | 全部 |
+| 加速度の無い Chromebook、Windows ノート | T0 | `sound_*`、`bottle_water`、`echo_speed_of_sound` |
+| 学級許可でマイク不可 | — | `energy_*` |
 
-端末側は起動時に `DeviceMotionEvent` の有無と `navigator.mediaDevices` を検出し、`capabilities` としてサーバへ送る。Planner の候補リストはこれと学級許可の積集合。
+ティアは起動時ではなく **許可のあと 2 秒以内に `devicemotion` が届いたか** で決める（`"DeviceMotionEvent" in window` は Chromebook や Windows でも真になる）。結果を `capabilities` としてサーバへ送る。
 
 ## 7. MVP の順番
 
-1. `pendulum_mass`（デモ動画の主役。6 画面すべてこれで撮る）
-2. `pendulum_length`（画面 3 の「次の予測」の飛び先）
-3. `pendulum_amplitude`
-4. `freefall_mass`（ChromeOS の逃げ道。時間があれば）
-5. `bottle_water`（マイクの疎通確認を兼ねる。時間があれば）
+1. `energy_height`（中 3。デモ動画の主役。6 画面をこれで撮る）
+2. `energy_mass`（画面 3 の「次の予測」の飛び先）
+3. `sound_pluck_strength`（中 1。Chromebook でも動く）
+4. `sound_string_length`
+5. `bottle_water`（時間があれば）
 
-残りはカタログに **定義だけ置き、`enabled_by: "later"`** にして Planner の候補から外す。README に「カタログは JSON で拡張できる」と書ける状態にしておく（審査軸③）。
+高校の実験（`pendulum_*` の周期、`beat_two_tones`、`freefall_*`、`jump_airtime` など）は **定義だけ置き、`enabled_by: "later"`** にして Planner の候補から外す。README に「カタログは JSON で拡張でき、学校種と教科書の対応を持つ」と書ける状態にしておく（審査軸③）。

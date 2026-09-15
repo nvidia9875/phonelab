@@ -3,8 +3,9 @@
  * 形は docs/record-schema.md に合わせる。名前は持たない。
  */
 import { useSyncExternalStore } from "react";
-import type { LocalCheck, PendulumFeatures } from "../measure/pendulum";
-import type { Variable } from "../catalog/themes";
+import type { LocalCheck } from "../measure/checks";
+import type { Features } from "../measure/features";
+import type { School, Variable } from "../catalog/themes";
 
 export type Direction = "faster" | "same" | "slower" | "unknown";
 export type RecordStatus = "open" | "held" | "judged" | "signed" | "stopped";
@@ -17,7 +18,7 @@ export interface Claim {
 }
 export interface Measurement {
   condition: CondKey;
-  features: PendulumFeatures;
+  features: Features;
   checks: LocalCheck[];
   rawHash: string;
   pass: boolean;
@@ -80,8 +81,10 @@ const KEY_SETTINGS = "phonelab.settings.v1";
 export interface Settings {
   /** テストモード: 全テーマを選べ、センサーが無くてもサンプルで進める（記録に demo が残る） */
   testMode: boolean;
+  /** 入口の学校種。学級コードに持たせるまでは端末ごとの設定 */
+  school: School;
 }
-const DEFAULT_SETTINGS: Settings = { testMode: false };
+const DEFAULT_SETTINGS: Settings = { testMode: false, school: "jhs" };
 
 type State = { records: StudyRecord[]; student: Student | null; halted: boolean; settings: Settings };
 

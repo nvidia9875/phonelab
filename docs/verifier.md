@@ -46,6 +46,24 @@
 
 `T_accel_s` の 2 倍で T を出すので、加速度側の分解能は 2 倍粗い。これは「二本目の時計」の一致条件（0.05 s）に織り込み済み。
 
+### 1.2b 振り子の最下点の速さ（profile: `pendulum_speed`、中 3 力学的エネルギー）
+
+物理: 糸の長さ L（カタログの `measure.length_m`）の振り子を、高さ h から押さずに放す。最下点の速さは v = √(2gh)。端末には次の 2 つが独立に現れる。
+
+- **ジャイロ**: 振り軸まわりの角速度は最下点で最大 ω_max になる → **v = ω_max × L**
+- **加速度**: 最下点では |a| = g + v²/L（重力に向心加速度が足される） → **v = √((|a|_max − g) × L)**
+
+| clock | 入力 | 手順 | 出力 |
+|---|---|---|---|
+| `gyro_omega_x_length` | `rotationRate` の 3 軸 | 分散最大の軸を選ぶ → 先頭 1 秒を捨てる → 角速度の大きさが初めて 30 °/s を超えた時刻を放した時刻とする → そこから 3 周期ぶん（T = 2π√(L/g) で見積もる）の角速度の大きさの最大 → rad/s に直して × L | `v_gyro_ms` |
+| `accel_centripetal` | `accelerationIncludingGravity` の 3 軸 | 同じ区間のノルムの最大 → g = 9.81 を引く → × L → 平方根 | `v_accel_ms` |
+
+- 3 周期のあいだの減衰は小さいので、区間の最大を最下点の値とみなす
+- 端末は袋の中にあり質点ではないので v は近似。判定は同じ L で測った条件 A と B の比較なので、向きの判定には効かない
+- 理論値（L = 0.80 m）: h = 10 cm → v = 1.40 m/s（ω = 100 °/s、|a| = 12.3 m/s²）、h = 20 cm → 1.98 m/s（142 °/s、14.7 m/s²）
+
+特徴量: 1.1 のサンプリング一式、`release_at_s`、`length_m`、`omega_peak_dps`、`accel_norm_peak_ms2`、`v_gyro_ms`、`v_accel_ms`、`gyro_axis`、`saturation_runs`。
+
 ### 1.3 安定性と振幅
 
 | 特徴量 | 定義 | 用途 |
@@ -59,14 +77,16 @@
 | `saturation_runs` | ノルムまたは角速度が同一値で 5 サンプル以上続いた回数 | 飽和（クリップ） |
 | `autocorr_peak` | 採用した極大の `r` 値（両 clock） | 信号の質 |
 
-### 1.4 音の基本周波数（profile: `pitch`）
+### 1.4 音の基本周波数（profile: `pitch`、中 1 音の高さ）
+
+マイクは `echoCancellation` / `noiseSuppression` / `autoGainControl` を切って開く（Safari は後の 2 つを切れる保証がない → curriculum-coverage.md 2.2）。`AnalyserNode`（`fftSize` 4096）を 100 ms ごとに読み、1 回分を 1 フレームとする。**承認のあと最初の 0.5 秒は音を出さない**（雑音の大きさを測る）。
 
 | clock | 手順 | 出力 |
 |---|---|---|
-| `f0_autocorr` | `AnalyserNode.getFloatTimeDomainData` を 1 秒分 → 自己相関 → 最初のピーク → f0 | `f0_hz` |
-| `harmonic_2_half` | FFT で f0 の 1.8〜2.2 倍の範囲のピーク → ÷2 | `f0_from_h2_hz` |
+| `f0_autocorr` | 音のあるフレーム（RMS が雑音より 10 dB 以上大きい）ごとに、時間領域データを自己相関 → 80〜2000 Hz の範囲の最初のピーク → f0。フレームの中央値 | `f0_hz` |
+| `harmonic_2_half` | 同じフレームの FFT（`getFloatFrequencyData`）で f0 の 1.8〜2.2 倍の範囲のピーク → ÷2。フレームの中央値 | `f0_from_h2_hz` |
 
-特徴量: `f0_hz`, `f0_from_h2_hz`, `rms_db`, `snr_db`, `clipping_ratio`, `duration_s`。
+特徴量: `f0_hz`, `f0_from_h2_hz`, `rms_db`（音の大きさ。判定には使わず、画面 3 に大きさの変化を添える）, `noise_db`, `snr_db`, `clipping_ratio`, `voiced_frames`, `duration_s`。時間領域データは端末から出さない。
 
 ### 1.5 自由落下（profile: `freefall_time`）
 
@@ -107,6 +127,16 @@
 
 通過したときの採用値: `T_s = (T_accel_s + T_gyro_s) / 2`、`T_unc_s = max(|T_accel_s − T_gyro_s|, 0.01)`。
 
+### 2.2b 振り子の速さ（`pendulum_speed`）
+
+| コード | 条件 | 理由文 |
+|---|---|---|
+| `no_release` | 角速度の大きさが一度も 30 °/s を超えない | 振り子が動き出していません |
+| `out_of_range` | v が 0.2〜4.0 m/s の外 | 振り子の速さとして考えにくい値です |
+| `two_clocks_disagree` | `abs(v_gyro_ms − v_accel_ms) > tolerance`（0.15 m/s。B7 の実機計測で決め直す） | 二つのセンサーの速さが一致しません |
+
+通過したときの採用値: `v_ms = (v_gyro_ms + v_accel_ms) / 2`、`v_unc_ms = max(abs(v_gyro_ms − v_accel_ms), 0.02)`。共通の `low_rate` / `gap` / `saturation` はそのまま使う。
+
 ### 2.3 音（`pitch`）
 
 | コード | 条件 |
@@ -115,6 +145,7 @@
 | `low_snr` | `snr_db < 10` |
 | `clipping` | `clipping_ratio > 0.01` |
 | `out_of_range` | f0 が 80〜2000 Hz の外 |
+| `low_voiced` | `voiced_frames < 5`（音が短すぎて高さを決められない） |
 
 ### 2.4 自由落下（`freefall_time`）
 
@@ -131,11 +162,12 @@
 
 ```
 Δ = value_B − value_A
-u = max(tolerance, unc_A + unc_B)
+u = max(tolerance, unc_A + unc_B)            # 音は相対値: tolerance = 0.03 × value_A
 
-if |Δ| ≤ u:        observed = "same"
-elif Δ < 0:        observed = "faster"   (周期が短い = 速い。音なら f が高い = "higher")
-else:              observed = "slower"
+sign = −1 if quantity == "period_s" else +1  # 周期は短いほど速い。速さ m/s と振動数 Hz は大きいほど速い / 高い
+if |Δ| ≤ u:           observed = "same"
+elif sign × Δ > 0:    observed = "faster"      # 音では「高くなった」と表示
+else:                 observed = "slower"
 ```
 
 | 予想 vs 観測 | 画面 3 の文（言葉のルール: 「正解」「間違い」と言わない） |
@@ -153,6 +185,8 @@ else:              observed = "slower"
 | `gap` | 「画面を開いたまま、同じ条件でもう一度 20 秒」 |
 | `saturation` | 「振れ幅を小さく（20° 以内）して、同じ条件でもう一度」 |
 | `no_signal` | 「振り子が止まっていました。振ってから承認を」 |
+| `no_release` | 「袋の底をものさしで高さに合わせて、押さずに放してから測る」 |
+| `low_snr` / `low_voiced` | 「端末に近づけて、はっきり鳴らしてから、もう一度 5 秒」 |
 | `two_clocks_disagree` 2 回目 | 「この端末では加速度を使わず、ジャイロ 2 回の一致で判定に切り替えます」（clock を `gyro_signed_axis` × 2 回に変更。記録に残す） |
 | `remeasure_per_condition` 上限 | 「この端末ではこの実験は保留のまま。別の実験へ」 |
 
@@ -177,3 +211,8 @@ else:              observed = "slower"
 | A = 1.42 ± 0.01、B = 1.43 ± 0.01、claim faster | observed `same`、不一致文 |
 | A = 1.42、B = 2.01（長さ 2 倍）、claim slower | observed `slower`、一致文 |
 | 前半 1.42、後半 1.55 | `hold: unstable` |
+| 合成の振り子（L = 0.80 m、h = 10 cm、60 Hz、10 秒） | `v_gyro_ms` ≈ `v_accel_ms` ≈ 1.40、`pass` |
+| 同上で角速度が 30 °/s を超えない | `hold: no_release` |
+| 速さ A = 1.40、B = 1.98、claim faster | observed `faster`、一致文 |
+| 合成音（f0 = 220 Hz ＋ 第 2 倍音、SNR 30 dB） | `f0_hz` ≈ `f0_from_h2_hz` ≈ 220、`pass` |
+| 音 A = 220 Hz、B = 224 Hz（1.8%）、claim faster | observed `same`（相対 3% の内側） |
