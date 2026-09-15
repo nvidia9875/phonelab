@@ -96,7 +96,7 @@ class PlanOutput(BaseModel):            # policy.md 2 章と同じ
 
 planner = LlmAgent(
     name="planner",
-    model="gemini-2.5-flash",           # モデル ID はスパイク B5 で最新を確認
+    model="gemini-3.8-flash",           # B5（9/15）で Vertex AI global から呼べた最新の Flash
     instruction=PLANNER_INSTRUCTION,    # {candidates} と {class_note?} を state から差し込む
     output_schema=PlanOutput,
     output_key="plan",
@@ -122,7 +122,7 @@ planner = LlmAgent(
 ```python
 class_observer = LlmAgent(
     name="class_observer",
-    model="gemini-2.5-flash",
+    model="gemini-3.8-flash",
     instruction=CLASS_INSTRUCTION,
     tools=[get_class_snapshot, get_student_trace, propose_action],
     generate_content_config=types.GenerateContentConfig(temperature=0.3, max_output_tokens=2048),
@@ -198,13 +198,13 @@ ADK はデプロイ時に `ADK_CAPTURE_MESSAGE_CONTENT_IN_SPANS='false'` を設�
 | サービス | 1 つ（`phonelab`）。PWA の静的配信も同居（`/`）、API は `/api/*`、教員画面は `/teacher` |
 | 実行 | `uvicorn` + FastAPI。ADK は `Runner` を直接使う（`get_fast_api_app` は使わない。公開 API の形を自分で決めるため。dev UI は不要） |
 | スケール | `min-instances=0`、`max-instances=3`、`concurrency=80`、CPU は起動時のみ |
-| サービスアカウント | 最小権限: `roles/datastore.user`、`roles/cloudkms.signerVerifier`（鍵 1 本に限定）、`roles/modelarmor.user`、`roles/cloudtrace.agent`、`roles/aiplatform.user` |
+| サービスアカウント | 最小権限: `roles/datastore.user`、`roles/cloudkms.signerVerifier`（鍵 1 本に限定）、`roles/modelarmor.user`、`roles/telemetry.writer`（ADK は Telemetry API に OTLP で送るので `cloudtrace.agent` ではなくこちら）、`roles/aiplatform.user`。B5 時点はデフォルト compute SA（editor）のまま |
 | 認証 | 未認証アクセス許可（生徒は URL で入る）。学級コード＋番号はアプリ層 |
 | Secret | 教師 PIN のハッシュは Firestore、鍵は KMS。Secret Manager は使わない（持つ秘密が無い） |
 | デプロイ | `gcloud run deploy --source .`（Cloud Build）。main への push で GitHub Actions が実行。新規プロジェクトはデフォルト compute SA に `roles/cloudbuild.builds.builder` 等を付けないとソースデプロイが失敗する（9/9 に遭遇） |
 | ヘルスチェック | `/api/status`。**`/healthz` は Google Front End が手前で 404 を返しコンテナに届かない**（9/9 に確認。リクエストログにも出ない） |
 | 実績 | プロジェクト `phonelab-2026`、サービス `phonelab`、URL https://phonelab-1094091671194.asia-northeast1.run.app（9/9） |
-| Trace | 起動時に `google_cloud.get_gcp_exporters(enable_cloud_tracing=True)` → `maybe_set_otel_providers` |
+| Trace | 起動時に `google_cloud.get_gcp_exporters(enable_cloud_tracing=True)` → `maybe_set_otel_providers`（`server/telemetry.py`、env `PHONELAB_TRACE_TO_CLOUD=1`）。送り先は Telemetry API（OTLP）で、**`observability.googleapis.com` の有効化が要る**（無いと `_Trace bucket not found` で保存されない。9/15）。ADK 2.8 は既定でプロンプトと応答をスパンに入れるので、同じファイルで `ADK_CAPTURE_MESSAGE_CONTENT_IN_SPANS=false` を設定する |
 
 ## 6. 費用の見積もり（12/1 までの 3 ヶ月）
 
