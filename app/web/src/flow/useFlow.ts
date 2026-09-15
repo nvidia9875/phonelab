@@ -2,12 +2,13 @@
  * 一本の記録を進める操作。画面はこれだけを呼ぶ。
  * サーバ実装後は、choosePlan / checkPolicy / judge / sign の呼び先を API に差し替える。
  */
+import type { ChatReply } from "../agent/chat";
 import { checkPolicy, choosePlan, judge, readClaim } from "../agent/stub";
 import { QUANTITY, formatQuantity, type Unit } from "../catalog/quantity";
 import { SENSOR_LABEL, themeById, variantById, variantsOf, type Theme } from "../catalog/themes";
 import type { LocalCheck } from "../measure/checks";
 import { clocksSummary, measuredValue, type Features } from "../measure/features";
-import { activeRecordForTheme, addEvent, createRecord, recordsForTheme, updateRecord, type CondKey, type Direction, type StudyRecord } from "../store/records";
+import { activeRecordForTheme, addEvent, createRecord, recordsForTheme, updateRecord, type ChatLog, type CondKey, type Direction, type StudyRecord } from "../store/records";
 
 export const MAX_RETRY = 3;
 
@@ -52,7 +53,7 @@ export function submitPrediction(rec: StudyRecord, theme: Theme, text: string): 
   updateRecord(rec.id, (r) => {
     let n: StudyRecord = { ...r, prediction: { ...r.prediction, text, claim, questionBack: null }, rejection: null, variantId: plan.variant.id, stage: "plan" };
     n = addEvent(n, "予想", `${text}（証拠を見る前に記入）`, "orange");
-    n = addEvent(n, "計画", `${plan.variant.title}。AI 提案`);
+    n = addEvent(n, "計画", `${plan.variant.title}。ラボ先生の提案`);
     return n;
   });
   return "plan";
@@ -149,7 +150,7 @@ export async function closeAndNext(rec: StudyRecord, theme: Theme): Promise<Stud
     const text = `${nv.changes.split("（")[0]}を変えたら、${directionWord(nv.unit, direction)}と思う`;
     let n: StudyRecord = { ...r, variantId: nv.id, stage: "plan", prediction: { ...r.prediction, text, claim: { variable: nv.variable, direction }, questionBack: null } };
     n = addEvent(n, "予想", `${text}（前の実験の結果を見て記入）`, "orange");
-    n = addEvent(n, "計画", `${nv.title}。AI 提案`);
+    n = addEvent(n, "計画", `${nv.title}。ラボ先生の提案`);
     return n;
   });
   return next;
@@ -167,6 +168,25 @@ export async function sealRecord(rec: StudyRecord): Promise<void> {
       const unit = (theme && variantById(theme, r.nextPrediction.variantId ?? r.variantId)?.unit) ?? "s";
       n = addEvent(n, "次の予測", `「${directionWord(unit, r.nextPrediction.direction)}」と記入。次の実験へ`, "orange");
     }
+    return n;
+  });
+}
+
+const EMPTY_CHAT: ChatLog = { thinking: "", messages: [], revealed: false, turnsUsed: 0, limitReached: false };
+
+/** ラボ先生とのふり返り: 自分の考え（先生の説明を開く鍵）を記録に残す */
+export function setChatThinking(rec: StudyRecord, thinking: string): void {
+  updateRecord(rec.id, (r) => ({ ...r, chat: { ...(r.chat ?? EMPTY_CHAT), thinking } }));
+}
+
+/** ラボ先生との 1 往復を記録に残す。説明を初めて聞いたらイベントにも残す */
+export function addChatTurn(rec: StudyRecord, studentText: string, reply: ChatReply): void {
+  const at = new Date().toISOString();
+  updateRecord(rec.id, (r) => {
+    const chat = r.chat ?? EMPTY_CHAT;
+    const messages = [...chat.messages, { role: "student" as const, text: studentText, at }, { role: "teacher" as const, text: reply.reply, at }];
+    let n: StudyRecord = { ...r, chat: { ...chat, messages, revealed: chat.revealed || reply.revealed, turnsUsed: reply.turns_used, limitReached: reply.limit_reached } };
+    if (reply.revealed && !chat.revealed) n = addEvent(n, "ラボ先生", "自分の考えを書いたあとで、ラボ先生の説明を聞いた", "orange");
     return n;
   });
 }

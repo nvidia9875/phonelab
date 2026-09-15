@@ -15,11 +15,12 @@ export interface ResultProps {
   onGoNext: () => void;
   onFinish: () => void;
   onRecord: () => void;
+  onChat: () => void;
   onHome: () => void;
 }
 
 /** 画面 3: 結果と次の予測。「正解」と言わない。「測定が言っていること」と言う */
-export function Result({ variant, judgement, explain, nextVariant, nextDirection, onExplain, onNext, onGoNext, onFinish, onRecord, onHome }: ResultProps) {
+export function Result({ variant, judgement, explain, nextVariant, nextDirection, onExplain, onNext, onGoNext, onFinish, onRecord, onChat, onHome }: ResultProps) {
   const [text, setText] = useState(explain);
   const j = judgement;
   const unit = variant.unit;
@@ -73,6 +74,7 @@ export function Result({ variant, judgement, explain, nextVariant, nextDirection
         ) : (
           <Button onClick={() => { onExplain(text); onFinish(); }}>トップへ</Button>
         )}
+        <Button secondary onClick={() => { onExplain(text); onChat(); }}>ラボ先生と、なぜそうなったか話す</Button>
         <LinkRow>
           <Link icon="ribbon" onClick={() => { onExplain(text); onRecord(); }}>
             署名付きの実験記録

@@ -54,6 +54,8 @@ export interface Theme {
   safety: string;
   /** 準備画面の「測る」の直前に出す一文 */
   measureHint: string;
+  /** カウントダウンの 0 で大きく出す合図 */
+  goCue: string;
   enabledBy: "default" | "teacher" | "later";
   measureProfile: MeasureProfile;
   variants: Variant[];
@@ -72,9 +74,9 @@ const SPEED_TOLERANCE_MS = 0.15;
 const PITCH_TOLERANCE_REL = 0.03;
 const PERIOD_TOLERANCE_S = 0.05;
 
-type Later = Omit<Theme, "variants" | "build" | "measureHint" | "enabledBy" | "measureProfile" | "example"> & Partial<Pick<Theme, "enabledBy">>;
+type Later = Omit<Theme, "variants" | "build" | "measureHint" | "enabledBy" | "measureProfile" | "example" | "goCue"> & Partial<Pick<Theme, "enabledBy">>;
 function later(t: Later): Theme {
-  return { build: ["先生と一緒に準備します"], example: "たとえば：〇〇を変えると、△△になると思う。理由は…", measureHint: "準備中です", enabledBy: "later", measureProfile: "later", variants: [], ...t };
+  return { build: ["先生と一緒に準備します"], example: "たとえば：〇〇を変えると、△△になると思う。理由は…", measureHint: "準備中です", goCue: "スタート！", enabledBy: "later", measureProfile: "later", variants: [], ...t };
 }
 
 const CATALOG: Theme[] = [
@@ -95,7 +97,8 @@ const CATALOG: Theme[] = [
     sensors: ["accelerometer", "gyroscope"],
     seconds: 10,
     safety: "糸は 1 m 以下、机の上で。端末はケースに入れて袋に。押さずに放す",
-    measureHint: "端末は袋に入れたまま。「測る」を押してから、押さずにそっと放します",
+    measureHint: "端末は袋に入れたまま。「測る」を押すと 3, 2, 1 の合図が出ます。0 で、押さずにそっと放します",
+    goCue: "そっと放して！",
     enabledBy: "default",
     measureProfile: "pendulum_speed",
     variants: [
@@ -147,7 +150,8 @@ const CATALOG: Theme[] = [
     sensors: ["microphone"],
     seconds: 5,
     safety: "輪ゴムを人に向けて飛ばさない。耳の近くではじかない",
-    measureHint: "端末は箱の横の机に置き、画面はこのまま。「測る」を押したら少し待ってから、何回かはじきます",
+    measureHint: "端末は箱の横の机に置き、画面はこのまま。3, 2, 1 のあと「はじいて！」の合図で、何回かはじきます",
+    goCue: "はじいて！",
     enabledBy: "default",
     measureProfile: "pitch",
     variants: [
@@ -189,15 +193,20 @@ const CATALOG: Theme[] = [
     curriculumRef: ["中学 第1分野(1)ア(ｱ)㋒ 音の性質"],
     minTier: "T0",
     title: "ペットボトルの音",
-    build: ["空のペットボトルの口に、息を吹いて音を出してみる", "水を少し入れて、もう一度吹いてみる"],
+    build: [
+      "500 mL くらいの、口の細いペットボトルを用意する（大きいボトルは音が低く、出しにくい）",
+      "下くちびるをボトルの口のふちに軽く当て、口の横から細く息を吹きかける。むずかしければ、ボトルの口を手のひらでポンとたたいて音を出す",
+      "水を少し入れて、同じやり方で鳴らしてみる",
+    ],
     question: "水を増やすと、音は高くなる？低くなる？",
     example: "たとえば：水を入れるとボトルが重くなるから、音が低くなると思う",
-    tagline: "口に息を吹いて、基本周波数を測る",
-    materials: "ペットボトル、水、自分の息",
+    tagline: "吹くか、口をポンとたたいて、音の高さを測る",
+    materials: "500 mL くらいの細口ペットボトル、水",
     sensors: ["microphone"],
     seconds: 5,
     safety: "水は机の上でこぼさないように",
-    measureHint: "端末はボトルの近くの机に置く。「測る」を押したら少し待ってから、同じ吹き方で何回か",
+    measureHint: "端末はボトルの近くの机に置く。3, 2, 1 のあと「鳴らして！」の合図で、同じやり方で何回か",
+    goCue: "鳴らして！",
     enabledBy: "default",
     measureProfile: "pitch",
     variants: [
@@ -206,10 +215,10 @@ const CATALOG: Theme[] = [
         variable: "water",
         title: "同じボトルで、水の量だけ変える",
         changes: "水の量（空 → 半分）",
-        holds: "ボトル、吹き方",
+        holds: "ボトル、鳴らし方",
         conditions: [
-          { key: "A", label: "空", setup: "空のボトルの口に息を吹く" },
-          { key: "B", label: "水 半分", setup: "水を半分まで入れて、同じ吹き方で" },
+          { key: "A", label: "空", setup: "空のボトルを、吹くか、口をポンとたたくかで鳴らす" },
+          { key: "B", label: "水 半分", setup: "水を半分まで入れて、同じやり方で鳴らす" },
         ],
         tolerance: PITCH_TOLERANCE_REL,
         toleranceKind: "rel",
@@ -237,6 +246,7 @@ const CATALOG: Theme[] = [
     seconds: 20,
     safety: "糸は1m以下、机の上で。スマホはケースに入れて袋に",
     measureHint: "スマホは袋に入れたまま、画面はこのまま。小さく振ってから「測る」を押します",
+    goCue: "そのまま振って！",
     enabledBy: "later",
     measureProfile: "pendulum_period",
     variants: [

@@ -59,6 +59,36 @@ describe("analyzeSpeed", () => {
     expect(high.v_accel_ms - low.v_accel_ms).toBeGreaterThan(0.4);
   });
 
+  it("keeps the first bottom pass when released right at the go signal after a countdown", () => {
+    const lengthM = 0.8;
+    const heightM = 0.1;
+    const releaseS = 0.4;
+    const damping = 0.3;
+    const theta0 = Math.acos(1 - heightM / lengthM);
+    const wn = Math.sqrt(G / lengthM);
+    const buf: RawBuffer = { t: [], ax: [], ay: [], az: [], gx: [], gy: [], gz: [], interval: 1000 / 60 };
+    for (let i = 0; i < 10 * 60; i++) {
+      const s = i / 60;
+      const u = Math.max(0, s - releaseS);
+      const amp = theta0 * Math.exp(-damping * u);
+      const th = amp * Math.cos(wn * u);
+      const dth = s < releaseS ? 0 : amp * (-damping * Math.cos(wn * u) - wn * Math.sin(wn * u));
+      buf.t.push(i * (1000 / 60));
+      buf.ax.push(0.02 * Math.sin(7 * s));
+      buf.ay.push(0.02 * Math.cos(5 * s));
+      buf.az.push(G * Math.cos(th) + lengthM * dth * dth);
+      buf.gx.push(0.3 * Math.sin(3 * s));
+      buf.gy.push((dth * 180) / Math.PI);
+      buf.gz.push(0.2 * Math.cos(4 * s));
+    }
+    const quarterPeriod = Math.PI / (2 * wn);
+    const firstPass = expectedSpeed(lengthM, heightM) * Math.exp(-damping * quarterPeriod);
+
+    const f = analyzeSpeed(buf, lengthM, 200);
+
+    expect(Math.abs(f.v_gyro_ms - firstPass) / firstPass).toBeLessThan(0.04);
+  });
+
   it("holds with no_release when the pendulum never starts moving", () => {
     const f = analyzeSpeed(swing({ lengthM: 0.8, heightM: 0.1, releaseS: 20 }), 0.8);
 

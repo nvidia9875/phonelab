@@ -19,6 +19,8 @@ export type MeasurementState =
   | { phase: "idle" }
   /** ブラウザの許可の確認に答えるのを待っている（答えが無いと、ここで止まったままになる） */
   | { phase: "requesting"; sensor: "microphone" | "motion"; seconds: number }
+  /** 許可のあとの「準備はいい？ 3, 2, 1」。この間はセンサーを読まない */
+  | { phase: "countdown"; count: number; seconds: number }
   | { phase: "denied"; reason: "denied" | "unsupported"; message?: string }
   | { phase: "measuring"; elapsed: number; samples: number; seconds: number }
   | { phase: "done"; features: Features; checks: LocalCheck[]; rawHash: string; seconds: number; stopped: boolean };
@@ -31,10 +33,15 @@ export interface MeasurementOptions {
 const MIN_MOTION_SAMPLES = 50;
 const MIN_PITCH_FRAMES = 10;
 const DEFAULT_LENGTH_M = 0.8;
+const COUNTDOWN_FROM = 3;
+const COUNT_MS = 1000;
+/** カウントダウンのあとは承認タップの揺れが無いので、合図の直後に放しても最初の最下点を拾えるように短くする */
+const SETTLE_AFTER_COUNTDOWN_MS = 200;
 
 const isMotionSensor = (s: Sensor): s is Permit["sensors"][number] => s === "accelerometer" || s === "gyroscope";
+const wait = (ms: number) => new Promise<void>((resolve) => window.setTimeout(resolve, ms));
 
-/** 承認 → 許可 → 収集 → 端末内計算 → 速報検査。生データはこのフックの外に出さない */
+/** 承認 → 許可 → 3, 2, 1 → 収集 → 端末内計算 → 速報検査。生データはこのフックの外に出さない */
 export function useMeasurement({ onMotionUnavailable }: MeasurementOptions = {}) {
   const [state, setState] = useState<MeasurementState>({ phase: "idle" });
   const stopRef = useRef<(() => void) | null>(null);
@@ -54,6 +61,14 @@ export function useMeasurement({ onMotionUnavailable }: MeasurementOptions = {})
       const tick = (elapsed: number, samples: number) => set({ phase: "measuring", elapsed, samples, seconds: spec.seconds });
       const finish = (features: Features, rawHash: string) =>
         set({ phase: "done", features, checks: checksFor(features, variant), rawHash, seconds: spec.seconds, stopped: stoppedRef.current });
+      const countdown = async (): Promise<boolean> => {
+        for (let count = COUNTDOWN_FROM; count > 0; count--) {
+          set({ phase: "countdown", count, seconds: spec.seconds });
+          await wait(COUNT_MS);
+          if (!current()) return false;
+        }
+        return true;
+      };
 
       if (spec.profile === "pitch") {
         const ctx = createAudioContext(); // 許可を待つ前に、タップの中で作る（iOS）
@@ -64,6 +79,11 @@ export function useMeasurement({ onMotionUnavailable }: MeasurementOptions = {})
           void ctx?.close();
           const reason = mic.kind === "granted" ? "unsupported" : mic.kind;
           set({ phase: "denied", reason, message: reason === "denied" ? "マイクの許可がありませんでした" : "この端末ではマイクが使えません" });
+          return;
+        }
+        if (!(await countdown())) {
+          mic.stream.getTracks().forEach((track) => track.stop());
+          void ctx.close();
           return;
         }
         measuring();
@@ -87,6 +107,7 @@ export function useMeasurement({ onMotionUnavailable }: MeasurementOptions = {})
         set({ phase: "denied", reason: permission });
         return;
       }
+      if (!(await countdown())) return;
       measuring();
       const { done, stop } = collect({ sensors: spec.sensors.filter(isMotionSensor), seconds: spec.seconds }, tick);
       stopRef.current = stop;
@@ -98,7 +119,8 @@ export function useMeasurement({ onMotionUnavailable }: MeasurementOptions = {})
         set({ phase: "denied", reason: "unsupported", message: "この端末では加速度センサーの値が届きません" });
         return;
       }
-      const features = spec.profile === "pendulum_speed" ? analyzeSpeed(raw, spec.lengthM ?? DEFAULT_LENGTH_M) : analyzePeriod(raw);
+      const features =
+        spec.profile === "pendulum_speed" ? analyzeSpeed(raw, spec.lengthM ?? DEFAULT_LENGTH_M, SETTLE_AFTER_COUNTDOWN_MS) : analyzePeriod(raw);
       finish(features, await motionRawHash(raw));
     },
     [onMotionUnavailable],

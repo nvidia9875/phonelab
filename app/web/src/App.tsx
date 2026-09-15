@@ -12,6 +12,7 @@ import { Record } from "./screens/Record";
 import { Halted } from "./screens/Halted";
 import { Teacher } from "./screens/Teacher";
 import { Settings } from "./screens/Settings";
+import { Chat } from "./screens/Chat";
 import { themeById, variantById, type Theme } from "./catalog/themes";
 import { matchRoute, nav, usePath, type Route } from "./router";
 import { activeRecordForTheme, clearAll, createRecord, recordById, setHalted, setSettings, setStudent, useStore, type StudyRecord } from "./store/records";
@@ -23,6 +24,14 @@ import { probeMotionEvents } from "./measure/pendulum";
 import * as flow from "./flow/useFlow";
 
 const goHome = () => nav("/");
+
+/** 音は最初の 0.5 秒で雑音の大きさを測るので、合図の前に「しーっ」を出す（docs/verifier.md 1.4） */
+const QUIET_S = 0.5;
+const CUE_HOLD_S = 2;
+function cueFor(theme: Theme, elapsed: number): string {
+  if (theme.measureProfile === "pitch") return elapsed < QUIET_S ? "しーっ、静かに" : theme.goCue;
+  return elapsed < CUE_HOLD_S ? theme.goCue : "そのまま待ちます";
+}
 
 /** 記録の段階 → その続きの URL */
 function stagePath(themeId: string, stage: StudyRecord["stage"]): string {
@@ -37,7 +46,7 @@ function stagePath(themeId: string, stage: StudyRecord["stage"]): string {
 
 /** 描画中に副作用を起こさないため、リダイレクト先と「描画前にやること」をここで決める */
 function resolve(route: Route, rec: StudyRecord | undefined, theme: Theme | undefined, hasStudent: boolean, halted: boolean): { redirect?: string; need?: "create" | "judge" } {
-  const inTheme = route.name === "predict" || route.name === "plan" || route.name === "rejected" || route.name === "setup" || route.name === "measure" || route.name === "hold" || route.name === "result";
+  const inTheme = route.name === "predict" || route.name === "plan" || route.name === "rejected" || route.name === "setup" || route.name === "measure" || route.name === "hold" || route.name === "result" || route.name === "chat";
   if (!inTheme) return {};
   if (!theme) return { redirect: "/" };
   if (!hasStudent) return { redirect: "/me" };
@@ -53,6 +62,7 @@ function resolve(route: Route, rec: StudyRecord | undefined, theme: Theme | unde
     const last = rec.measurements[rec.measurements.length - 1];
     if (!last || last.pass) return { redirect: `/x/${theme.id}/plan` };
   }
+  if (route.name === "chat" && !rec.result && rec.status !== "held") return { redirect: stagePath(theme.id, rec.stage) };
   if (route.name === "result") {
     if (!rec.result) {
       const a = rec.measurements.some((m) => m.condition === "A" && m.pass);
@@ -234,7 +244,9 @@ export function App() {
       const cannotRead = t.measureProfile === "pitch" ? "この端末ではマイクが使えません" : "この端末では加速度センサーが読めません";
       const view: MeasureView =
         s.phase === "measuring"
-          ? { phase: "measuring", elapsed: s.elapsed, seconds: s.seconds, conditionLabel: label, clocks: emptyClocks, unit, checks: [], sentBytes: null, allOk: false }
+          ? { phase: "measuring", elapsed: s.elapsed, seconds: s.seconds, conditionLabel: label, clocks: emptyClocks, unit, checks: [], sentBytes: null, allOk: false, cue: cueFor(t, s.elapsed) }
+          : s.phase === "countdown"
+            ? { phase: "countdown", elapsed: 0, seconds: s.seconds, conditionLabel: label, clocks: emptyClocks, unit, checks: [], sentBytes: null, allOk: false, countdown: s.count, cue: t.goCue }
           : s.phase === "requesting"
             ? { phase: "requesting", elapsed: 0, seconds: s.seconds, conditionLabel: label, clocks: emptyClocks, unit, checks: [], sentBytes: null, allOk: false, waitingFor: s.sensor === "microphone" ? "マイクの許可を待っています。ブラウザの確認で「許可」を押してください" : "センサーの許可を待っています。確認で「許可」を押してください" }
           : s.phase === "done"
@@ -267,6 +279,7 @@ export function App() {
           retry={r.retries[cond]}
           maxRetry={flow.MAX_RETRY}
           onRetry={() => { flow.retry(r, cond); nav(`/x/${t.id}/setup/${cond}`); }}
+          onChat={() => nav(`/x/${t.id}/chat`)}
           onOther={goHome}
           onHome={goHome}
         />
@@ -286,10 +299,23 @@ export function App() {
           onGoNext={async () => { const next = await flow.closeAndNext(r, t); nav(next ? `/x/${t.id}/plan` : "/"); }}
           onFinish={async () => { await flow.sealRecord(r); goHome(); }}
           onRecord={async () => { await flow.sealRecord(r); nav(`/records/${r.id}`); }}
+          onChat={() => nav(`/x/${t.id}/chat`)}
           onHome={goHome}
         />
       );
     }
+    case "chat":
+      return (
+        <Chat
+          rec={r}
+          theme={t}
+          variant={variant!}
+          onThinking={(x) => flow.setChatThinking(r, x)}
+          onTurn={(x, reply) => flow.addChatTurn(r, x, reply)}
+          onBack={() => nav(r.result ? `/x/${t.id}/result` : `/x/${t.id}/hold`)}
+          onHome={goHome}
+        />
+      );
   }
   return <Home {...homeProps} />;
 }

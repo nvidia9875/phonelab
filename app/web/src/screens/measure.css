@@ -1,0 +1,14 @@
+/* 「準備はいい？ 3, 2, 1」と、測定中の合図。動きは transform と opacity だけ */
+.countdown { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 18px 0 10px; text-align: center; }
+.countdown__ready { font-family: var(--font-head); font-size: 20px; font-weight: 900; }
+.countdown__n { font-family: var(--font-head); font-size: 128px; font-weight: 900; line-height: 1; color: var(--orange); animation: countdown-pop 0.9s var(--ease-out) both; }
+.countdown__cue { font-size: 15px; font-weight: 700; }
+.countdown__label { font-size: 13px; color: var(--muted); }
+.go-cue { align-self: center; margin: 0; font-family: var(--font-head); font-size: 30px; font-weight: 900; color: var(--teal); animation: countdown-pop 0.5s var(--ease-out) both; }
+@keyframes countdown-pop {
+  from { transform: scale(1.35); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .countdown__n, .go-cue { animation: none; }
+}

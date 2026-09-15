@@ -17,6 +17,8 @@ const MAX_SPEED_MS = 4.0;
 const SATURATION_MS2 = 39;
 const SATURATION_DPS = 1500;
 const AXES = ["alpha", "beta", "gamma"] as const;
+/** 先頭で捨てる時間。承認タップの揺れ用。カウントダウンのあとに読み始めるときは短くしてよい */
+const TAP_SETTLE_MS = 1000;
 
 export type SpeedFeatures = SamplingStats & {
   profile: "pendulum_speed";
@@ -35,11 +37,11 @@ function peak(a: readonly number[], digits: number): number {
   return a.length ? +Math.max(...a).toFixed(digits) : 0;
 }
 
-export function analyzeSpeed(b: RawBuffer, lengthM: number): SpeedFeatures {
+export function analyzeSpeed(b: RawBuffer, lengthM: number, skipMs = TAP_SETTLE_MS): SpeedFeatures {
   const sampling = samplingStats(b.t);
   const n = b.t.length;
   let s0 = 0;
-  while (s0 < n && b.t[s0] - b.t[0] < 1000) s0++; // 承認タップの揺れを捨てる
+  while (s0 < n && b.t[s0] - b.t[0] < skipMs) s0++; // 承認タップの揺れを捨てる
 
   const axes = [b.gx, b.gy, b.gz].map((a) => a.slice(s0));
   const vars = axes.map(variance);

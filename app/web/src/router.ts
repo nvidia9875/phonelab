@@ -28,6 +28,7 @@ export type Route =
   | { name: "measure"; theme: string; cond: "A" | "B" }
   | { name: "hold"; theme: string }
   | { name: "result"; theme: string }
+  | { name: "chat"; theme: string }
   | { name: "record"; id: string }
   | { name: "halted" }
   | { name: "teacher" }
@@ -45,8 +46,8 @@ export function matchRoute(path: string): Route {
   if (m) return { name: "record", id: m[1] };
   m = p.match(/^\/x\/([^/]+)$/);
   if (m) return { name: "predict", theme: m[1] };
-  m = p.match(/^\/x\/([^/]+)\/(plan|rejected|hold|result)$/);
-  if (m) return { name: m[2] as "plan" | "rejected" | "hold" | "result", theme: m[1] };
+  m = p.match(/^\/x\/([^/]+)\/(plan|rejected|hold|result|chat)$/);
+  if (m) return { name: m[2] as "plan" | "rejected" | "hold" | "result" | "chat", theme: m[1] };
   m = p.match(/^\/x\/([^/]+)\/(setup|measure)\/(A|B)$/);
   if (m) return { name: m[2] as "setup" | "measure", theme: m[1], cond: m[3] as "A" | "B" };
   return { name: "home" };

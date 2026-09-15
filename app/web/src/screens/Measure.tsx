@@ -1,9 +1,10 @@
 import { Button, Card, Check, Checks, Counter, Eyebrow, Foot, FootNote, Grid2, Note, Screen, Stat, Wave } from "../components/ui";
 import { formatNumber, type Unit } from "../catalog/quantity";
 import type { CheckCode, LocalCheck } from "../measure/checks";
+import "./measure.css";
 
 export interface MeasureView {
-  phase: "requesting" | "measuring" | "done" | "denied";
+  phase: "requesting" | "countdown" | "measuring" | "done" | "denied";
   elapsed: number;
   seconds: number;
   conditionLabel: string;
@@ -17,6 +18,10 @@ export interface MeasureView {
   deniedReason?: string;
   /** 許可の確認を待っているときに出す一文 */
   waitingFor?: string;
+  /** カウントダウンの残り（3, 2, 1） */
+  countdown?: number;
+  /** 0 の合図と、測定中に大きく出す一言（「はじいて！」など） */
+  cue?: string;
 }
 
 type Row = { ok: boolean; text: string };
@@ -45,32 +50,56 @@ export interface MeasureProps {
   onDemo?: () => void;
 }
 
+const BADGE: Record<MeasureView["phase"], string> = {
+  requesting: "許可の確認",
+  countdown: "準備",
+  measuring: "2 測定中",
+  done: "2 検査",
+  denied: "測れません",
+};
+
 /** 画面 2: 測定と検査。測定中はトップへのリンクを出さない */
 export function Measure({ view, onStop, onContinue, onDemo }: MeasureProps) {
   const done = view.phase === "done";
   const waiting = view.phase === "requesting";
+  const counting = view.phase === "countdown";
   const sub =
     view.phase === "measuring"
       ? `${view.conditionLabel}を測っています。画面はこのまま`
-      : view.phase === "done"
+      : done
         ? `${view.conditionLabel}の測定が終わりました。検査の結果です`
         : waiting
           ? view.waitingFor ?? "許可を待っています"
           : view.deniedReason ?? "測れませんでした";
   return (
-    <Screen badge={done ? "2 検査" : view.phase === "denied" ? "測れません" : waiting ? "許可の確認" : "2 測定中"} tone={view.phase === "denied" || waiting ? "ink" : "teal"}>
-      <Counter value={Math.floor(view.elapsed)} of={view.seconds} sub={sub} />
-
-      <Grid2>
-        {view.clocks.map((c, i) => (
-          <Stat key={c.label} label={c.label} value={c.value !== null ? formatNumber(c.value, view.unit) : "—"} unit={view.unit} md>
-            <Wave dashed={i === 1} />
-          </Stat>
-        ))}
-      </Grid2>
+    <Screen badge={BADGE[view.phase]} tone={view.phase === "denied" || waiting ? "ink" : counting ? "orange" : "teal"}>
+      {counting ? (
+        <div className="countdown" aria-live="assertive">
+          <p className="countdown__ready">準備はいい？</p>
+          <p key={view.countdown} className="countdown__n">{view.countdown}</p>
+          <p className="countdown__cue">0 になったら「{view.cue}」</p>
+          <p className="countdown__label">{view.conditionLabel}</p>
+        </div>
+      ) : (
+        <>
+          <Counter value={Math.floor(view.elapsed)} of={view.seconds} sub={sub} />
+          {view.phase === "measuring" && view.cue && (
+            <p key={view.cue} className="go-cue" aria-live="assertive">
+              {view.cue}
+            </p>
+          )}
+          <Grid2>
+            {view.clocks.map((c, i) => (
+              <Stat key={c.label} label={c.label} value={c.value !== null ? formatNumber(c.value, view.unit) : "—"} unit={view.unit} md>
+                <Wave dashed={i === 1} />
+              </Stat>
+            ))}
+          </Grid2>
+        </>
+      )}
 
       <Card variant="line">
-        <Eyebrow>機械の検査（AI は見ていない）</Eyebrow>
+        <Eyebrow>機械の検査（ラボ先生は見ていない）</Eyebrow>
         <Checks>
           {done ? (
             view.checks.map((c, i) => (
@@ -80,8 +109,8 @@ export function Measure({ view, onStop, onContinue, onDemo }: MeasureProps) {
             ))
           ) : view.phase === "denied" ? (
             <Check warn>{view.deniedReason}</Check>
-          ) : waiting ? (
-            <Check>許可のあとで測り始めます。許可するまでセンサーは読みません</Check>
+          ) : waiting || counting ? (
+            <Check>合図のあとで測り始めます。それまでセンサーは読みません</Check>
           ) : (
             <Check>測定が終わってから検査します</Check>
           )}
@@ -96,7 +125,7 @@ export function Measure({ view, onStop, onContinue, onDemo }: MeasureProps) {
         {(view.phase === "denied" || waiting) && onDemo && (
           <Button secondary={waiting} onClick={onDemo}>{waiting ? "許可を出せない端末なら、サンプルの測定で進む（デモ）" : "この端末では測れないので、サンプルの測定で進む（デモ）"}</Button>
         )}
-        <Button secondary onClick={onStop}>{view.phase === "measuring" ? "測定をやめる" : "準備に戻る"}</Button>
+        <Button secondary onClick={onStop}>{view.phase === "measuring" || counting ? "測定をやめる" : "準備に戻る"}</Button>
       </Foot>
     </Screen>
   );

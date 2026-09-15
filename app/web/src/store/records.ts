@@ -35,6 +35,19 @@ export interface Judgement {
   statement: string;
   detail: string;
 }
+export interface ChatMessage {
+  role: "student" | "teacher";
+  text: string;
+  at: string;
+}
+/** ラボ先生とのふり返り。thinking は先生の説明を開くための「自分の考え」 */
+export interface ChatLog {
+  thinking: string;
+  messages: ChatMessage[];
+  revealed: boolean;
+  turnsUsed: number;
+  limitReached: boolean;
+}
 export interface RecordEvent {
   t: string;
   k: string;
@@ -64,6 +77,8 @@ export interface StudyRecord {
   nextPrediction: { variantId: string | null; direction: Direction } | null;
   events: RecordEvent[];
   signature: { signer: string; hash: string; server: boolean } | null;
+  /** 古い記録には無い（undefined は null として扱う） */
+  chat?: ChatLog | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -162,6 +177,7 @@ export function createRecord(themeId: string): StudyRecord {
     nextPrediction: null,
     events: [],
     signature: null,
+    chat: null,
     createdAt: at,
     updatedAt: at,
   };

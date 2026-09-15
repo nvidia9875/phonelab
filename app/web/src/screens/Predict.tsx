@@ -19,7 +19,7 @@ export function Predict({ theme, initialText, questionBack, hintMessage, onSubmi
   const canGo = text.trim().length > 0;
   const noteRef = useRef<HTMLDivElement>(null);
   const fieldRef = useRef<HTMLTextAreaElement>(null);
-  // AI の問い返しが来たら、キーボードを閉じて見える位置へ（スマホではキーボードの下に隠れる）
+  // ラボ先生の問い返しが来たら、キーボードを閉じて見える位置へ（スマホではキーボードの下に隠れる）
   useEffect(() => {
     if (questionBack || hintMessage) {
       fieldRef.current?.blur();
@@ -58,14 +58,14 @@ export function Predict({ theme, initialText, questionBack, hintMessage, onSubmi
           style={{ borderColor: "var(--orange)" }}
         />
         <div ref={noteRef} style={{ display: "contents" }}>
-          {questionBack && <Note icon="bulb"><strong>AI からの問い返し</strong>　{questionBack}</Note>}
+          {questionBack && <Note icon="bulb"><strong>ラボ先生からの問い返し</strong>　{questionBack}</Note>}
           {hintMessage && <Note icon="shield-x">{hintMessage}</Note>}
         </div>
       </Section>
 
       <Foot>
-        <Button disabled={!canGo} onClick={() => onSubmit(text)}>AI に実験を考えてもらう</Button>
-        <FootNote>まず「こう思う」を書こう。そこから AI がいっしょに実験を考えます。センサーはまだ読みません。</FootNote>
+        <Button disabled={!canGo} onClick={() => onSubmit(text)}>ラボ先生に実験を考えてもらう</Button>
+        <FootNote>まず「こう思う」を書こう。そこからラボ先生がいっしょに実験を考えます。センサーはまだ読みません。</FootNote>
       </Foot>
     </Screen>
   );

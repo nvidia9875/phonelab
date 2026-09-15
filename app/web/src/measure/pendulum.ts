@@ -93,6 +93,8 @@ export function collect(permit: Permit, onTick?: (elapsedS: number, samples: num
   const useAccel = permit.sensors.includes("accelerometer");
   const useGyro = permit.sensors.includes("gyroscope");
   const onMotion = (e: DeviceMotionEvent) => {
+    // センサーの無い端末のブラウザが出す、値がすべて null のイベントは数えない（数えると 2 秒の打ち切りが効かない）
+    if (classifyMotionSample(e) === "no") return;
     const a = e.accelerationIncludingGravity;
     const r = e.rotationRate;
     buf.t.push(performance.now());

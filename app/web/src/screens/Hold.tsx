@@ -8,6 +8,7 @@ export interface HoldProps {
   maxRetry: number;
   onRetry: () => void;
   onOther: () => void;
+  onChat: () => void;
   onHome: () => void;
 }
 
@@ -28,7 +29,7 @@ const PROPOSAL: Record<CheckCode, string> = {
 };
 
 /** 画面 4: 保留。理由と再測定の提案。上限に達したら別の実験へ */
-export function Hold({ checks, conditionLabel, retry, maxRetry, onRetry, onOther, onHome }: HoldProps) {
+export function Hold({ checks, conditionLabel, retry, maxRetry, onRetry, onOther, onChat, onHome }: HoldProps) {
   const failed = checks.filter((c) => !c.ok);
   const passed = checks.filter((c) => c.ok);
   const first = failed[0];
@@ -58,12 +59,13 @@ export function Hold({ checks, conditionLabel, retry, maxRetry, onRetry, onOther
       </Card>
 
       <Card variant="line">
-        <Eyebrow>AI の提案</Eyebrow>
+        <Eyebrow>ラボ先生の提案</Eyebrow>
         <p style={{ fontSize: 14, lineHeight: 1.6 }}>{canRetry ? PROPOSAL[first?.code ?? "gap"] : `この端末では${conditionLabel}が ${maxRetry} 回続けて保留になりました。この実験は保留のまま、別の実験へ進みます。`}</p>
       </Card>
 
       <Foot>
         {canRetry && <Button onClick={onRetry}>同じ条件で再測定する（{retry + 1} / {maxRetry} 回目）</Button>}
+        <Button secondary onClick={onChat}>ラボ先生と、保留になった理由を考える</Button>
         <Button secondary onClick={onOther}>別の実験にする</Button>
         <FootNote>保留は失敗ではありません。データを信じない、という判断です。</FootNote>
       </Foot>
