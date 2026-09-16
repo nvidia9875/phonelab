@@ -88,14 +88,19 @@ class PolicyPlugin(BasePlugin):
         state = callback_context.state
         if not state.get(ANSWER_LOCKED_KEY):
             return None
-        text = _response_text(llm_response)
-        phrases = [p for p in state.get(LEAK_PHRASES_KEY, []) if p]
-        leaked = any(p in text for p in phrases)
+        text = _squash(_response_text(llm_response))
+        phrases = [_squash(p) for p in state.get(LEAK_PHRASES_KEY, []) if p]
+        leaked = any(p and p in text for p in phrases)
         with _tracer.start_as_current_span("phonelab.leak_check") as span:
             span.set_attribute("phonelab.answer_leak", leaked)
         if not leaked:
             return None
         return _text_response(LEAK_FALLBACK_TEXT, {ANSWER_LEAK_KEY: True})
+
+
+def _squash(text: str) -> str:
+    """空白を全部落として比べる。語句表は「約 1.4 倍」、Gemini は「約1.4倍」と書くため"""
+    return "".join(text.split())
 
 
 def _response_text(response: LlmResponse) -> str:

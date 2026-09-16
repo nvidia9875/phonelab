@@ -29,3 +29,14 @@ def test_counts_each_client_separately():
 
     assert limiter.allow("a") is True
     assert limiter.allow("b") is True
+
+
+def test_forgets_clients_whose_requests_have_all_left_the_window():
+    now = [1000.0]
+    limiter = SlidingWindowLimiter(limit=1, window_s=60, clock=lambda: now[0], sweep_every=1)
+
+    limiter.allow("a")
+    now[0] += 61
+    limiter.allow("b")
+
+    assert limiter.tracked_clients == 1

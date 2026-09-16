@@ -50,3 +50,18 @@ def test_skips_the_model_when_the_chat_turn_limit_is_reached(fake_llm):
     assert fake_llm.requests == []
     assert reply.skipped is True
     assert reply.text
+
+
+def test_catches_a_leak_written_without_the_spaces_of_the_phrase_list(fake_llm):
+    """Gemini は「約1.4倍」と詰めて書く。語句表の「約 1.4 倍」と空白の違いで見逃さない"""
+    fake_llm.reply = "高さを2倍にすると、速さは約1.4倍になります。"
+    runner = build_tutor_runner(fake_llm)
+
+    reply = asyncio.run(
+        run_tutor(
+            runner, prompt="どうして？", turns_used=0, leak_phrases=("約 1.4 倍",), locked=True
+        )
+    )
+
+    assert reply.leaked is True
+    assert reply.text == LEAK_FALLBACK_TEXT

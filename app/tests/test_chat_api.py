@@ -130,3 +130,39 @@ def test_returns_a_friendly_timeout_when_the_lab_teacher_is_too_slow(monkeypatch
 
     assert res.status_code == 504
     assert "ラボ先生" in res.json()["detail"]
+
+
+def test_does_not_send_the_model_answer_while_the_measurement_is_held(client, fake_llm):
+    """保留（有効な測定がまだ無い）では、考えを書いても説明は渡さない。測る前に答えを知ってしまうから"""
+    res = client.post(
+        "/api/chat",
+        json=body(situation="hold", result_statement="", reveal=True, student_thinking=THINKING),
+    )
+
+    assert res.json()["revealed"] is False
+    assert MODEL_ANSWERS["sound_pluck_strength"].explanation not in prompt_sent(fake_llm)
+
+
+def test_keys_the_rate_limit_on_the_address_cloud_run_appends(fake_llm):
+    """run.app は利用者の IP を X-Forwarded-For の末尾に足す。先頭は利用者が自由に書ける"""
+    limiter = SlidingWindowLimiter(limit=1, window_s=60)
+    app.dependency_overrides[get_tutor_runner] = lambda: build_tutor_runner(fake_llm)
+    app.dependency_overrides[get_chat_limiter] = lambda: limiter
+    try:
+        client = TestClient(app)
+        first = client.post(
+            "/api/chat", json=body(), headers={"x-forwarded-for": "1.1.1.1, 203.0.113.9"}
+        )
+        second = client.post(
+            "/api/chat", json=body(), headers={"x-forwarded-for": "2.2.2.2, 203.0.113.9"}
+        )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert first.status_code == 200
+    assert second.status_code == 429
+
+
+def test_does_not_serve_the_app_for_unknown_api_paths(client):
+    assert client.get("/api/does-not-exist").status_code == 404
+    assert client.get("/api/chat").status_code in (404, 405)

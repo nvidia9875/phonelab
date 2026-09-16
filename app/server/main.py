@@ -164,8 +164,8 @@ def get_chat_limiter() -> SlidingWindowLimiter:
 
 
 def client_key(request: Request) -> str:
-    """Cloud Run の前段が付ける X-Forwarded-For の先頭（利用者の IP）。無ければ接続元"""
-    forwarded = request.headers.get("x-forwarded-for", "").split(",")[0].strip()
+    """Cloud Run（run.app）は利用者の IP を X-Forwarded-For の末尾に足す。先頭は利用者が書けるので使わない"""
+    forwarded = request.headers.get("x-forwarded-for", "").split(",")[-1].strip()
     return forwarded or (request.client.host if request.client else "unknown")
 
 
@@ -183,7 +183,12 @@ async def chat(
         )
 
     answer = MODEL_ANSWERS[body.variant_id]
-    revealed = body.reveal and len(body.student_thinking.strip()) >= MIN_THINKING_CHARS
+    # 保留（有効な測定が無い）では渡さない。測る前に答えを知ってしまうから。docs/policy.md 3.8
+    revealed = (
+        body.reveal
+        and body.situation != "hold"
+        and len(body.student_thinking.strip()) >= MIN_THINKING_CHARS
+    )
     context = TutorContext(
         school=body.school,
         theme_title=body.theme_title,
@@ -245,6 +250,8 @@ if WEB_DIST.exists():
 
     @app.get("/{path:path}", response_class=HTMLResponse, include_in_schema=False)
     def spa(path: str) -> FileResponse:
+        if path.startswith("api/"):
+            raise HTTPException(status_code=404, detail="Not Found")
         candidate = WEB_DIST / path
         if path and candidate.is_file():
             return FileResponse(candidate)
