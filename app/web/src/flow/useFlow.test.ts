@@ -1,9 +1,10 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { themeById } from "../catalog/themes";
 import type { Features } from "../measure/features";
 import type { LocalCheck } from "../measure/checks";
 import { clearAll, createRecord, recordById, updateRecord, type CondKey, type Measurement, type StudyRecord } from "../store/records";
-import { MAX_RETRY, ensureJudged, finishMeasure, remeasure } from "./useFlow";
+import { MAX_RETRY, ensureJudged, finishMeasure, remeasure, submitPrediction } from "./useFlow";
+import type { PlanReply } from "../agent/plan";
 
 const sound = themeById("sound")!;
 const energy = themeById("energy")!;
@@ -170,5 +171,102 @@ describe("repeats", () => {
     const judged = ensureJudged(rec, energy)!;
 
     expect(judged.result?.a).toBeCloseTo(1.42, 2);
+  });
+});
+
+describe("submitPrediction", () => {
+  beforeEach(() => clearAll());
+  afterEach(() => vi.unstubAllGlobals());
+
+  function reply(overrides: Partial<PlanReply> = {}): PlanReply {
+    return {
+      kind: "plan",
+      variant_id: "sound_string_length",
+      claim: { variable: "length", direction: "faster" },
+      why: "震える長さだけを変えれば、あなたの予想をそのまま試せます",
+      question_back: null,
+      rejection: null,
+      planner_calls: 1,
+      skipped: false,
+      policy_fixed: false,
+      source: "agent",
+      trace_id: "a".repeat(32),
+      ...overrides,
+    };
+  }
+
+  function serverAnswers(body: unknown, status = 200) {
+    const fetchMock = vi.fn(async () => ({ ok: status < 400, status, json: async () => body }));
+    vi.stubGlobal("fetch", fetchMock);
+    return fetchMock;
+  }
+
+  it("uses the experiment the lab teacher chose and remembers who chose it", async () => {
+    const fetchMock = serverAnswers(reply());
+    const rec = createRecord(sound.id);
+
+    expect(await submitPrediction(rec, sound, "短くすると高くなると思う")).toBe("plan");
+
+    const after = recordById(rec.id)!;
+    expect(after.variantId).toBe("sound_string_length");
+    expect(after.prediction.claim).toEqual({ variable: "length", direction: "faster" });
+    expect(after.plan).toEqual({ source: "agent", why: reply().why, traceId: "a".repeat(32) });
+    expect(after.plannerCalls).toBe(1);
+    const sent = JSON.parse((fetchMock.mock.calls[0] as unknown as [string, { body: string }])[1].body);
+    expect(sent.theme_id).toBe("sound");
+    expect(sent.planner_calls).toBe(0);
+    expect(sent.previous_question_back).toBeNull();
+  });
+
+  it("falls back to the on-device rules when the lab teacher cannot be reached", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => { throw new TypeError("network"); }));
+    const rec = createRecord(sound.id);
+
+    expect(await submitPrediction(rec, sound, "強くはじくと高くなると思う")).toBe("plan");
+
+    const after = recordById(rec.id)!;
+    expect(after.variantId).toBe("sound_pluck_strength");
+    expect(after.plan?.source).toBe("stub");
+    expect(after.plannerCalls).toBe(0);
+  });
+
+  it("shows the lab teacher's question back before choosing", async () => {
+    serverAnswers(reply({ kind: "question", variant_id: null, question_back: "どうしてそう思う？" }));
+    const rec = createRecord(sound.id);
+
+    expect(await submitPrediction(rec, sound, "高くなる")).toBe("predict");
+
+    const after = recordById(rec.id)!;
+    expect(after.prediction.questionBack).toBe("どうしてそう思う？");
+    expect(after.variantId).toBeNull();
+  });
+
+  it("keeps a rejection from the policy with its alternative experiment", async () => {
+    serverAnswers(
+      reply({
+        kind: "rejected",
+        variant_id: "sound_pluck_strength",
+        rejection: { title: "端末の落下・投擲を伴う実験は、候補に出しません", reasons: ["a", "b", "c"], quoted: "落として", alternative_variant_id: "sound_pluck_strength" },
+        source: "policy",
+      }),
+    );
+    const rec = createRecord(sound.id);
+
+    expect(await submitPrediction(rec, sound, "スマホを落として測りたい")).toBe("rejected");
+
+    const after = recordById(rec.id)!;
+    expect(after.rejection?.title).toBe("端末の落下・投擲を伴う実験は、候補に出しません");
+    expect(after.variantId).toBe("sound_pluck_strength");
+    expect(after.stage).toBe("plan");
+  });
+
+  it("ignores an experiment the server names that is not in this theme", async () => {
+    serverAnswers(reply({ variant_id: "energy_height" }));
+    const rec = createRecord(sound.id);
+
+    expect(await submitPrediction(rec, sound, "強くはじくと高くなると思う")).toBe("plan");
+
+    expect(recordById(rec.id)!.variantId).toBe("sound_pluck_strength");
+    expect(recordById(rec.id)!.plan?.source).toBe("stub");
   });
 });

@@ -1,14 +1,16 @@
 /**
  * 一本の記録を進める操作。画面はこれだけを呼ぶ。
- * サーバ実装後は、choosePlan / checkPolicy / judge / sign の呼び先を API に差し替える。
+ * 実験を選ぶのはサーバの Planner（POST /api/plan）。つながらないときだけ端末内の stub に縮退する。
+ * judge / sign はまだ端末内（サーバ実装後に差し替える）。
  */
 import type { ChatReply } from "../agent/chat";
+import { requestPlan, type PlanReply } from "../agent/plan";
 import { checkPolicy, choosePlan, judge, readClaim } from "../agent/stub";
 import { QUANTITY, formatQuantity, type Unit } from "../catalog/quantity";
 import { SENSOR_LABEL, repeatsOf, themeById, variantById, variantsOf, type Theme } from "../catalog/themes";
 import type { LocalCheck } from "../measure/checks";
 import { clocksSummary, measuredValue, type Features } from "../measure/features";
-import { activeRecordForTheme, addEvent, createRecord, recordsForTheme, updateRecord, type ChatLog, type CondKey, type Direction, type StudyRecord } from "../store/records";
+import { activeRecordForTheme, addEvent, createRecord, recordsForTheme, updateRecord, type ChatLog, type Claim, type CondKey, type Direction, type PlanInfo, type Rejection, type StudyRecord } from "../store/records";
 
 export const MAX_RETRY = 3;
 const EMPTY_TRIES: Record<CondKey, number> = { A: 0, B: 0 };
@@ -30,38 +32,112 @@ export function openTheme(theme: Theme): StudyRecord {
   return activeRecordForTheme(theme.id) ?? createRecord(theme.id);
 }
 
-/** 予想を出す → Policy → Planner。戻り値で次の画面を決める */
-export function submitPrediction(rec: StudyRecord, theme: Theme, text: string): "plan" | "rejected" | "predict" {
-  const done = doneVariantIds(theme.id);
+type Decision =
+  | { kind: "hint"; message: string }
+  | { kind: "question"; questionBack: string }
+  | { kind: "reject"; rejection: Rejection }
+  | { kind: "plan"; variantId: string; claim: Claim; why: string; source: PlanInfo["source"]; traceId: string | null };
+
+const DIRECTIONS: ReadonlySet<string> = new Set(["faster", "slower", "same", "unknown"]);
+const PLAN_SOURCE_LABEL: Record<PlanInfo["source"], string> = {
+  agent: "ラボ先生（Gemini）が予想を読んで選んだ",
+  policy: "Policy の判断",
+  catalog: "カタログの順で選んだ",
+  stub: "オフラインのため端末内の規則で選んだ",
+};
+
+/** 端末内の縮退（サーバにつながらない・遅いとき）。答えは持たない */
+function decideLocally(rec: StudyRecord, theme: Theme, text: string, done: string[]): Decision {
   const policy = checkPolicy(text, theme, done);
-  if (policy.kind === "hint") {
-    updateRecord(rec.id, (r) => ({ ...r, prediction: { ...r.prediction, text, questionBack: policy.message, hints: r.prediction.hints + 1 } }));
+  if (policy.kind === "hint") return { kind: "hint", message: policy.message };
+  if (policy.kind === "reject") return { kind: "reject", rejection: policy.rejection };
+  const plan = choosePlan(text, theme, done);
+  // 問い返しは 1 回だけ。2 回目の送信は理由が無くても受け付ける（行き止まりにしない）
+  if (plan.questionBack && !rec.prediction.questionBack) return { kind: "question", questionBack: plan.questionBack };
+  return { kind: "plan", variantId: plan.variant.id, claim: readClaim(text, theme), why: plan.why, source: "stub", traceId: null };
+}
+
+/** サーバの返事を画面の決定に直す。形が崩れていたら null（端末内に縮退） */
+function decideFromServer(reply: PlanReply, theme: Theme, text: string): Decision | null {
+  if (reply.kind === "hint" && reply.question_back) return { kind: "hint", message: reply.question_back };
+  if (reply.kind === "question" && reply.question_back) return { kind: "question", questionBack: reply.question_back };
+  if (reply.kind === "rejected" && reply.rejection && variantById(theme, reply.rejection.alternative_variant_id)) {
+    const x = reply.rejection;
+    return { kind: "reject", rejection: { title: x.title, reasons: x.reasons, quoted: x.quoted, alternativeVariantId: x.alternative_variant_id } };
+  }
+  if (reply.kind === "plan" && reply.variant_id && variantById(theme, reply.variant_id)) {
+    const variables = new Set<string>(variantsOf(theme).map((v) => v.variable));
+    const claim: Claim =
+      reply.claim && variables.has(reply.claim.variable) && DIRECTIONS.has(reply.claim.direction)
+        ? { variable: reply.claim.variable as Claim["variable"], direction: reply.claim.direction as Direction }
+        : readClaim(text, theme);
+    // ローカル実行など、トレースを送っていないときは 0 が並ぶ
+    const traceId = /^0+$/.test(reply.trace_id) ? null : reply.trace_id;
+    return { kind: "plan", variantId: reply.variant_id, claim, why: reply.why, source: reply.source, traceId };
+  }
+  return null;
+}
+
+function applyDecision(rec: StudyRecord, text: string, d: Decision, plannerCalls: number): "plan" | "rejected" | "predict" {
+  if (d.kind === "hint") {
+    updateRecord(rec.id, (r) => ({ ...r, plannerCalls, prediction: { ...r.prediction, text, questionBack: d.message, hints: r.prediction.hints + 1 } }));
     return "predict";
   }
-  if (policy.kind === "reject") {
+  if (d.kind === "question") {
+    updateRecord(rec.id, (r) => ({ ...r, plannerCalls, prediction: { ...r.prediction, text, questionBack: d.questionBack } }));
+    return "predict";
+  }
+  if (d.kind === "reject") {
     updateRecord(rec.id, (r) =>
-      addEvent({ ...r, prediction: { ...r.prediction, text, claim: null, questionBack: null }, rejection: policy.rejection, variantId: policy.rejection.alternativeVariantId, stage: "plan" }, "却下", `Policy が要望を却下：${policy.rejection.reasons[0]}`),
+      addEvent(
+        { ...r, plannerCalls, prediction: { ...r.prediction, text, claim: null, questionBack: null }, rejection: d.rejection, variantId: d.rejection.alternativeVariantId, stage: "plan" },
+        "却下",
+        `Policy が要望を却下：${d.rejection.reasons[0]}`,
+      ),
     );
     return "rejected";
   }
-  const plan = choosePlan(text, theme, done);
-  // 問い返しは 1 回だけ。2 回目の送信は理由が無くても受け付ける（行き止まりにしない）
-  if (plan.questionBack && !rec.prediction.questionBack) {
-    updateRecord(rec.id, (r) => ({ ...r, prediction: { ...r.prediction, text, questionBack: plan.questionBack } }));
-    return "predict";
-  }
-  const claim = readClaim(text, theme);
   updateRecord(rec.id, (r) => {
-    let n: StudyRecord = { ...r, prediction: { ...r.prediction, text, claim, questionBack: null }, rejection: null, variantId: plan.variant.id, stage: "plan" };
+    let n: StudyRecord = {
+      ...r,
+      plannerCalls,
+      prediction: { ...r.prediction, text, claim: d.claim, questionBack: null },
+      rejection: null,
+      variantId: d.variantId,
+      plan: { source: d.source, why: d.why, traceId: d.traceId },
+      stage: "plan",
+    };
     n = addEvent(n, "予想", `${text}（証拠を見る前に記入）`, "orange");
-    n = addEvent(n, "計画", `${plan.variant.title}。ラボ先生の提案`);
+    const title = variantById(themeById(r.themeId)!, d.variantId)?.title ?? d.variantId;
+    n = addEvent(n, "計画", `${title}。${PLAN_SOURCE_LABEL[d.source]}${d.traceId ? `（trace ${d.traceId.slice(0, 8)}）` : ""}`);
     return n;
   });
   return "plan";
 }
 
+/** 予想を出す → サーバの Policy と Planner（つながらなければ端末内）。戻り値で次の画面を決める */
+export async function submitPrediction(rec: StudyRecord, theme: Theme, text: string): Promise<"plan" | "rejected" | "predict"> {
+  const done = doneVariantIds(theme.id);
+  const plannerCalls = rec.plannerCalls ?? 0;
+  try {
+    const reply = await requestPlan({
+      theme_id: theme.id,
+      school: theme.school,
+      text,
+      done_variant_ids: done,
+      previous_question_back: rec.prediction.questionBack,
+      planner_calls: plannerCalls,
+    });
+    const decision = decideFromServer(reply, theme, text);
+    if (decision) return applyDecision(rec, text, decision, reply.planner_calls);
+  } catch {
+    /* つながらない・遅い・返事が崩れている → 端末内で選ぶ。記録に stub と残る */
+  }
+  return applyDecision(rec, text, decideLocally(rec, theme, text, done), plannerCalls);
+}
+
 export function planWhy(rec: StudyRecord, theme: Theme): string {
-  return choosePlan(rec.prediction.text, theme, doneVariantIds(theme.id).filter((v) => v !== rec.variantId)).why;
+  return rec.plan?.why || choosePlan(rec.prediction.text, theme, doneVariantIds(theme.id).filter((v) => v !== rec.variantId)).why;
 }
 
 export function approve(rec: StudyRecord, theme: Theme): void {
@@ -197,9 +273,10 @@ export async function closeAndNext(rec: StudyRecord, theme: Theme): Promise<Stud
   const next = createRecord(theme.id);
   updateRecord(next.id, (r) => {
     const text = `${nv.changes.split("（")[0]}を変えたら、${directionWord(nv.unit, direction)}と思う`;
-    let n: StudyRecord = { ...r, variantId: nv.id, stage: "plan", prediction: { ...r.prediction, text, claim: { variable: nv.variable, direction }, questionBack: null } };
+    const plan: PlanInfo = { source: "catalog", why: `前の実験の続きとして、次は${nv.changes.split("（")[0]}だけを変えます`, traceId: null };
+    let n: StudyRecord = { ...r, variantId: nv.id, stage: "plan", plan, prediction: { ...r.prediction, text, claim: { variable: nv.variable, direction }, questionBack: null } };
     n = addEvent(n, "予想", `${text}（前の実験の結果を見て記入）`, "orange");
-    n = addEvent(n, "計画", `${nv.title}。ラボ先生の提案`);
+    n = addEvent(n, "計画", `${nv.title}。${PLAN_SOURCE_LABEL.catalog}`);
     return n;
   });
   return next;

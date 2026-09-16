@@ -1,18 +1,28 @@
 import { Button, Card, CardLabel, CardTitle, Foot, FootNote, InfoRow, Pair, PermitChip, Screen, Section } from "../components/ui";
 import { SENSOR_LABEL, type Theme, type Variant } from "../catalog/themes";
+import type { PlanInfo } from "../store/records";
+
+const SOURCE_NOTE: Record<PlanInfo["source"], string> = {
+  agent: "ラボ先生（Gemini）が、あなたの予想を読んでカタログから選びました。答えは渡していません",
+  policy: "Policy の判断で、この実験を代わりに出しています",
+  catalog: "ラボ先生に聞ける回数の上限のため、カタログの順で選びました",
+  stub: "いまはラボ先生につながらないので、端末の中の簡単な規則で選びました",
+};
 
 export interface PlanProps {
   theme: Theme;
   variant: Variant;
   predictionText: string;
   why: string;
+  /** 誰が選んだか（古い記録には無い） */
+  source?: PlanInfo["source"];
   onApprove: () => void;
   onOther: () => void;
   onHome: () => void;
 }
 
 /** 画面 1: 計画と承認。許可チップは承認ボタンの真上 */
-export function Plan({ theme, variant, predictionText, why, onApprove, onOther, onHome }: PlanProps) {
+export function Plan({ theme, variant, predictionText, why, source, onApprove, onOther, onHome }: PlanProps) {
   const sensors = theme.sensors.map((s) => SENSOR_LABEL[s]).join("・");
   const denied = ["microphone", "camera"].filter((s) => !theme.sensors.includes(s as never)).map((s) => SENSOR_LABEL[s as "microphone" | "camera"]);
   const deniedText = `${[...denied, "位置"].join("、")}は使わない`;
@@ -29,6 +39,7 @@ export function Plan({ theme, variant, predictionText, why, onApprove, onOther, 
         <CardLabel icon="target">ラボ先生が考えた実験</CardLabel>
         <CardTitle>{variant.title}</CardTitle>
         <p className="card__hint">{why}</p>
+        {source && <p className="card__hint">{SOURCE_NOTE[source]}</p>}
         <Pair items={[{ k: "変えるもの", v: variant.changes }, { k: "一定にするもの", v: variant.holds }]} />
         <PermitChip sensors={sensors} seconds={theme.seconds} denied={deniedText} />
         <InfoRow icon="box-check">

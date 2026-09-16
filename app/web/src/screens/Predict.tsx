@@ -9,14 +9,24 @@ export interface PredictProps {
   initialText: string;
   questionBack: string | null;
   hintMessage: string | null;
-  onSubmit: (text: string) => void;
+  onSubmit: (text: string) => Promise<void> | void;
   onHome: () => void;
 }
 
 /** 予想ゲート: 予想を書くまで実験もヒントもセンサーも出ない */
 export function Predict({ theme, initialText, questionBack, hintMessage, onSubmit, onHome }: PredictProps) {
   const [text, setText] = useState(initialText);
-  const canGo = text.trim().length > 0;
+  const [pending, setPending] = useState(false);
+  const canGo = text.trim().length > 0 && !pending;
+  async function submit() {
+    if (!canGo) return;
+    setPending(true);
+    try {
+      await onSubmit(text);
+    } finally {
+      setPending(false);
+    }
+  }
   const noteRef = useRef<HTMLDivElement>(null);
   const fieldRef = useRef<HTMLTextAreaElement>(null);
   // ラボ先生の問い返しが来たら、キーボードを閉じて見える位置へ（スマホではキーボードの下に隠れる）
@@ -64,8 +74,8 @@ export function Predict({ theme, initialText, questionBack, hintMessage, onSubmi
       </Section>
 
       <Foot>
-        <Button disabled={!canGo} onClick={() => onSubmit(text)}>ラボ先生に実験を考えてもらう</Button>
-        <FootNote>まず「こう思う」を書こう。そこからラボ先生がいっしょに実験を考えます。センサーはまだ読みません。</FootNote>
+        <Button disabled={!canGo} onClick={() => void submit()}>{pending ? "ラボ先生が考えています…" : "ラボ先生に実験を考えてもらう"}</Button>
+        <FootNote>{pending ? "予想を読んで、カタログから実験を選んでいます。答えは渡していません。" : "まず「こう思う」を書こう。そこからラボ先生がいっしょに実験を考えます。センサーはまだ読みません。"}</FootNote>
       </Foot>
     </Screen>
   );

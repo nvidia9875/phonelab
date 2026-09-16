@@ -186,8 +186,8 @@ export function App() {
           initialText={r.prediction.text}
           questionBack={r.prediction.questionBack}
           hintMessage={r.prediction.hints > 0 ? `ヒントは ${r.prediction.hints} / 3 回使いました` : null}
-          onSubmit={(text) => {
-            const next = flow.submitPrediction(r, t, text);
+          onSubmit={async (text) => {
+            const next = await flow.submitPrediction(r, t, text);
             nav(next === "predict" ? `/x/${t.id}` : `/x/${t.id}/${next}`);
           }}
           onHome={goHome}
@@ -212,6 +212,7 @@ export function App() {
           variant={variant!}
           predictionText={r.prediction.text}
           why={flow.planWhy(r, t)}
+          source={r.plan?.source}
           onApprove={() => { flow.approve(r, t); nav(`/x/${t.id}/setup/A`); }}
           onOther={goHome}
           onHome={goHome}

@@ -54,6 +54,12 @@ export interface RecordEvent {
   tone?: "orange" | "teal";
   body: string;
 }
+/** 実験を誰が選んだか。agent = ラボ先生（Gemini）、policy = 決定論の Policy、catalog = カタログの順（上限・読めない出力）、stub = 端末内（オフライン） */
+export interface PlanInfo {
+  source: "agent" | "policy" | "catalog" | "stub";
+  why: string;
+  traceId: string | null;
+}
 export interface Rejection {
   title: string;
   reasons: string[];
@@ -68,6 +74,10 @@ export interface StudyRecord {
   stage: Stage;
   prediction: { text: string; claim: Claim | null; questionBack: string | null; hints: number };
   rejection: Rejection | null;
+  /** 古い記録には無い */
+  plan?: PlanInfo | null;
+  /** ラボ先生（Planner）に聞いた回数。サーバの上限（5 回 / 実験）と同じ数を送る */
+  plannerCalls?: number;
   approvedAt: string | null;
   measurements: Measurement[];
   retries: Record<CondKey, number>;
