@@ -9,6 +9,7 @@ from fastapi.testclient import TestClient
 
 import server.main as main_module
 from server.agent.answers import MODEL_ANSWERS
+from server.agent.policy_plugin import LEAK_FALLBACK_TEXT
 from server.agent.runner import build_tutor_runner
 from server.main import app, get_chat_limiter, get_tutor_runner
 from server.ratelimit import SlidingWindowLimiter
@@ -166,3 +167,26 @@ def test_keys_the_rate_limit_on_the_address_cloud_run_appends(fake_llm):
 def test_does_not_serve_the_app_for_unknown_api_paths(client):
     assert client.get("/api/does-not-exist").status_code == 404
     assert client.get("/api/chat").status_code in (404, 405)
+
+
+def test_replaces_a_reply_that_gives_the_result_away_while_held(client, fake_llm):
+    """保留では結果もまだ秘密。モデルが自分の知識で「高さは変わらない」と言ったら問い返しに差し替える（9/16 に本番で漏れた）"""
+    fake_llm.reply = "実は、輪ゴムをはじく強さを変えても、音の高さはあまり変わらず、変わるのは音の大きさなんです。"
+
+    res = client.post(
+        "/api/chat",
+        json=body(
+            situation="hold", result_statement="", hold_reasons=["音が小さく、雑音と区別できません"]
+        ),
+    )
+
+    assert res.json()["reply"] == LEAK_FALLBACK_TEXT
+
+
+def test_lets_the_teacher_restate_the_result_once_it_is_on_screen(client, fake_llm):
+    """判定が出たあとは、結果そのものは画面に出ているので言ってよい（理由はまだ言わない）"""
+    fake_llm.reply = "測定では、音の高さはあまり変わりませんでしたね。何が変わったと思いますか？"
+
+    res = client.post("/api/chat", json=body())
+
+    assert res.json()["reply"] == fake_llm.reply

@@ -21,7 +21,7 @@ from google.adk.runners import Runner
 from opentelemetry import trace
 from pydantic import BaseModel, Field, field_validator
 
-from server.agent.answers import MODEL_ANSWERS
+from server.agent.answers import MODEL_ANSWERS, phrases_for
 from server.agent.planner import planner_model
 from server.agent.policy_plugin import PLANNER_CALLS_PER_EXPERIMENT
 from server.agent.runner import (
@@ -215,7 +215,7 @@ async def chat(
                     runner,
                     prompt=prompt,
                     turns_used=body.turns_used,
-                    leak_phrases=answer.leak_phrases,
+                    leak_phrases=phrases_for(answer, body.situation),
                     locked=not revealed,
                 ),
                 timeout=CHAT_TIMEOUT_S,

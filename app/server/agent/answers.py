@@ -1,8 +1,9 @@
 """先生の説明（模範の回答）— docs/experiments.md 2 章の answers.json に当たる。
 
 サーバだけが持つ。生徒が自分の考えを書くまでは LLM にも渡さない（いちばん強い漏えい対策）。
-leak_phrases は「なぜそうなるか」の説明の言い回し。測定の結果（「高さは変わらなかった」など）は
-生徒の画面に出ているので、ここには入れない。
+leak_phrases は「なぜそうなるか」の説明の言い回し。判定が出たあとは、測定の結果（「高さは変わらなかった」など）は
+生徒の画面に出ているので言ってよい。result_phrases はその結果の言い回しで、保留（結果がまだ無い）のときだけ
+漏えいとして扱う（9/16 に本番で、保留中に「高さはあまり変わらず」と漏れた）。
 """
 
 from __future__ import annotations
@@ -14,6 +15,15 @@ from dataclasses import dataclass
 class ModelAnswer:
     explanation: str
     leak_phrases: tuple[str, ...]
+    # 結果そのものの言い回し。保留（結果がまだ画面に無い）では、これも言ってはいけない
+    result_phrases: tuple[str, ...] = ()
+
+
+def phrases_for(answer: ModelAnswer, situation: str) -> tuple[str, ...]:
+    """説明が閉じているときに差し替える語句。保留では結果の言い回しも足す"""
+    if situation == "hold":
+        return answer.leak_phrases + answer.result_phrases
+    return answer.leak_phrases
 
 
 MODEL_ANSWERS: dict[str, ModelAnswer] = {
@@ -31,6 +41,7 @@ MODEL_ANSWERS: dict[str, ModelAnswer] = {
             "ルート2",
             "1.4 倍",
         ),
+        result_phrases=("ほど速くな", "高いほど速", "高くから放すほど", "速さは大きくな"),
     ),
     "energy_mass": ModelAnswer(
         explanation=(
@@ -43,6 +54,13 @@ MODEL_ANSWERS: dict[str, ModelAnswer] = {
             "重さは関係な",
             "打ち消し",
             "運動エネルギーも 2 倍",
+        ),
+        result_phrases=(
+            "速さは変わら",
+            "速さはほとんど変わら",
+            "速さはあまり変わら",
+            "同じ速さ",
+            "重くしても",
         ),
     ),
     "sound_pluck_strength": ModelAnswer(
@@ -60,6 +78,16 @@ MODEL_ANSWERS: dict[str, ModelAnswer] = {
             "ふるえる回数は輪ゴムの長さ",
             "振動数は輪ゴムの長さ",
         ),
+        result_phrases=(
+            "高さはあまり変わ",
+            "高さはほとんど変わ",
+            "高さは変わ",
+            "高さが変わら",
+            "大きさが変わ",
+            "変わるのは音の大きさ",
+            "変わるのは大きさ",
+            "強くはじいても高さ",
+        ),
     ),
     "sound_string_length": ModelAnswer(
         explanation=(
@@ -73,6 +101,7 @@ MODEL_ANSWERS: dict[str, ModelAnswer] = {
             "振動数が大きいほど高い",
             "短いほど振動数",
         ),
+        result_phrases=("短くすると高", "短いほど高", "短くするほど高", "高い音にな"),
     ),
     "bottle_water": ModelAnswer(
         explanation=(
@@ -88,6 +117,7 @@ MODEL_ANSWERS: dict[str, ModelAnswer] = {
             "空気の柱が短く",
             "気柱",
         ),
+        result_phrases=("水を入れると高", "水が多いほど高", "水を増やすと高", "高い音にな"),
     ),
     "pendulum_mass": ModelAnswer(
         explanation=(
@@ -101,13 +131,22 @@ MODEL_ANSWERS: dict[str, ModelAnswer] = {
             "動かしにくさも大きく",
             "打ち消し",
         ),
+        result_phrases=("周期は変わら", "周期はほとんど変わら", "重さを変えても", "同じ周期"),
     ),
     "pendulum_length": ModelAnswer(
         explanation="振り子の周期は糸の長さの平方根に比例します（T = 2π√(L/g)）。糸を 2 倍にすると、周期はおよそ 1.4 倍になります。",
         leak_phrases=("平方根に比例", "ルートに比例", "2π√", "1.4 倍", "√2"),
+        result_phrases=(
+            "長いほど周期は長",
+            "長くすると周期",
+            "長いほどゆっくり",
+            "周期は長くな",
+            "長いほど遅",
+        ),
     ),
     "pendulum_amplitude": ModelAnswer(
         explanation="振れ幅が小さい範囲では、振り子の周期はほとんど変わりません（振り子の等時性）。30° くらいまでなら、違いは 2% ほどです。",
         leak_phrases=("等時性", "振れ幅によらず", "振れ幅に関係な", "違いは 2%"),
+        result_phrases=("振れ幅を変えても", "周期は変わら", "周期はほとんど変わら"),
     ),
 }
