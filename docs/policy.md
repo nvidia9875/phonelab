@@ -178,7 +178,7 @@ Planner の `why_this`, `hint`, `restated`, `question_back` を `answers.json` �
 }
 ```
 
-Firestore の `classes/{class_code}` に置く。PWA は Firestore に直接触らない。**測定中だけ** `GET /api/class/{code}/status` を 2 秒ごとに呼び、`halted` が true になったらセンサーを止める（最悪 2 秒遅れ。→ architecture.md 4.3、flow.md D7）。すべての API 応答に `X-PhoneLab-Halted` ヘッダを付け、測定外でも次の操作で止まる。
+Firestore の `classes/{class_code}` に置く（実装 9/16: `server/classroom.py`。`microphone_mode` / `camera_mode` / `enabled_families` はまだ持たない）。PWA は Firestore に直接触らない。**測定中だけ** `GET /api/class/{code}/status` を 2 秒ごとに呼び、`halted` が true になったらセンサーを止める（最悪 2 秒遅れ。→ architecture.md 4.3、flow.md D7）。すべての API 応答に `X-PhoneLab-Halted` ヘッダを付け、測定外でも次の操作で止まる。
 
 ### 5.1 提案（proposals）— ClassAgent が書き、教師が決める
 

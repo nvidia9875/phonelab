@@ -180,6 +180,8 @@ class_observer = LlmAgent(
 
 ### 4.3 全端末停止はポーリングで届ける
 
+> **実装（9/16、C′1）**: `server/classroom.py`（学級 `classes/{code}`、本番は Firestore・ローカルとテストはメモリ、教師 PIN は salt 付きハッシュ）、`server/routes_class.py`（`GET /api/class/{code}`、`POST …/join`、`POST …/halt`、`PUT …/policy`。PIN は学級 × 接続元で 10 回 / 10 分）。端末は準備・測定中と停止中は 2 秒、それ以外は 10 秒ごとに `GET` して `halted` を受け取り、準備・測定の画面なら `/halted` へ（ローカル実測 2.0 秒）。`/api/plan` と `/api/chat` は `class_code` 付きなら停止中は 409、さらに `PolicyPlugin.before_run_callback` が `class_halted` を見て Runner の入口で止める（モデルを呼ばない。テスト `test_before_run_skips_the_agent_entirely_while_the_class_is_halted`）。学級 `DEMO-2026` は起動時に `PHONELAB_DEMO_PIN` から作る。
+
 以前の案（PWA が Firestore を `onSnapshot`）は「PWA はクライアント SDK を持たず、Firestore ルールは全拒否」と矛盾していた。
 
 - PWA は **測定中だけ** `GET /api/class/{code}/status` を 2 秒ごとに呼ぶ（`{halted, updated_at}`。応答 50 バイト）
