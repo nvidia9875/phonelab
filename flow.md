@@ -22,6 +22,7 @@
 | 設計 | **B0 完了**（`docs/` 6 本。9/9。アーキテクチャは公式ドキュメントで裏取り済み） |
 | コード | **B5 完了**（ADK + PolicyPlugin + Cloud Trace が Cloud Run で動く、9/15）。B1〜B4・B7 は実機計測待ち、B6 未 |
 | 参加形態 | **個人（9/14 確定）** |
+| 監査（9/16） | 崩れ・クラッシュ無し。**本番の生徒フローで LLM を呼ぶのは `/api/chat` だけ**（計画は `web/src/agent/stub.ts` の正規表現）。設計の D13〜D16（PolicyPlugin 6 コールバック・Model Armor・ClassAgent・Firestore・KMS 署名・全端末停止）は未実装。README / LICENSE / アーキ図 PNG / 動画 / GitHub 連携が未。同日に直したもの: 保留中の説明漏れ、デモ測定の本番露出、検査行の抜け、/me の矛盾、X-Forwarded-For、漏えい語句の空白 |
 
 公式の逆算マイルストーン（`context/02-schedule.md`）では「9/中旬までにコアループ実装＋デプロイ」だったので、**約 1 週間遅れ**からのスタート。ハード調達ゼロの案を選んだ分、その遅れは吸収できる。
 
