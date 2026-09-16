@@ -10,7 +10,7 @@ import { QUANTITY, formatQuantity, type Unit } from "../catalog/quantity";
 import { SENSOR_LABEL, repeatsOf, themeById, variantById, variantsOf, type Theme } from "../catalog/themes";
 import type { LocalCheck } from "../measure/checks";
 import { clocksSummary, measuredValue, type Features } from "../measure/features";
-import { activeRecordForTheme, addEvent, createRecord, recordsForTheme, updateRecord, type ChatLog, type Claim, type CondKey, type Direction, type PlanInfo, type Rejection, type StudyRecord } from "../store/records";
+import { activeRecordForTheme, addEvent, createRecord, currentClassCode, recordsForTheme, updateRecord, type ChatLog, type Claim, type CondKey, type Direction, type PlanInfo, type Rejection, type StudyRecord } from "../store/records";
 
 export const MAX_RETRY = 3;
 const EMPTY_TRIES: Record<CondKey, number> = { A: 0, B: 0 };
@@ -127,6 +127,7 @@ export async function submitPrediction(rec: StudyRecord, theme: Theme, text: str
       done_variant_ids: done,
       previous_question_back: rec.prediction.questionBack,
       planner_calls: plannerCalls,
+      class_code: currentClassCode(),
     });
     const decision = decideFromServer(reply, theme, text);
     if (decision) return applyDecision(rec, text, decision, reply.planner_calls);

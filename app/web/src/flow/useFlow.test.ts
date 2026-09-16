@@ -216,6 +216,7 @@ describe("submitPrediction", () => {
     expect(sent.theme_id).toBe("sound");
     expect(sent.planner_calls).toBe(0);
     expect(sent.previous_question_back).toBeNull();
+    expect(sent.class_code).toBeNull(); // 学級に入っていない端末
   });
 
   it("falls back to the on-device rules when the lab teacher cannot be reached", async () => {

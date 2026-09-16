@@ -15,8 +15,9 @@ import { Settings } from "./screens/Settings";
 import { Chat } from "./screens/Chat";
 import { repeatsOf, themeById, variantById, type Theme } from "./catalog/themes";
 import { matchRoute, nav, usePath, type Route } from "./router";
-import { activeRecordForTheme, clearAll, createRecord, recordById, setHalted, setSettings, setStudent, useStore, type StudyRecord } from "./store/records";
-import { DEFAULT_CLASS_POLICY, detectCaps, type DeviceCaps } from "./store/status";
+import { activeRecordForTheme, clearAll, createRecord, recordById, setClassState, setHalted, setSettings, setStudent, useStore, type ClassState, type StudyRecord } from "./store/records";
+import { DEFAULT_CLASS_POLICY, detectCaps, type ClassPolicy, type DeviceCaps } from "./store/status";
+import { ClassError, fetchClass, joinClass, setClassHalt, setClassPolicyOnServer, type ClassInfo } from "./agent/classroom";
 import { useMeasurement } from "./measure/useMeasurement";
 import { checksFor, clockLabels, clocksOf, type Features } from "./measure/features";
 import { demoFeatures } from "./measure/demo";
@@ -50,6 +51,36 @@ function previousAttemptNote(rec: StudyRecord, cond: "A" | "B"): string | undefi
   const previous = rec.measurements.filter((x) => x.condition === cond).at(-1);
   if (previous && !previous.pass) return "前回の測定は検査で保留になりました。今回はその再測定です。";
   return `この条件を測り直しています（${rec.retries[cond] + 1} 回目）。前の測定も記録に残ります。`;
+}
+
+function classStateFrom(info: ClassInfo): ClassState {
+  return { classCode: info.class_code, school: info.school, allowedSensors: info.allowed_sensors, teacherEnabled: info.teacher_enabled, halted: info.halted, updatedAt: info.updated_at, seenAt: new Date().toISOString() };
+}
+
+/** 学級の停止はポーリングで届く。測定と準備の画面では 2 秒、それ以外は 10 秒（docs/policy.md 5 章） */
+const POLL_MEASURING_MS = 2000;
+const POLL_IDLE_MS = 10000;
+
+function useClassPoll(classCode: string | null, measuring: boolean): void {
+  useEffect(() => {
+    if (!classCode) return;
+    let alive = true;
+    const tick = async () => {
+      try {
+        const info = await fetchClass(classCode);
+        if (alive) setClassState(classStateFrom(info));
+      } catch (e: unknown) {
+        // 学級が消えた（404）ときだけ端末の学級を外す。通信の失敗は前の状態を保つ
+        if (alive && e instanceof ClassError && e.status === 404) setClassState(null);
+      }
+    };
+    void tick();
+    const id = setInterval(() => void tick(), measuring ? POLL_MEASURING_MS : POLL_IDLE_MS);
+    return () => {
+      alive = false;
+      clearInterval(id);
+    };
+  }, [classCode, measuring]);
 }
 
 /** 描画中に副作用を起こさないため、リダイレクト先と「描画前にやること」をここで決める */
@@ -88,7 +119,13 @@ export function App() {
   const route = matchRoute(path);
   const store = useStore();
   const [caps, setCaps] = useState<DeviceCaps>(detectCaps);
-  const policy = { ...DEFAULT_CLASS_POLICY, halted: store.halted };
+  // 学級に入っていれば先生の許可・停止・学校種はサーバのもの。入っていなければ端末の設定（テストモード）
+  const cls = store.classState;
+  const halted = cls ? cls.halted : store.halted;
+  const policy: ClassPolicy = cls ? { allowedSensors: cls.allowedSensors, teacherEnabled: cls.teacherEnabled, halted } : { ...DEFAULT_CLASS_POLICY, halted };
+  const school = cls?.school ?? store.settings.school;
+  // 準備・測定中と、止められて待っている間は 2 秒ごと（解除もすぐ届くように）
+  useClassPoll(store.student?.classCode ?? null, route.name === "setup" || route.name === "measure" || halted);
   const markNoMotion = useCallback(() => setCaps((c) => ({ ...c, motionEvents: "no" })), []);
   const m = useMeasurement({ onMotionUnavailable: markNoMotion });
 
@@ -107,7 +144,7 @@ export function App() {
   const themeId = "theme" in route ? route.theme : null;
   const theme = themeId ? themeById(themeId) : undefined;
   const rec = theme ? activeRecordForTheme(theme.id, store.records) : undefined;
-  const { redirect, need } = resolve(route, rec, theme, !!store.student, store.halted);
+  const { redirect, need } = resolve(route, rec, theme, !!store.student, halted);
 
   useEffect(() => {
     if (redirect) {
@@ -126,8 +163,8 @@ export function App() {
     records: store.records,
     caps,
     policy,
-    halted: store.halted,
-    school: store.settings.school,
+    halted,
+    school,
     onOpenTheme: (t: Theme) => {
       if (!store.student) return nav("/me");
       const r = activeRecordForTheme(t.id, store.records);
@@ -144,9 +181,22 @@ export function App() {
 
   switch (route.name) {
     case "teacher":
-      return <Teacher halted={store.halted} onHalt={() => setHalted(!store.halted)} />;
+      return (
+        <Teacher
+          classCode={cls?.classCode ?? store.student?.classCode ?? "DEMO-2026"}
+          cls={cls}
+          halted={halted}
+          onHalt={async (code, pin, next) => {
+            if (!code) return setHalted(next); // 学級に入っていない端末（テストモード）は端末内だけ
+            setClassState(classStateFrom(await setClassHalt(code, pin, next)));
+          }}
+          onPolicy={async (code, pin, sensors, enabled) => {
+            setClassState(classStateFrom(await setClassPolicyOnServer(code, pin, sensors, enabled)));
+          }}
+        />
+      );
     case "halted":
-      return <Halted halted={store.halted} onHome={goHome} />;
+      return <Halted halted={halted} onHome={goHome} />;
     case "settings":
       return <Settings settings={store.settings} onChange={setSettings} onMe={() => nav("/me")} onTeacher={() => nav("/teacher")} onHome={goHome} />;
     case "me":
@@ -156,7 +206,19 @@ export function App() {
           caps={caps}
           policy={policy}
           recordCount={store.records.length}
-          onSave={(s) => { setStudent(s); goHome(); }}
+          onSave={async (s) => {
+            try {
+              const info = await joinClass(s.classCode, s.number);
+              setClassState(classStateFrom(info));
+            } catch (e: unknown) {
+              // テストモードだけ、学級が無くても端末内で進める
+              if (!store.settings.testMode) return e instanceof ClassError ? e.message : "学級につながりませんでした";
+              setClassState(null);
+            }
+            setStudent(s);
+            goHome();
+            return null;
+          }}
           onClear={() => { if (confirm("この端末の記録をすべて消します。よろしいですか？")) clearAll(); }}
           onHome={goHome}
         />

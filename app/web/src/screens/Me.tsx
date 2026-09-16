@@ -10,7 +10,8 @@ export interface MeProps {
   caps: DeviceCaps;
   policy: ClassPolicy;
   recordCount: number;
-  onSave: (s: Student) => void;
+  /** 学級コードで入場する。失敗したら理由の文を返す */
+  onSave: (s: Student) => Promise<string | null>;
   onClear: () => void;
   onHome: () => void;
 }
@@ -19,7 +20,20 @@ export interface MeProps {
 export function Me({ student, caps, policy, recordCount, onSave, onClear, onHome }: MeProps) {
   const [classCode, setClassCode] = useState(student?.classCode ?? "");
   const [number, setNumber] = useState(student?.number ?? "");
-  const ok = classCode.trim().length >= 3 && number.trim().length >= 1;
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const ok = classCode.trim().length >= 3 && number.trim().length >= 1 && !pending;
+  async function save() {
+    if (!ok) return;
+    setPending(true);
+    setError(null);
+    try {
+      const err = await onSave({ classCode: classCode.trim().toUpperCase(), number: number.trim().toUpperCase() });
+      if (err) setError(err);
+    } finally {
+      setPending(false);
+    }
+  }
   return (
     <Screen badge="生徒の情報" tone="outline" onHome={onHome}>
       <Section label="学級コードと出席番号（名前は入れません）">
@@ -27,6 +41,7 @@ export function Me({ student, caps, policy, recordCount, onSave, onClear, onHome
           <input className="input" placeholder="学級コード（例: DEMO-2026）" value={classCode} onChange={(e) => setClassCode(e.target.value.toUpperCase())} autoCapitalize="characters" />
           <input className="input" placeholder="出席番号（例: S-04）" value={number} onChange={(e) => setNumber(e.target.value.toUpperCase())} />
         </div>
+        {error && <p className="card__hint" role="alert" style={{ color: "var(--ink)", fontWeight: 700 }}>{error}</p>}
       </Section>
 
       <Card variant="line">
@@ -51,7 +66,7 @@ export function Me({ student, caps, policy, recordCount, onSave, onClear, onHome
       </Card>
 
       <Foot>
-        <Button disabled={!ok} onClick={() => onSave({ classCode: classCode.trim(), number: number.trim() })}>保存してトップへ</Button>
+        <Button disabled={!ok} onClick={() => void save()}>{pending ? "学級を確かめています…" : "保存してトップへ"}</Button>
         <FootNote>学級コードと番号は、先生の画面で進み方を見るためだけに使います。</FootNote>
       </Foot>
     </Screen>

@@ -5,7 +5,7 @@
 import { useSyncExternalStore } from "react";
 import type { LocalCheck } from "../measure/checks";
 import type { Features } from "../measure/features";
-import type { School, Variable } from "../catalog/themes";
+import type { School, Sensor, Variable } from "../catalog/themes";
 
 export type Direction = "faster" | "same" | "slower" | "unknown";
 export type RecordStatus = "open" | "held" | "judged" | "signed" | "stopped";
@@ -100,10 +100,23 @@ export interface Student {
   number: string;
 }
 
+/** サーバの学級（/api/class）。先生の許可・有効化・停止。入場したときと、測定中のポーリングで更新する */
+export interface ClassState {
+  classCode: string;
+  school: School;
+  allowedSensors: Sensor[];
+  teacherEnabled: string[];
+  halted: boolean;
+  updatedAt: string;
+  /** この端末が最後に受け取った時刻 */
+  seenAt: string;
+}
+
 const KEY_RECORDS = "phonelab.records.v1";
 const KEY_STUDENT = "phonelab.student.v1";
 const KEY_HALTED = "phonelab.halted.v1";
 const KEY_SETTINGS = "phonelab.settings.v1";
+const KEY_CLASS = "phonelab.class.v1";
 
 export interface Settings {
   /** テストモード: 全テーマを選べ、センサーが無くてもサンプルで進める（記録に demo が残る） */
@@ -113,7 +126,7 @@ export interface Settings {
 }
 const DEFAULT_SETTINGS: Settings = { testMode: false, school: "jhs" };
 
-type State = { records: StudyRecord[]; student: Student | null; halted: boolean; settings: Settings };
+type State = { records: StudyRecord[]; student: Student | null; halted: boolean; settings: Settings; classState: ClassState | null };
 
 function read<T>(key: string, fallback: T): T {
   try {
@@ -131,7 +144,7 @@ function write(key: string, value: unknown): void {
   }
 }
 
-let state: State = { records: read(KEY_RECORDS, []), student: read(KEY_STUDENT, null), halted: read(KEY_HALTED, false), settings: { ...DEFAULT_SETTINGS, ...read(KEY_SETTINGS, {}) } };
+let state: State = { records: read(KEY_RECORDS, []), student: read(KEY_STUDENT, null), halted: read(KEY_HALTED, false), settings: { ...DEFAULT_SETTINGS, ...read(KEY_SETTINGS, {}) }, classState: read(KEY_CLASS, null) };
 const listeners = new Set<() => void>();
 function emit(next: State): void {
   state = next;
@@ -139,6 +152,7 @@ function emit(next: State): void {
   write(KEY_STUDENT, state.student);
   write(KEY_HALTED, state.halted);
   write(KEY_SETTINGS, state.settings);
+  write(KEY_CLASS, state.classState);
   listeners.forEach((l) => l());
 }
 function subscribe(l: () => void): () => void {
@@ -158,6 +172,13 @@ export function setHalted(halted: boolean): void {
 }
 export function setSettings(patch: Partial<Settings>): void {
   emit({ ...state, settings: { ...state.settings, ...patch } });
+}
+export function setClassState(classState: ClassState | null): void {
+  emit({ ...state, classState });
+}
+/** 学級コード付きの API 呼び出しに使う。入場していなければ null */
+export function currentClassCode(): string | null {
+  return state.student?.classCode ?? null;
 }
 
 /* ---------- 記録 ---------- */
@@ -224,5 +245,5 @@ export function activeRecordForTheme(themeId: string, records = state.records): 
   return records.find((r) => r.themeId === themeId && (r.status === "open" || r.status === "held" || r.status === "judged"));
 }
 export function clearAll(): void {
-  emit({ records: [], student: state.student, halted: false, settings: state.settings });
+  emit({ records: [], student: state.student, halted: false, settings: state.settings, classState: state.classState });
 }
