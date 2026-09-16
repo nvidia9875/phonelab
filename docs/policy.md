@@ -120,6 +120,8 @@ Planner の `why_this`, `hint`, `restated`, `question_back` を `answers.json` �
 | `experiments_per_session` | 10 | セッション終了、記録を締める |
 | Planner のトークン | 入力 4k / 出力 1k | Gemini の `max_output_tokens`。費用の上限にもなる |
 
+生徒が「うまく取れなかった」と思って測り直すときも、保留の再測定と同じ `remeasure_per_condition`（1 条件 3 回）を数える。予想に合う結果が出るまで測り続けられないようにするため。前の測定は記録に残し、判定は最後に検査を通った測定でやり直す。
+
 ### 3.7 予想ゲート
 
 | 条件 | 処理 |

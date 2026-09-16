@@ -56,6 +56,7 @@
     "quantity": "speed_ms",
     "profile": "pendulum_speed",
     "length_m": 0.8,
+    "repeats": 3,                          // 1 条件を何回測って平均するか（既定 1）
     "tolerance": 0.15,
     "tolerance_kind": "abs"               // "abs" 単位そのまま | "rel" 条件 A の値に対する割合（音）
   },
@@ -98,6 +99,7 @@
 - 端末が受ける信号（→ [verifier.md](verifier.md) 1.2b）: 最下点でジャイロの角速度が最大になり、加速度の大きさも g + v²/L で最大になる。2 系統が独立に v を出す
 - `energy_mass` の「測定が言っていること」は「同じ高さから放すと、重さを変えても速さは変わらなかった」。重いほど速いという思い込みを壊す入口
 - 放すときに押すと速くなる。`procedure` に「押さずに放す」を書き、Verifier の `two_clocks_disagree` で拾う
+- **1 条件を 3 回測って平均する**（`repeats: 3`）。放す高さは手で合わせるので毎回ぶれる。音（`pitch`）は 5 秒の中で何十フレームぶんの中央値を取っているので 1 回、周期（`pendulum_period`）も 20 秒で何往復ぶんも平均しているので 1 回
 - 学校の iPad を袋に入れて吊るすかは先生が決める。**端末を机に置いて振り子を撮る動画版（T0）** を後で足す
 
 ### 3.2 振り子の周期（family: pendulum_period）— 高校（物理）、`enabled_by: "later"`
