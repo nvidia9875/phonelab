@@ -7,11 +7,11 @@ export function Halted({ halted, onHome }: { halted: boolean; onHome: () => void
       <Card variant="navy">
         <Eyebrow>先生の操作</Eyebrow>
         <CardTitle size="lg">{halted ? "先生が学級の測定を止めました" : "測定の停止は解除されました"}</CardTitle>
-        <CardBody>{halted ? "センサーは読みません。先生が解除するまで待ってください。途中の測定は記録に「停止」として残ります。" : "トップに戻って続きから進めます。"}</CardBody>
+        <CardBody>{halted ? "センサーは読みません。先生が解除するまで待ってください。途中だった測定は記録に入りません。" : "トップに戻って続きから進めます。"}</CardBody>
       </Card>
       <Foot>
         <Button onClick={onHome} disabled={halted}>トップに戻る</Button>
-        <FootNote>止めるのは人。この停止も記録に残ります。</FootNote>
+        <FootNote>止めるのは人。ラボ先生は止められません。</FootNote>
       </Foot>
     </Screen>
   );

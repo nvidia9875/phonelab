@@ -51,9 +51,14 @@ describe("chatSituation", () => {
 
 describe("canReveal", () => {
   it("opens the lab teacher's explanation only after the student writes their own thinking", () => {
-    expect(canReveal("")).toBe(false);
-    expect(canReveal("なんとなく")).toBe(false);
-    expect(canReveal("強くはじくと大きくなるだけだと思う")).toBe(true);
+    expect(canReveal("", "mismatch")).toBe(false);
+    expect(canReveal("なんとなく", "mismatch")).toBe(false);
+    expect(canReveal("強くはじくと大きくなるだけだと思う", "mismatch")).toBe(true);
+  });
+
+  it("keeps the explanation closed while the measurement is held, so the student measures before knowing", () => {
+    expect(canReveal("強くはじくと大きくなるだけだと思う", "hold")).toBe(false);
+    expect(canReveal("強くはじくと大きくなるだけだと思う", "match")).toBe(true);
   });
 });
 

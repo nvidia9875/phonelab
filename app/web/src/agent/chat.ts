@@ -46,9 +46,14 @@ export function chatSituation(rec: StudyRecord): ChatSituation {
   return rec.result.consistent ? "match" : "mismatch";
 }
 
-/** 先生の説明を開いてよいか（自分の考えを書いたか） */
-export function canReveal(thinking: string): boolean {
+/** 話しはじめてよいか（自分の考えを書いたか） */
+export function canStart(thinking: string): boolean {
   return thinking.trim().length >= MIN_THINKING_CHARS;
+}
+
+/** 先生の説明を開いてよいか。自分の考えを書き、かつ判定が出ているとき。保留では測る前に答えを知ってしまうので開かない */
+export function canReveal(thinking: string, situation: ChatSituation): boolean {
+  return situation !== "hold" && canStart(thinking);
 }
 
 /** 保留になった測定の、通らなかった検査の文 */

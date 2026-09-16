@@ -26,11 +26,11 @@ export interface MeasureView {
 
 type Row = { ok: boolean; text: string };
 
-/** 画面に出す 3 行: 途切れ・音の量 / 飽和・動き出し / 二本の時計 */
+/** 画面に出す 3 行: 途切れ・音の量 / 飽和・動き出し / 二本の時計と値の妥当さ。全コードをどれかに入れる（抜けると緑に見えて次で保留になる） */
 const ROW_GROUPS: CheckCode[][] = [
   ["low_rate", "gap", "low_voiced", "low_snr"],
   ["saturation", "clipping", "no_signal", "no_release"],
-  ["two_clocks_disagree"],
+  ["two_clocks_disagree", "unstable", "weak_autocorr", "out_of_range"],
 ];
 
 /** 端末内検査の結果を画面の 3 行に要約する（詳細は保留画面で出す） */
@@ -110,7 +110,10 @@ export function Measure({ view, onStop, onContinue, onDemo, onRemeasure }: Measu
               </Check>
             ))
           ) : view.phase === "denied" ? (
-            <Check warn>{view.deniedReason}</Check>
+            <>
+              <Check warn>{view.deniedReason}</Check>
+              {!onDemo && <Check>センサーの無い端末で流れを試すなら、設定の「テストモード」でサンプルの測定を使えます</Check>}
+            </>
           ) : waiting || counting ? (
             <Check>合図のあとで測り始めます。それまでセンサーは読みません</Check>
           ) : (

@@ -28,7 +28,10 @@ export function Record({ theme, variant, record, onVerify, onHome }: RecordProps
           <p style={{ fontSize: 14, fontWeight: 700 }}>
             {title}　記録 {record.id}
           </p>
-          <p style={{ fontSize: 12, color: "var(--muted)" }}>{statusText[record.status]}</p>
+          <p style={{ fontSize: 12, color: "var(--muted)" }}>
+            {record.measurements.some((m) => m.demo) ? "テストモードのサンプル値。" : ""}
+            {statusText[record.status]}
+          </p>
         </div>
       </Card>
 

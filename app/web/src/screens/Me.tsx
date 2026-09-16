@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Button, Card, Eyebrow, Foot, FootNote, Screen, Section } from "../components/ui";
 import { SENSOR_LABEL } from "../catalog/themes";
 import type { Student } from "../store/records";
-import type { ClassPolicy, DeviceCaps } from "../store/status";
+import { deviceTier, type ClassPolicy, type DeviceCaps } from "../store/status";
 import "./catalog.css";
 
 export interface MeProps {
@@ -31,7 +31,7 @@ export function Me({ student, caps, policy, recordCount, onSave, onClear, onHome
 
       <Card variant="line">
         <Eyebrow>この端末で使えるセンサー</Eyebrow>
-        <div className="kv"><span className="kv__k">加速度・ジャイロ</span><span>{caps.motion ? "使える" : "ありません"}</span></div>
+        <div className="kv"><span className="kv__k">加速度・ジャイロ</span><span>{deviceTier(caps) === "T0" ? "ありません" : caps.motionEvents === "yes" ? "使える" : "測るときに確かめます"}</span></div>
         <div className="kv"><span className="kv__k">マイク・カメラ</span><span>{caps.media ? "使える（端末内処理）" : "使えません"}</span></div>
         <div className="kv"><span className="kv__k">位置情報</span><span>常に使わない</span></div>
       </Card>

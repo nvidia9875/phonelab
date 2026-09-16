@@ -44,6 +44,14 @@ function stagePath(themeId: string, stage: StudyRecord["stage"]): string {
   }
 }
 
+/** 同じ条件を測り直しているときの一文。前回が検査で止まったのか、自分で測り直したのかを分ける */
+function previousAttemptNote(rec: StudyRecord, cond: "A" | "B"): string | undefined {
+  if (rec.retries[cond] === 0) return undefined;
+  const previous = rec.measurements.filter((x) => x.condition === cond).at(-1);
+  if (previous && !previous.pass) return "前回の測定は検査で保留になりました。今回はその再測定です。";
+  return `この条件を測り直しています（${rec.retries[cond] + 1} 回目）。前の測定も記録に残ります。`;
+}
+
 /** 描画中に副作用を起こさないため、リダイレクト先と「描画前にやること」をここで決める */
 function resolve(route: Route, rec: StudyRecord | undefined, theme: Theme | undefined, hasStudent: boolean, halted: boolean): { redirect?: string; need?: "create" | "judge" } {
   const inTheme = route.name === "predict" || route.name === "plan" || route.name === "rejected" || route.name === "setup" || route.name === "measure" || route.name === "hold" || route.name === "result" || route.name === "chat";
@@ -173,6 +181,7 @@ export function App() {
     case "predict":
       return (
         <Predict
+          key={t.id}
           theme={t}
           initialText={r.prediction.text}
           questionBack={r.prediction.questionBack}
@@ -252,7 +261,7 @@ export function App() {
           : s.phase === "requesting"
             ? { phase: "requesting", elapsed: 0, seconds: s.seconds, conditionLabel: label, clocks: emptyClocks, unit, checks: [], sentBytes: null, allOk: false, waitingFor: s.sensor === "microphone" ? "マイクの許可を待っています。ブラウザの確認で「許可」を押してください" : "センサーの許可を待っています。確認で「許可」を押してください" }
           : s.phase === "done"
-            ? { phase: "done", elapsed: s.seconds, seconds: s.seconds, conditionLabel: label, clocks: clocksOf(s.features), unit, checks: checksToRows(s.checks), sentBytes: JSON.stringify(s.features).length, allOk: s.checks.every((c) => c.ok), previousHold: r.retries[route.cond] > 0 ? "前回の測定は検査で保留になりました。今回はその再測定です。" : undefined }
+            ? { phase: "done", elapsed: s.seconds, seconds: s.seconds, conditionLabel: label, clocks: clocksOf(s.features), unit, checks: checksToRows(s.checks), sentBytes: JSON.stringify(s.features).length, allOk: s.checks.every((c) => c.ok), previousHold: previousAttemptNote(r, route.cond) }
             : { phase: "denied", elapsed: 0, seconds: t.seconds, conditionLabel: label, clocks: emptyClocks, unit, checks: [], sentBytes: null, allOk: false, deniedReason: s.phase === "denied" ? (s.message ?? (s.reason === "denied" ? "センサーの許可がありませんでした" : cannotRead)) : "測定が始まっていません。準備画面から「測る」を押してください" };
       const finish = (features: Features, demo: boolean) => {
         const hash = s.phase === "done" ? s.rawHash : "sha256:demo";
@@ -268,8 +277,8 @@ export function App() {
           view={view}
           onStop={() => { m.stop(); m.reset(); flow.stopMeasure(r, route.cond); nav(`/x/${t.id}/setup/${route.cond}`); }}
           onContinue={() => { if (s.phase === "done") finish(s.features, false); }}
-          onRemeasure={r.retries[route.cond] < flow.MAX_RETRY ? () => { m.reset(); flow.remeasure(r, route.cond); nav(`/x/${t.id}/setup/${route.cond}`); } : undefined}
-          onDemo={s.phase === "denied" || s.phase === "requesting" ? () => finish(demoFeatures(t, variant!, idx), true) : undefined}
+          onRemeasure={s.phase === "done" && s.checks.every((c) => c.ok) && r.retries[route.cond] < flow.MAX_RETRY ? () => { m.reset(); flow.remeasure(r, route.cond); nav(`/x/${t.id}/setup/${route.cond}`); } : undefined}
+          onDemo={store.settings.testMode && (s.phase === "denied" || s.phase === "requesting") ? () => finish(demoFeatures(t, variant!, idx), true) : undefined}
         />
       );
     }
@@ -293,6 +302,8 @@ export function App() {
       const nextVariant = flow.nextVariantFor(r, t);
       return (
         <Result
+          key={r.id}
+          sample={r.measurements.some((x) => x.demo)}
           variant={variant!}
           judgement={r.result!}
           explain={r.explain}
@@ -315,6 +326,7 @@ export function App() {
     case "chat":
       return (
         <Chat
+          key={r.id}
           rec={r}
           theme={t}
           variant={variant!}

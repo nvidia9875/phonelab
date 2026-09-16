@@ -18,13 +18,15 @@ export interface ResultProps {
   onChat: () => void;
   retries: Record<CondKey, number>;
   repeats: number;
+  /** テストモードのサンプル値で進めた記録 */
+  sample?: boolean;
   maxRetry: number;
   onRemeasure: (cond: CondKey) => void;
   onHome: () => void;
 }
 
 /** 画面 3: 結果と次の予測。「正解」と言わない。「測定が言っていること」と言う */
-export function Result({ variant, judgement, explain, nextVariant, nextDirection, onExplain, onNext, onGoNext, onFinish, onRecord, onChat, retries, maxRetry, repeats, onRemeasure, onHome }: ResultProps) {
+export function Result({ variant, judgement, explain, nextVariant, nextDirection, onExplain, onNext, onGoNext, onFinish, onRecord, onChat, retries, maxRetry, repeats, sample = false, onRemeasure, onHome }: ResultProps) {
   const [text, setText] = useState(explain);
   const j = judgement;
   const unit = variant.unit;
@@ -37,6 +39,7 @@ export function Result({ variant, judgement, explain, nextVariant, nextDirection
       </Grid2>
 
       {repeats > 1 && <p className="card__hint">それぞれ {repeats} 回測った平均です</p>}
+      {sample && <p className="card__hint">テストモードのサンプル値です。実際の測定ではありません</p>}
 
       <Card variant="navy">
         <Eyebrow>測定が言っていること</Eyebrow>

@@ -6,6 +6,7 @@ import {
   ChatError,
   MIN_THINKING_CHARS,
   canReveal,
+  canStart,
   chatRequestFor,
   chatSituation,
   holdReasons,
@@ -56,6 +57,7 @@ export function Chat({ rec, theme, variant, onThinking, onTurn, onBack, onHome }
   const endRef = useRef<HTMLDivElement>(null);
   const turnsLeft = Math.max(0, CHAT_TURNS_PER_RECORD - chat.turnsUsed);
   const reasons = situation === "hold" ? holdReasons(rec) : [];
+  const revealable = canReveal(chat.thinking, situation);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
@@ -79,7 +81,7 @@ export function Chat({ rec, theme, variant, onThinking, onTurn, onBack, onHome }
 
   function start() {
     const thinking = draft.trim();
-    if (!canReveal(thinking)) return;
+    if (!canStart(thinking)) return;
     onThinking(thinking);
     void send(thinking, false, { ...rec, chat: { ...chat, thinking } });
   }
@@ -112,9 +114,13 @@ export function Chat({ rec, theme, variant, onThinking, onTurn, onBack, onHome }
             style={{ borderColor: "var(--orange)" }}
           />
           <p className="card__hint">
-            {canReveal(draft) ? "送ると、ラボ先生と話しはじめます。ラボ先生の説明も聞けるようになります" : `${MIN_THINKING_CHARS} 文字以上で書くと、ラボ先生と話せます`}
+            {!canStart(draft)
+              ? `${MIN_THINKING_CHARS} 文字以上で書くと、ラボ先生と話せます`
+              : situation === "hold"
+                ? "送ると、ラボ先生と話しはじめます。説明は、測れて結果が出てから聞けます"
+                : "送ると、ラボ先生と話しはじめます。ラボ先生の説明も聞けるようになります"}
           </p>
-          <Button disabled={!canReveal(draft) || sending} onClick={start}>
+          <Button disabled={!canStart(draft) || sending} onClick={start}>
             {sending ? "ラボ先生が考えています…" : "考えを送って、ラボ先生と話す"}
           </Button>
         </Section>
@@ -140,7 +146,7 @@ export function Chat({ rec, theme, variant, onThinking, onTurn, onBack, onHome }
 
       {started && !chat.limitReached && (
         <div className="chat-input">
-          {!chat.revealed && (
+          {!chat.revealed && revealable && (
             <Button secondary disabled={sending} onClick={() => void send(REVEAL_MESSAGE, true)}>
               ラボ先生の説明を聞く
             </Button>
@@ -154,7 +160,13 @@ export function Chat({ rec, theme, variant, onThinking, onTurn, onBack, onHome }
 
       <Foot>
         <FootNote>
-          {chat.limitReached ? "この記録でラボ先生と話せる回数は終わりました" : `ラボ先生と話せるのは、あと ${turnsLeft} 回です。説明は、自分の考えを書いたあとで聞けます`}
+          {chat.limitReached
+            ? "この記録でラボ先生と話せる回数は終わりました"
+            : situation === "hold"
+              ? `ラボ先生と話せるのは、あと ${turnsLeft} 回です。説明は、測れて結果が出てから聞けます`
+              : chat.revealed
+                ? `ラボ先生と話せるのは、あと ${turnsLeft} 回です`
+                : `ラボ先生と話せるのは、あと ${turnsLeft} 回です。説明は、自分の考えを書いたあとで聞けます`}
         </FootNote>
         <Button secondary onClick={onBack}>
           {rec.result ? "結果に戻る" : "保留の画面に戻る"}
