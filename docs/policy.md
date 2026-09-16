@@ -58,6 +58,8 @@ Gemini の structured output（response schema）で固定する。
 
 ### 3.2 禁止動作（forbidden_action）— 候補にも出さない
 
+> 9/16: この表と 3.4 の決定論パターンは `server/agent/policy.py` に置き、`POST /api/plan` が **Gemini を呼ぶ前に** 判定する（`tests/test_policy.py`）。端末の `stub.ts` にも同じ規則があるが、それはサーバにつながらないときの縮退。
+
 | コード | 条件 | 理由文（画面 5 の「理由 1」） |
 |---|---|---|
 | `drop_phone` | `out_of_catalog_request == "drop_phone"` または plan の実験の `safety.phone_in_hand == true` | 禁止動作: 端末の落下 |

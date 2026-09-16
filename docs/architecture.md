@@ -81,32 +81,36 @@ runner = Runner(
 
 **なぜ Agent のコールバックでなく Plugin か**: Plugin は Runner に一度登録すれば全エージェント・全ツールに効き、Agent 個別のコールバックより先に走る（公式の使い分けどおり「ポリシー・監視は Plugin」）。StudentAgent と ClassAgent の両方に同じ統制がかかることを一箇所で保証できる。
 
-### 2.2 StudentAgent（Planner）
+### 2.2 StudentAgent（Planner）— 9/16 に本番へ結線
 
 ```python
-class PlanOutput(BaseModel):            # policy.md 2 章と同じ
-    interpreted_claim: Claim
-    experiment_id: str | None
-    why_this: str
-    sensors: list[Sensor]
-    seconds: int
-    question_back: str | None
-    hint: str | None
-    out_of_catalog_request: str | None
+class PlanOutput(BaseModel):            # server/agent/planner.py
+    claim_variable: str = "unknown"     # 予想が「何を変えると」と言っているか（カタログの変数名）
+    claim_direction: Literal["faster", "slower", "same", "unknown"] = "unknown"
+    experiment_id: str                  # カタログの id。候補外なら PolicyPlugin が差し替える
+    why_this: str = ""                  # なぜこの実験で確かめられるか。結果の言葉が混じれば差し替える
+    question_back: str | None = None    # 理由が無いときの問い返し（1 回だけ）
 
 planner = LlmAgent(
     name="planner",
-    model="gemini-3.8-flash",           # B5（9/15）で Vertex AI global から呼べた最新の Flash
-    instruction=PLANNER_INSTRUCTION,    # {candidates} と {class_note?} を state から差し込む
-    output_schema=PlanOutput,
-    output_key="plan",
-    generate_content_config=types.GenerateContentConfig(temperature=0.2, max_output_tokens=1024),
+    model="gemini-3.5-flash-lite",      # 9/16: 3.8-flash は 25〜50 秒かかる時間帯があった。lite + thinking low で 1.4〜1.9 s
+    instruction=PLANNER_INSTRUCTION,    # 波かっこ無し。候補は state でなくメッセージ本文に並べる
+    output_schema=PlanOutput,           # output_key は付けない（ADK の検証で落とさず、読めない出力はサーバが縮退）
 )
 ```
 
-- **ツールは持たせない**。`output_schema` とツールの併用は一部モデル（Gemini 3.0 系）に限られ、他では `set_model_response` にフォールバックして信頼性が落ちると公式が明記している。Planner に必要な情報（候補リスト、端末能力、学級許可、これまでの記録の要約）は **サーバが state に入れてから** 呼ぶ
-- 1 リクエスト = 1 セッション。会話履歴は持たず、state に `record_summary`（これまでの予想・判定・保留の要約）を渡す。トークンを固定でき、費用の上限になる
-- instruction の要点: 「あなたは実験助手。答えを知らない。候補リストにない実験は選べない。結論・数値・向きを書かない。予想に理由が無ければ `question_back` を返す」
+`POST /api/plan`（`server/main.py`）の順番:
+
+1. **決定論の Policy**（`server/agent/policy.py`、`docs/policy.md` 3.2 / 3.4 / 3.7）。禁止動作・メモ内の指示・答えの要求は **モデルを呼ばずに** 却下・問い返し。却下の代替は候補の先頭
+2. **Planner**（Gemini、構造化出力）。メッセージには、相手・テーマ・予想・前回の問い返し・**そのテーマの候補だけ**（id、変える／一定にする、変数名）・向きの言葉。`answers.py` は渡さない（テスト `test_gives_the_planner_only_the_catalog_never_an_answer`）
+3. **PolicyPlugin `after_model_callback`**（`server/agent/policy_plugin.py`）。`experiment_id` が候補に無ければ先頭に差し替え、`why_this` に結果の言葉（速くなる・変わらない など）が混じれば中立の文に差し替え。直したことは `custom_metadata` の印で返し、`policy_fixed` として端末に届く
+4. 上限（`planner_calls` 5 回 / 実験）は `before_model_callback` がモデルを呼ばずに返し、サーバはカタログの順で進める。読めない出力・12 秒超（504）も同じ縮退
+
+端末（`web/src/flow/useFlow.ts`）は返事の `source`（agent / policy / catalog）と `trace_id` を記録に残し、計画画面に「誰が選んだか」を一行出す。**サーバにつながらないときだけ** `web/src/agent/stub.ts` の規則で選び、記録に `stub` と残す。
+
+- **ツールは持たせない**。`output_schema` とツールの併用は一部モデルに限られ、他では `set_model_response` にフォールバックして信頼性が落ちると公式が明記している
+- 1 リクエスト = 1 セッション。会話履歴は持たない。トークンを固定でき、費用の上限になる
+- 未: 回数をサーバ側の状態（C8 Firestore）で数える（いまは端末が `planner_calls` を送る）、Model Armor（B6）
 
 ### 2.2b ラボ先生（TutorAgent、ふり返りのチャット）
 

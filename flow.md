@@ -22,7 +22,7 @@
 | 設計 | **B0 完了**（`docs/` 6 本。9/9。アーキテクチャは公式ドキュメントで裏取り済み） |
 | コード | **B5 完了**（ADK + PolicyPlugin + Cloud Trace が Cloud Run で動く、9/15）。B1〜B4・B7 は実機計測待ち、B6 未 |
 | 参加形態 | **個人（9/14 確定）** |
-| 監査（9/16） | 崩れ・クラッシュ無し。**本番の生徒フローで LLM を呼ぶのは `/api/chat` だけ**（計画は `web/src/agent/stub.ts` の正規表現）。設計の D13〜D16（PolicyPlugin 6 コールバック・Model Armor・ClassAgent・Firestore・KMS 署名・全端末停止）は未実装。README / LICENSE / アーキ図 PNG / 動画 / GitHub 連携が未。同日に直したもの: 保留中の説明漏れ、デモ測定の本番露出、検査行の抜け、/me の矛盾、X-Forwarded-For、漏えい語句の空白 |
+| 監査（9/16） | 崩れ・クラッシュ無し。**本番の生徒フローで LLM を呼ぶのは `/api/chat` だけ**だった（計画は `web/src/agent/stub.ts` の正規表現）→ 同日 C3 で Planner を結線。設計の D13〜D16（PolicyPlugin 6 コールバック・Model Armor・ClassAgent・Firestore・KMS 署名・全端末停止）は未実装。README / LICENSE / アーキ図 PNG / 動画 / GitHub 連携が未。同日に直したもの: 保留中の説明漏れ、デモ測定の本番露出、検査行の抜け、/me の矛盾、X-Forwarded-For、漏えい語句の空白 |
 
 公式の逆算マイルストーン（`context/02-schedule.md`）では「9/中旬までにコアループ実装＋デプロイ」だったので、**約 1 週間遅れ**からのスタート。ハード調達ゼロの案を選んだ分、その遅れは吸収できる。
 
@@ -258,7 +258,7 @@ flowchart LR
 
 - [~] C1 PWA 骨格: `app/web`（Vite + React + TS）。**UX の流れを `docs/ux-flow.md` に固め、トップ（テーマのカタログ＋状態）、生徒の情報、予想ゲート、計画、準備、測定、保留、却下、結果、記録、停止、教員の 12 画面を結線**。記録は localStorage、Agent/Policy/判定は端末内スタブ（`src/agent/stub.ts`）。ブラウザで全経路を一周して検証済み（9/9）。`manifest.json` とオフライン縮退は未
 - [x] C2 画面 1（承認から実測に結線済み。`app/web/src/measure/pendulum.ts` が端末内計算）
-- [ ] C3 Planner（プロンプトは「仮説の候補、許可された実験、検査の基準、問い返し方」だけ。答えを含めない。出力は JSON schema で固定）
+- [x] C3 Planner（9/16）: `POST /api/plan`。決定論の Policy → Gemini `gemini-3.5-flash-lite`（構造化出力 `PlanOutput`、thinking low、1.4〜1.9 s）→ PolicyPlugin の突き合わせ（候補外の id・理由に混じった結果を差し替え）。端末は `source` と `trace_id` を記録に残し、つながらないときだけ stub。テスト 55 件（`app/tests/`）。未: 回数のサーバ側カウント（C8）、Model Armor（B6）
 - [~] C4 画面 2（実測の値と端末内検査を表示。サーバ Verifier 未）
 - [ ] C5 Verifier（サーバ側。特徴量だけを受け取る）
 - [~] C6 画面 3（見た目のみ。判定はサーバ実装後）
