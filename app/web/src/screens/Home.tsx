@@ -36,7 +36,7 @@ const HERO: Record<School, { title: [string, string]; sub: string; section: stri
 
 /** トップ: 学級と番号、進み方、テーマのカタログ（状態つき）、記録 */
 export function Home({ student, records, caps, policy, halted, school, onOpenTheme, onOpenRecord, onMe, onSettings, testMode }: HomeProps) {
-  const statuses = themesFor(school).map((t) => ({ theme: t, status: themeStatus(t, records, caps, policy, testMode) }));
+  const statuses = themesFor(school, policy.teacherEnabled).map((t) => ({ theme: t, status: themeStatus(t, records, caps, policy, testMode) }));
   const done = records.filter((r) => r.status === "signed").length;
   const signed = records.filter((r) => r.status === "signed" || r.status === "judged");
   const hero = HERO[school];
@@ -129,7 +129,11 @@ function ThemeCard({ no, theme, status, disabled, onOpen }: { no: number; theme:
       case "held": return <span className="theme__status theme__status--held">保留中</span>;
       case "judged": return <span className="theme__status theme__status--judged">次の予測</span>;
       case "done": return <span className="theme__status theme__status--done">✓ {status.count} / {status.total}</span>;
-      case "unavailable": return <span className="theme__status theme__status--off">{theme.enabledBy === "teacher" ? "先生が有効化" : theme.enabledBy === "later" ? "準備中" : "この端末では不可"}</span>;
+      case "unavailable": {
+        // 印は「選べない理由」に合わせる（有効化済みでも端末にセンサーが無ければ「この端末では不可」）
+        const label = status.reason.startsWith("先生が有効化") ? (theme.home ? "先生が有効化（家で）" : "先生が有効化") : status.reason === "準備中" ? "準備中" : status.reason.includes("学級で不可") ? "学級で不可" : "この端末では不可";
+        return <span className="theme__status theme__status--off">{label}</span>;
+      }
     }
   })();
   return (
@@ -151,6 +155,7 @@ function ThemeCard({ no, theme, status, disabled, onOpen }: { no: number; theme:
             <span className="tag tag--teal" key={x}>{SENSOR_LABEL[x]}</span>
           ))}
           <span className="tag">{theme.seconds} 秒</span>
+          {theme.home && <span className="tag tag--orange">家で</span>}
         </span>
       </span>
       {off && status.reason !== "準備中" && <span className="theme__reason">{status.reason}</span>}

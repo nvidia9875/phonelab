@@ -46,6 +46,7 @@
 .theme__meta { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
 .tag { font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 6px; background: var(--paper); color: var(--muted); }
 .tag--teal { color: var(--teal); background: transparent; border: 1.5px solid var(--teal); }
+.tag--orange { color: var(--orange); background: transparent; border: 1.5px solid var(--orange); }
 .theme__status { align-self: flex-start; font-size: 11px; font-weight: 700; white-space: nowrap; padding: 4px 9px; border-radius: var(--r-pill); border: 2px solid var(--ink); }
 .theme__status--open { background: var(--orange); border-color: var(--orange); }
 .theme__status--held { background: var(--ink); color: var(--paper); }

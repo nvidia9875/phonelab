@@ -59,6 +59,8 @@ export interface Theme {
   /** カウントダウンの 0 で大きく出す合図 */
   goCue: string;
   enabledBy: "default" | "teacher" | "later";
+  /** 先生が有効化して、家（私物の端末）でやる実験。学校種をまたいでカタログに出る（docs/personas.md §3） */
+  home?: boolean;
   measureProfile: MeasureProfile;
   variants: Variant[];
 }
@@ -243,17 +245,18 @@ const CATALOG: Theme[] = [
     curriculumRef: ["高校 物理 (1)(ｳ)㋑ 単振動", "共通テスト 令和7年度 物理 第2問"],
     minTier: "T1",
     title: "振り子の周期",
+    home: true,
     build: ["糸（1 m 以下）の先に袋を結び、消しゴムを 1 個入れる", "机の端から垂らして、小さく振ってみる", "何回か往復を見て、速さを感じてみる。まだスマホは入れない"],
     question: "振ってみて、どう思った？　重さや糸の長さを変えたら、周期はどうなりそう？",
     example: "たとえば：重くすると引っ張られる力が強いから、速く振れると思う",
-    tagline: "重い方が速い？　長い方が遅い？",
-    materials: "糸（1 m 以下）、袋、消しゴム 2 個",
+    tagline: "家で、自分のスマホを袋に入れて振る。重い方が速い？　長い方が遅い？",
+    materials: "糸（1 m 以下）、袋、消しゴム 2 個、加速度センサーのあるスマホ",
     sensors: ["accelerometer", "gyroscope"],
     seconds: 20,
     safety: "糸は1m以下、机の上で。スマホはケースに入れて袋に",
     measureHint: "スマホは袋に入れたまま、画面はこのまま。小さく振ってから「測る」を押します",
     goCue: "そのまま振って！",
-    enabledBy: "later",
+    enabledBy: "teacher",
     measureProfile: "pendulum_period",
     variants: [
       {
@@ -323,8 +326,9 @@ function textbookRank(id: string): number {
 
 export const THEMES: Theme[] = [...CATALOG].sort((a, b) => textbookRank(a.id) - textbookRank(b.id));
 
-export function themesFor(school: School): Theme[] {
-  return THEMES.filter((t) => t.school === school);
+/** 入口の学校種のテーマに、先生が有効化した「家でやる実験」を学校種をまたいで足す（教科書の順のまま） */
+export function themesFor(school: School, teacherEnabled: readonly string[] = []): Theme[] {
+  return THEMES.filter((t) => t.school === school || (t.home && teacherEnabled.includes(t.id)));
 }
 
 export function themeById(id: string): Theme | undefined {

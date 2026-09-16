@@ -61,7 +61,7 @@ const STAGE_LABEL: Record<StudyRecord["stage"], string> = {
 };
 
 function availability(theme: Theme, caps: DeviceCaps, policy: ClassPolicy): string | null {
-  if (theme.enabledBy === "teacher" && !policy.teacherEnabled.includes(theme.id)) return "先生が有効化する実験です";
+  if (theme.enabledBy === "teacher" && !policy.teacherEnabled.includes(theme.id)) return theme.home ? "先生が有効化すると、家で自分のスマホからできます" : "先生が有効化する実験です";
   if (theme.enabledBy === "later") return "準備中";
   const denied = theme.sensors.find((s) => !policy.allowedSensors.includes(s) && s !== "speaker");
   if (denied) return `${SENSOR_LABEL[denied]}は学級で不可`;
