@@ -4,10 +4,13 @@ Runner に一度登録すれば、どのエージェントのモデル呼び出�
   before_model_callback: 呼び出し回数が上限ならモデルを呼ばずに応答を返す（スキップ）。
                          生成設定（温度・出力トークン上限・思考の量）をエージェント側の設定より優先して強制する
   after_model_callback:  先生の説明がまだ閉じているのに、応答が説明の言い回しを含んだら、問い返しの文に差し替える
+                         Planner の構造化出力が候補に無い実験を指していたら候補の先頭に、理由に結果が混じっていたら中立の文に差し替える
 Planner（実験を選ぶ）とラボ先生（ふり返りの会話）で、数える回数と上限だけを変えて同じ統制をかける。
 """
 
 from __future__ import annotations
+
+import re
 
 from google.adk.agents.callback_context import CallbackContext
 from google.adk.models.llm_request import LlmRequest
@@ -15,6 +18,8 @@ from google.adk.models.llm_response import LlmResponse
 from google.adk.plugins.base_plugin import BasePlugin
 from google.genai import types
 from opentelemetry import trace
+
+from server.agent.planner import parse_plan
 
 PLANNER_CALLS_PER_EXPERIMENT = 5  # docs/policy.md 上限表 planner_calls_per_experiment
 PLANNER_TEMPERATURE = 0.2
@@ -27,6 +32,15 @@ LIMIT_REACHED_TEXT = (
     "この実験でラボ先生に聞ける回数の上限に達しました。"
     "いまの計画のまま測るか、先生に相談してください。"
 )
+
+PLAN_CANDIDATES_KEY = "plan_candidates"
+PLAN_OFF_CATALOG_KEY = "phonelab.plan_off_catalog"
+PLAN_WHY_REPLACED_KEY = "phonelab.plan_why_replaced"
+# 「なぜこの実験か」に混じってはいけない、結果の言葉
+RESULT_WORDS = re.compile(
+    r"速くな|遅くな|高くな|低くな|変わらな|同じにな|長くな|短くな|ほぼ同じ|ならない"
+)
+NEUTRAL_WHY = "この実験なら、予想した変数だけを変えて確かめられます。結果は測って見つけます"
 
 ANSWER_LOCKED_KEY = "answer_locked"
 LEAK_PHRASES_KEY = "leak_phrases"
@@ -86,6 +100,9 @@ class PolicyPlugin(BasePlugin):
         self, *, callback_context: CallbackContext, llm_response: LlmResponse
     ) -> LlmResponse | None:
         state = callback_context.state
+        candidates = [str(c) for c in (state.get(PLAN_CANDIDATES_KEY) or [])]
+        if candidates:
+            return _check_plan(candidates, llm_response)
         if not state.get(ANSWER_LOCKED_KEY):
             return None
         text = _squash(_response_text(llm_response))
@@ -96,6 +113,27 @@ class PolicyPlugin(BasePlugin):
         if not leaked:
             return None
         return _text_response(LEAK_FALLBACK_TEXT, {ANSWER_LEAK_KEY: True})
+
+
+def _check_plan(candidates: list[str], llm_response: LlmResponse) -> LlmResponse | None:
+    """Planner の出力を候補と突き合わせる。直したところだけ印を付けて返す"""
+    plan = parse_plan(_response_text(llm_response))
+    flags: dict[str, object] = {}
+    with _tracer.start_as_current_span("phonelab.policy") as span:
+        span.set_attribute("phonelab.check", "plan_output")
+        if plan is None:
+            span.set_attribute("phonelab.decision", "unreadable")
+            return None
+        if plan.experiment_id not in candidates:
+            plan = plan.model_copy(update={"experiment_id": candidates[0]})
+            flags[PLAN_OFF_CATALOG_KEY] = True
+        if RESULT_WORDS.search(plan.why_this):
+            plan = plan.model_copy(update={"why_this": NEUTRAL_WHY})
+            flags[PLAN_WHY_REPLACED_KEY] = True
+        span.set_attribute("phonelab.decision", "fixed" if flags else "allow")
+    if not flags:
+        return None
+    return _text_response(plan.model_dump_json(), flags)
 
 
 def _squash(text: str) -> str:

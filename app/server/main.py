@@ -22,7 +22,9 @@ from opentelemetry import trace
 from pydantic import BaseModel, Field, field_validator
 
 from server.agent.answers import MODEL_ANSWERS, phrases_for
-from server.agent.planner import planner_model
+from server.agent.catalog import CATALOG, candidates_for, short_changes
+from server.agent.planner import PlanContext, build_plan_prompt, planner_model
+from server.agent.policy import check_prediction
 from server.agent.policy_plugin import PLANNER_CALLS_PER_EXPERIMENT
 from server.agent.runner import (
     CHAT_TURNS_PER_RECORD,
@@ -95,6 +97,188 @@ async def spike_agent(
         reply=reply.text,
         skipped=reply.skipped,
         planner_calls=reply.planner_calls,
+        trace_id=trace_id,
+    )
+
+
+# ---- Planner: 予想を読んで実験を一つ選ぶ（docs/architecture.md 2.2、docs/policy.md 3.2〜3.4） ----
+
+PLAN_REQUESTS_PER_WINDOW = 30
+PLAN_WINDOW_S = 600
+PLAN_TIMEOUT_S = 12  # 端末はこれを超えたら端末内の縮退（stub）で進む
+MAX_DONE_IDS = 10
+MAX_QUESTION_BACK_CHARS = 200
+
+PlanKind = Literal["plan", "question", "hint", "rejected"]
+PlanSource = Literal["agent", "policy", "catalog"]
+
+
+class PlanRequest(BaseModel):
+    theme_id: str
+    school: Literal["jhs", "hs"]
+    text: str = Field(min_length=1, max_length=MAX_PREDICTION_CHARS)
+    done_variant_ids: list[Annotated[str, Field(max_length=60)]] = Field(
+        default_factory=list, max_length=MAX_DONE_IDS
+    )
+    previous_question_back: str | None = Field(default=None, max_length=MAX_QUESTION_BACK_CHARS)
+    planner_calls: int = Field(default=0, ge=0, le=PLANNER_CALLS_PER_EXPERIMENT)
+
+    @field_validator("theme_id")
+    @classmethod
+    def known_theme(cls, value: str) -> str:
+        if value not in CATALOG:
+            raise ValueError("カタログにないテーマです")
+        return value
+
+
+class ClaimOut(BaseModel):
+    variable: str
+    direction: str
+
+
+class RejectionOut(BaseModel):
+    title: str
+    reasons: list[str]
+    quoted: str
+    alternative_variant_id: str
+
+
+class PlanResponse(BaseModel):
+    kind: PlanKind
+    variant_id: str | None = None
+    claim: ClaimOut | None = None
+    why: str = ""
+    question_back: str | None = None
+    rejection: RejectionOut | None = None
+    planner_calls: int
+    skipped: bool = False
+    # Policy が Planner の出力を直した（候補外の id、理由に混じった結果、読めない出力）
+    policy_fixed: bool = False
+    source: PlanSource
+    trace_id: str
+
+
+@lru_cache(maxsize=1)
+def get_plan_limiter() -> SlidingWindowLimiter:
+    return SlidingWindowLimiter(limit=PLAN_REQUESTS_PER_WINDOW, window_s=PLAN_WINDOW_S)
+
+
+@app.post("/api/plan")
+async def plan(
+    body: PlanRequest,
+    request: Request,
+    runner: Annotated[Runner, Depends(get_planner_runner)],
+    limiter: Annotated[SlidingWindowLimiter, Depends(get_plan_limiter)],
+) -> PlanResponse:
+    """決定論の Policy → Planner（Gemini、構造化出力）→ PolicyPlugin の突き合わせ。答えは渡さない。"""
+    if not limiter.allow(client_key(request)):
+        raise HTTPException(status_code=429, detail="少し時間をおいてから、もう一度送ってください")
+
+    candidates = candidates_for(body.theme_id, body.done_variant_ids)
+    first = candidates[0]
+    variables = {v.variable for v in CATALOG[body.theme_id].variants}
+
+    with _tracer.start_as_current_span("phonelab.plan") as span:
+        span.set_attribute("phonelab.theme", body.theme_id)
+        span.set_attribute("phonelab.text_len", len(body.text))
+        span.set_attribute("phonelab.planner_calls", body.planner_calls)
+        trace_id = format(span.get_span_context().trace_id, "032x")
+
+        check = check_prediction(body.text)
+        span.set_attribute("phonelab.policy", check.kind)
+        if check.kind == "hint":
+            return PlanResponse(
+                kind="hint",
+                question_back=check.message,
+                planner_calls=body.planner_calls,
+                source="policy",
+                trace_id=trace_id,
+            )
+        if check.kind == "reject" and check.rejection:
+            rejection = check.rejection
+            return PlanResponse(
+                kind="rejected",
+                variant_id=first.id,
+                rejection=RejectionOut(
+                    title=rejection.title,
+                    reasons=list(rejection.reasons),
+                    quoted=rejection.quoted,
+                    alternative_variant_id=first.id,
+                ),
+                planner_calls=body.planner_calls,
+                source="policy",
+                trace_id=trace_id,
+            )
+
+        prompt = build_plan_prompt(
+            PlanContext(
+                school=body.school,
+                theme_id=body.theme_id,
+                text=body.text,
+                candidates=candidates,
+                previous_question_back=body.previous_question_back,
+            )
+        )
+        try:
+            reply = await asyncio.wait_for(
+                run_planner(
+                    runner,
+                    text=prompt,
+                    planner_calls=body.planner_calls,
+                    candidates=[c.id for c in candidates],
+                ),
+                timeout=PLAN_TIMEOUT_S,
+            )
+        except TimeoutError as exc:
+            logger.warning("Planner が %s 秒を超えた (trace_id=%s)", PLAN_TIMEOUT_S, trace_id)
+            raise HTTPException(status_code=504, detail="ラボ先生の返事が遅れています") from exc
+        except Exception as exc:
+            logger.exception("Planner の実行に失敗 (trace_id=%s)", trace_id)
+            raise HTTPException(status_code=502, detail="ラボ先生につながりませんでした") from exc
+        span.set_attribute("phonelab.skipped", reply.skipped)
+        span.set_attribute("phonelab.plan_readable", reply.plan is not None)
+        span.set_attribute("phonelab.policy_fixed", reply.off_catalog or reply.why_replaced)
+
+    if reply.skipped:
+        return PlanResponse(
+            kind="plan",
+            variant_id=first.id,
+            why="ラボ先生に聞ける回数の上限に達したので、カタログの順で進めます",
+            planner_calls=reply.planner_calls,
+            skipped=True,
+            source="catalog",
+            trace_id=trace_id,
+        )
+    if reply.plan is None:
+        return PlanResponse(
+            kind="plan",
+            variant_id=first.id,
+            why=f"まず{short_changes(first)}だけを変えて、予想の土台を確かめます",
+            planner_calls=reply.planner_calls,
+            policy_fixed=True,
+            source="catalog",
+            trace_id=trace_id,
+        )
+    out = reply.plan
+    if out.question_back and not body.previous_question_back:
+        return PlanResponse(
+            kind="question",
+            question_back=out.question_back[:MAX_QUESTION_BACK_CHARS],
+            planner_calls=reply.planner_calls,
+            source="agent",
+            trace_id=trace_id,
+        )
+    return PlanResponse(
+        kind="plan",
+        variant_id=out.experiment_id,
+        claim=ClaimOut(
+            variable=out.claim_variable if out.claim_variable in variables else "unknown",
+            direction=out.claim_direction,
+        ),
+        why=out.why_this,
+        planner_calls=reply.planner_calls,
+        policy_fixed=reply.off_catalog or reply.why_replaced,
+        source="agent",
         trace_id=trace_id,
     )
 

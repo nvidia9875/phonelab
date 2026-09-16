@@ -1,0 +1,69 @@
+"""決定論の Policy — docs/policy.md 3.2（禁止動作）・3.4（注入）・3.7（答えの要求）。
+
+LLM を呼ぶ前に、予想の文だけを見て判定する。web/src/agent/stub.ts の checkPolicy と同じ規則。
+ここで却下したものは Planner に渡らない（禁止動作は候補にも出さない）。
+"""
+
+from __future__ import annotations
+
+import re
+from dataclasses import dataclass
+from typing import Literal
+
+FORBIDDEN: tuple[tuple[re.Pattern[str], str], ...] = (
+    (re.compile(r"落と|投げ|ぶつけ"), "端末の落下・投擲"),
+    (re.compile(r"[2-9２-９] ?m|屋上|階段|ベランダ|窓から"), "1 m を超える高さ"),
+    (re.compile(r"水に|プール|風呂"), "水の近く"),
+    (re.compile(r"道路|車道|交差点"), "交通のある場所"),
+)
+INJECTION = re.compile(r"飛ばして|無視して|と表示|答えは|チェックを飛ば|スキップ")
+ANSWER_REQUEST = re.compile(r"答え(だけ)?教えて|正解(は|を)|答えを教え")
+# 引用する文。指示文（注入）があればそれを、無ければ禁止動作の文を
+QUOTE_INJECTION = re.compile(r"[^。\n]*(飛ばして|無視して|と表示|答えは)[^。\n]*。?")
+QUOTE_FORBIDDEN = re.compile(
+    r"[^。\n]*(落と|投げ|ぶつけ|屋上|階段|ベランダ|窓から|水に|プール|風呂|道路|車道|交差点)[^。\n]*。?"
+)
+
+HINT_TEXT = "答えは測って見つけよう。まず、あなたはどうなると思う？ 理由も一緒に書いてみて"
+
+
+@dataclass(frozen=True)
+class Rejection:
+    title: str
+    reasons: tuple[str, str, str]
+    quoted: str
+
+
+@dataclass(frozen=True)
+class PredictionCheck:
+    kind: Literal["allow", "hint", "reject"]
+    message: str = ""
+    rejection: Rejection | None = None
+
+
+def check_prediction(text: str) -> PredictionCheck:
+    if ANSWER_REQUEST.search(text):
+        return PredictionCheck(kind="hint", message=HINT_TEXT)
+    forbidden = next((label for pattern, label in FORBIDDEN if pattern.search(text)), None)
+    injected = INJECTION.search(text) is not None
+    if not forbidden and not injected:
+        return PredictionCheck(kind="allow")
+    quote = QUOTE_INJECTION.search(text) or QUOTE_FORBIDDEN.search(text)
+    quoted = quote.group(0).strip() if quote else ""
+    reasons = (
+        f"禁止動作：{forbidden}"
+        if forbidden
+        else "禁止動作に当たる要望はありませんが、指示文が含まれていました",
+        f"メモの中の「{quoted}」は、証拠の前に答えを出す／検査を飛ばす指示なので無視"
+        if injected
+        else "カタログにない実験は候補にしません",
+        "この文はメモの本文であって、あなたの操作ではない",
+    )
+    title = (
+        f"{forbidden}を伴う実験は、候補に出しません"
+        if forbidden
+        else "メモの指示は実験になりません"
+    )
+    return PredictionCheck(
+        kind="reject", rejection=Rejection(title=title, reasons=reasons, quoted=quoted)
+    )

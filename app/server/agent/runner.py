@@ -14,11 +14,14 @@ from google.adk.runners import Runner
 from google.adk.sessions import BaseSessionService, InMemorySessionService
 from google.genai import types
 
-from server.agent.planner import build_planner
+from server.agent.planner import PLANNER_THINKING_LEVEL, PlanOutput, build_planner, parse_plan
 from server.agent.policy_plugin import (
     ANSWER_LEAK_KEY,
     ANSWER_LOCKED_KEY,
     LEAK_PHRASES_KEY,
+    PLAN_CANDIDATES_KEY,
+    PLAN_OFF_CATALOG_KEY,
+    PLAN_WHY_REPLACED_KEY,
     PLANNER_CALLS_KEY,
     SKIP_REASON_KEY,
     PolicyPlugin,
@@ -48,6 +51,10 @@ class PlannerReply:
     text: str
     skipped: bool
     planner_calls: int
+    # 構造化出力として読めたもの。上限で呼ばなかった／読めなかったときは None
+    plan: PlanOutput | None = None
+    off_catalog: bool = False
+    why_replaced: bool = False
 
 
 @dataclass(frozen=True)
@@ -72,7 +79,7 @@ def build_runner(
         app_name=APP_NAME,
         agent=build_planner(model, generate_content_config),
         session_service=InMemorySessionService(),
-        plugins=[PolicyPlugin()],
+        plugins=[PolicyPlugin(thinking_level=PLANNER_THINKING_LEVEL)],
     )
 
 
@@ -94,12 +101,26 @@ def build_tutor_runner(model: str | BaseLlm) -> Runner:
     )
 
 
-async def run_planner(runner: Runner, *, text: str, planner_calls: int) -> PlannerReply:
-    outcome = await _run_once(runner, SPIKE_USER_ID, text, {PLANNER_CALLS_KEY: planner_calls})
+async def run_planner(
+    runner: Runner,
+    *,
+    text: str,
+    planner_calls: int,
+    candidates: tuple[str, ...] | list[str] = (),
+) -> PlannerReply:
+    """candidates を渡すと、PolicyPlugin が出力を候補と突き合わせる（スパイクは渡さない）"""
+    state: dict[str, object] = {PLANNER_CALLS_KEY: planner_calls}
+    if candidates:
+        state[PLAN_CANDIDATES_KEY] = list(candidates)
+    outcome = await _run_once(runner, SPIKE_USER_ID, text, state)
+    skipped = SKIP_REASON_KEY in outcome.flags
     return PlannerReply(
         text=outcome.text,
-        skipped=SKIP_REASON_KEY in outcome.flags,
+        skipped=skipped,
         planner_calls=int(outcome.state.get(PLANNER_CALLS_KEY, planner_calls)),
+        plan=None if skipped or not candidates else parse_plan(outcome.text),
+        off_catalog=PLAN_OFF_CATALOG_KEY in outcome.flags,
+        why_replaced=PLAN_WHY_REPLACED_KEY in outcome.flags,
     )
 
 
