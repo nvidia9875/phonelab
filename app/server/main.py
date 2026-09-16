@@ -10,6 +10,8 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from functools import lru_cache
 from pathlib import Path
 from typing import Annotated, Literal
@@ -34,7 +36,10 @@ from server.agent.runner import (
     run_tutor,
 )
 from server.agent.tutor import ChatTurn, TutorContext, build_tutor_prompt, chat_model
+from server.classroom import ClassStore, normalize_code, seed_demo
 from server.ratelimit import SlidingWindowLimiter
+from server.routes_class import get_class_store
+from server.routes_class import router as class_router
 from server.telemetry import disable_content_capture, setup_cloud_tracing
 
 STATIC = Path(__file__).parent / "static"
@@ -47,7 +52,30 @@ disable_content_capture()
 setup_cloud_tracing()
 _tracer = trace.get_tracer("phonelab.api")
 
-app = FastAPI(title="PhoneLab", version="0.0.1")
+
+@asynccontextmanager
+async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+    """起動時に審査員向けの学級 DEMO-2026 を作る（PHONELAB_DEMO_PIN があるとき）"""
+    try:
+        await seed_demo(get_class_store())
+    except Exception:
+        logger.exception("学級の初期化に失敗（学級の API は動かない可能性）")
+    yield
+
+
+app = FastAPI(title="PhoneLab", version="0.0.1", lifespan=lifespan)
+app.include_router(class_router)
+
+MAX_CLASS_CODE_CHARS = 20
+HALTED_DETAIL = "先生が学級の測定を止めています。解除されるまで待ってください"
+
+
+async def class_is_halted(store: ClassStore, code: str | None) -> bool:
+    """学級コード付きの呼び出しは、停止中なら Runner を動かさない（PolicyPlugin の before_run と二重に）"""
+    if not code:
+        return False
+    record = await store.get(normalize_code(code))
+    return record is not None and record.policy.halted
 
 
 @app.get("/api/status")
@@ -122,6 +150,7 @@ class PlanRequest(BaseModel):
     )
     previous_question_back: str | None = Field(default=None, max_length=MAX_QUESTION_BACK_CHARS)
     planner_calls: int = Field(default=0, ge=0, le=PLANNER_CALLS_PER_EXPERIMENT)
+    class_code: str | None = Field(default=None, max_length=MAX_CLASS_CODE_CHARS)
 
     @field_validator("theme_id")
     @classmethod
@@ -169,10 +198,14 @@ async def plan(
     request: Request,
     runner: Annotated[Runner, Depends(get_planner_runner)],
     limiter: Annotated[SlidingWindowLimiter, Depends(get_plan_limiter)],
+    store: Annotated[ClassStore, Depends(get_class_store)],
 ) -> PlanResponse:
     """決定論の Policy → Planner（Gemini、構造化出力）→ PolicyPlugin の突き合わせ。答えは渡さない。"""
     if not limiter.allow(client_key(request)):
         raise HTTPException(status_code=429, detail="少し時間をおいてから、もう一度送ってください")
+    halted = await class_is_halted(store, body.class_code)
+    if halted:
+        raise HTTPException(status_code=409, detail=HALTED_DETAIL)
 
     candidates = candidates_for(body.theme_id, body.done_variant_ids)
     first = candidates[0]
@@ -226,6 +259,7 @@ async def plan(
                     text=prompt,
                     planner_calls=body.planner_calls,
                     candidates=[c.id for c in candidates],
+                    class_halted=halted,
                 ),
                 timeout=PLAN_TIMEOUT_S,
             )
@@ -320,6 +354,7 @@ class ChatRequest(BaseModel):
     message: str = Field(min_length=1, max_length=MAX_CHAT_CHARS)
     turns_used: int = Field(default=0, ge=0, le=CHAT_TURNS_PER_RECORD)
     reveal: bool = False
+    class_code: str | None = Field(default=None, max_length=MAX_CLASS_CODE_CHARS)
 
     @field_validator("variant_id")
     @classmethod
@@ -359,12 +394,16 @@ async def chat(
     request: Request,
     runner: Annotated[Runner, Depends(get_tutor_runner)],
     limiter: Annotated[SlidingWindowLimiter, Depends(get_chat_limiter)],
+    store: Annotated[ClassStore, Depends(get_class_store)],
 ) -> ChatResponse:
     """ラボ先生と実験をふり返る。先生の説明は、生徒が自分の考えを書いたあとだけ LLM に渡す。"""
     if not limiter.allow(client_key(request)):
         raise HTTPException(
             status_code=429, detail="少し時間をおいてから、もう一度話しかけてください"
         )
+    halted = await class_is_halted(store, body.class_code)
+    if halted:
+        raise HTTPException(status_code=409, detail=HALTED_DETAIL)
 
     answer = MODEL_ANSWERS[body.variant_id]
     # 保留（有効な測定が無い）では渡さない。測る前に答えを知ってしまうから。docs/policy.md 3.8
@@ -401,6 +440,7 @@ async def chat(
                     turns_used=body.turns_used,
                     leak_phrases=phrases_for(answer, body.situation),
                     locked=not revealed,
+                    class_halted=halted,
                 ),
                 timeout=CHAT_TIMEOUT_S,
             )

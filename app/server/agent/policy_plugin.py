@@ -1,6 +1,7 @@
 """統制層 PolicyPlugin — docs/architecture.md 2.1、docs/policy.md 3.5・3.6。
 
 Runner に一度登録すれば、どのエージェントのモデル呼び出しにも効く。
+  before_run_callback:   先生が学級の測定を止めていたら（state の class_halted）、エージェントを走らせない（D8 / D13）
   before_model_callback: 呼び出し回数が上限ならモデルを呼ばずに応答を返す（スキップ）。
                          生成設定（温度・出力トークン上限・思考の量）をエージェント側の設定より優先して強制する
   after_model_callback:  先生の説明がまだ閉じているのに、応答が説明の言い回しを含んだら、問い返しの文に差し替える
@@ -13,6 +14,7 @@ from __future__ import annotations
 import re
 
 from google.adk.agents.callback_context import CallbackContext
+from google.adk.agents.invocation_context import InvocationContext
 from google.adk.models.llm_request import LlmRequest
 from google.adk.models.llm_response import LlmResponse
 from google.adk.plugins.base_plugin import BasePlugin
@@ -24,6 +26,9 @@ from server.agent.planner import parse_plan
 PLANNER_CALLS_PER_EXPERIMENT = 5  # docs/policy.md 上限表 planner_calls_per_experiment
 PLANNER_TEMPERATURE = 0.2
 PLANNER_MAX_OUTPUT_TOKENS = 1024
+
+CLASS_HALTED_KEY = "class_halted"
+HALTED_TEXT = "先生が学級の測定を止めています。解除されるまで待ってください。"
 
 PLANNER_CALLS_KEY = "planner_calls"
 SKIP_REASON_KEY = "phonelab.skip_reason"
@@ -69,6 +74,17 @@ class PolicyPlugin(BasePlugin):
         self._temperature = temperature
         self._max_output_tokens = max_output_tokens
         self._thinking_level = thinking_level
+
+    async def before_run_callback(
+        self, *, invocation_context: InvocationContext
+    ) -> types.Content | None:
+        """先生の全端末停止。Runner の入口で止め、エージェントもモデルも動かさない"""
+        if not invocation_context.session.state.get(CLASS_HALTED_KEY):
+            return None
+        with _tracer.start_as_current_span("phonelab.policy") as span:
+            span.set_attribute("phonelab.check", "class_halted")
+            span.set_attribute("phonelab.decision", "skip_run")
+        return types.Content(role="model", parts=[types.Part(text=HALTED_TEXT)])
 
     async def before_model_callback(
         self, *, callback_context: CallbackContext, llm_request: LlmRequest

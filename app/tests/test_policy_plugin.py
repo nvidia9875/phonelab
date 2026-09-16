@@ -8,6 +8,7 @@ import json
 from google.genai import types
 
 from server.agent.policy_plugin import (
+    HALTED_TEXT,
     PLANNER_CALLS_PER_EXPERIMENT,
     PLANNER_MAX_OUTPUT_TOKENS,
     PLANNER_TEMPERATURE,
@@ -107,3 +108,17 @@ def test_planner_reason_with_a_result_in_it_is_neutralised(fake_llm):
     assert reply.plan is not None
     assert "高くならない" not in reply.plan.why_this
     assert reply.why_replaced is True
+
+
+def test_before_run_skips_the_agent_entirely_while_the_class_is_halted(fake_llm):
+    """先生の全端末停止は before_run_callback で Runner を止める（D8 / D13）。モデルは呼ばれない"""
+    runner = build_runner(fake_llm)
+
+    reply = asyncio.run(
+        run_planner(runner, text="重いほど速く揺れる", planner_calls=0, class_halted=True)
+    )
+
+    assert fake_llm.requests == []
+    assert reply.halted is True
+    assert reply.skipped is True
+    assert reply.text == HALTED_TEXT

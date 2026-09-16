@@ -18,6 +18,7 @@ from server.agent.planner import PLANNER_THINKING_LEVEL, PlanOutput, build_plann
 from server.agent.policy_plugin import (
     ANSWER_LEAK_KEY,
     ANSWER_LOCKED_KEY,
+    CLASS_HALTED_KEY,
     LEAK_PHRASES_KEY,
     PLAN_CANDIDATES_KEY,
     PLAN_OFF_CATALOG_KEY,
@@ -55,6 +56,8 @@ class PlannerReply:
     plan: PlanOutput | None = None
     off_catalog: bool = False
     why_replaced: bool = False
+    # 先生の全端末停止で、Runner の入口で止まった
+    halted: bool = False
 
 
 @dataclass(frozen=True)
@@ -62,6 +65,7 @@ class TutorReply:
     text: str
     skipped: bool
     leaked: bool
+    halted: bool = False
 
 
 @dataclass(frozen=True)
@@ -107,13 +111,14 @@ async def run_planner(
     text: str,
     planner_calls: int,
     candidates: tuple[str, ...] | list[str] = (),
+    class_halted: bool = False,
 ) -> PlannerReply:
     """candidates を渡すと、PolicyPlugin が出力を候補と突き合わせる（スパイクは渡さない）"""
-    state: dict[str, object] = {PLANNER_CALLS_KEY: planner_calls}
+    state: dict[str, object] = {PLANNER_CALLS_KEY: planner_calls, CLASS_HALTED_KEY: class_halted}
     if candidates:
         state[PLAN_CANDIDATES_KEY] = list(candidates)
     outcome = await _run_once(runner, SPIKE_USER_ID, text, state)
-    skipped = SKIP_REASON_KEY in outcome.flags
+    skipped = SKIP_REASON_KEY in outcome.flags or class_halted
     return PlannerReply(
         text=outcome.text,
         skipped=skipped,
@@ -121,6 +126,7 @@ async def run_planner(
         plan=None if skipped or not candidates else parse_plan(outcome.text),
         off_catalog=PLAN_OFF_CATALOG_KEY in outcome.flags,
         why_replaced=PLAN_WHY_REPLACED_KEY in outcome.flags,
+        halted=class_halted,
     )
 
 
@@ -131,17 +137,20 @@ async def run_tutor(
     turns_used: int,
     leak_phrases: tuple[str, ...] | list[str],
     locked: bool,
+    class_halted: bool = False,
 ) -> TutorReply:
     state = {
         CHAT_TURNS_KEY: turns_used,
         ANSWER_LOCKED_KEY: locked,
         LEAK_PHRASES_KEY: list(leak_phrases),
+        CLASS_HALTED_KEY: class_halted,
     }
     outcome = await _run_once(runner, CHAT_USER_ID, prompt, state)
     return TutorReply(
         text=outcome.text,
-        skipped=SKIP_REASON_KEY in outcome.flags,
+        skipped=SKIP_REASON_KEY in outcome.flags or class_halted,
         leaked=ANSWER_LEAK_KEY in outcome.flags,
+        halted=class_halted,
     )
 
 
