@@ -5,12 +5,13 @@
 import type { ChatReply } from "../agent/chat";
 import { checkPolicy, choosePlan, judge, readClaim } from "../agent/stub";
 import { QUANTITY, formatQuantity, type Unit } from "../catalog/quantity";
-import { SENSOR_LABEL, themeById, variantById, variantsOf, type Theme } from "../catalog/themes";
+import { SENSOR_LABEL, repeatsOf, themeById, variantById, variantsOf, type Theme } from "../catalog/themes";
 import type { LocalCheck } from "../measure/checks";
 import { clocksSummary, measuredValue, type Features } from "../measure/features";
 import { activeRecordForTheme, addEvent, createRecord, recordsForTheme, updateRecord, type ChatLog, type CondKey, type Direction, type StudyRecord } from "../store/records";
 
 export const MAX_RETRY = 3;
+const EMPTY_TRIES: Record<CondKey, number> = { A: 0, B: 0 };
 
 function doneVariantIds(themeId: string): string[] {
   return recordsForTheme(themeId)
@@ -82,15 +83,27 @@ export function stopMeasure(rec: StudyRecord, cond: CondKey): void {
 }
 
 /** 測定が終わった。検査を通れば次の条件へ、通らなければ保留 */
-export function finishMeasure(rec: StudyRecord, cond: CondKey, features: Features, checks: LocalCheck[], rawHash: string, demo = false): "next" | "hold" {
+export function finishMeasure(
+  rec: StudyRecord,
+  cond: CondKey,
+  features: Features,
+  checks: LocalCheck[],
+  rawHash: string,
+  demo = false,
+  repeats = 1,
+): "next" | "again" | "hold" {
   const pass = checks.every((c) => c.ok);
   const idx = cond === "A" ? 0 : 1;
+  const tries = (rec.tries?.[cond] ?? 0) + 1;
+  const again = pass && tries < repeats; // 同じ条件をもう一回（平均を取る実験）
   updateRecord(rec.id, (r) => {
     const m = { condition: cond, features, checks, rawHash, pass, at: new Date().toISOString(), demo };
     let n: StudyRecord = { ...r, measurements: [...r.measurements, m] };
     if (pass) {
-      n = addEvent(n, `測定 ${idx + 1}`, `${clocksSummary(features)}。二本の時計が一致し、検査を通過${demo ? "（サンプル）" : ""}`, "teal");
-      n = { ...n, status: "open", stage: cond === "A" ? "setup_B" : "result", holdCodes: [] };
+      const label = repeats > 1 ? `測定 ${idx + 1}（${tries} / ${repeats} 回目）` : `測定 ${idx + 1}`;
+      n = addEvent(n, label, `${clocksSummary(features)}。二本の時計が一致し、検査を通過${demo ? "（サンプル）" : ""}`, "teal");
+      const nextStage = again ? (cond === "A" ? "setup_A" : "setup_B") : cond === "A" ? "setup_B" : "result";
+      n = { ...n, status: "open", stage: nextStage, holdCodes: [], tries: { ...(r.tries ?? EMPTY_TRIES), [cond]: tries } };
     } else {
       const codes = checks.filter((c) => !c.ok).map((c) => c.code);
       n = addEvent(n, `測定 ${idx + 1}`, `${checks.find((c) => !c.ok)?.text ?? "検査で止まった"}のため保留`);
@@ -98,11 +111,33 @@ export function finishMeasure(rec: StudyRecord, cond: CondKey, features: Feature
     }
     return n;
   });
-  return pass ? "next" : "hold";
+  return pass ? (again ? "again" : "next") : "hold";
 }
 
 export function retry(rec: StudyRecord, cond: CondKey): void {
   updateRecord(rec.id, (r) => ({ ...r, status: "open", stage: cond === "A" ? "setup_A" : "setup_B" }));
+}
+
+/**
+ * 「うまく取れなかった」ときの測り直し。検査を通っていても、結果が出たあとでもできる。
+ * 前の測定は消さずに残し（記録に全部並ぶ）、判定は最後に検査を通った測定でやり直す。
+ * 予想に合う結果が出るまで測り続けられないように、保留の再測定と同じ上限（1 条件 3 回）を使う。
+ */
+export function remeasure(rec: StudyRecord, cond: CondKey): boolean {
+  if (rec.retries[cond] >= MAX_RETRY) return false;
+  updateRecord(rec.id, (r) => {
+    const n: StudyRecord = {
+      ...r,
+      status: "open",
+      stage: cond === "A" ? "setup_A" : "setup_B",
+      result: null,
+      holdCodes: [],
+      retries: { ...r.retries, [cond]: r.retries[cond] + 1 },
+      tries: { ...(r.tries ?? EMPTY_TRIES), [cond]: 0 },
+    };
+    return addEvent(n, "測り直し", `測定 ${cond} をもう一度（${r.retries[cond] + 1} / ${MAX_RETRY} 回目）`);
+  });
+  return true;
 }
 
 /** 両条件が通ったら判定（テンプレート。LLM は関与しない） */
@@ -112,8 +147,10 @@ export function ensureJudged(rec: StudyRecord, theme: Theme): StudyRecord | null
   const a = [...rec.measurements].reverse().find((m) => m.condition === "A" && m.pass);
   const b = [...rec.measurements].reverse().find((m) => m.condition === "B" && m.pass);
   if (!variant || !a || !b) return null;
-  const ma = measuredValue(a.features);
-  const mb = measuredValue(b.features);
+  // 測り直したときに古い回を混ぜないよう、新しいほうから repeats 回だけ取る
+  const repeats = repeatsOf(variant);
+  const ma = averageOf(rec, "A", repeats);
+  const mb = averageOf(rec, "B", repeats);
   const result = judge(ma.value, mb.value, ma.unc + mb.unc, rec.prediction.claim, variant);
   return updateRecord(rec.id, (r) => {
     const within = Math.abs(result.delta) <= result.tolerance ? "内側" : "外側";
@@ -122,6 +159,18 @@ export function ensureJudged(rec: StudyRecord, theme: Theme): StudyRecord | null
     n = addEvent(n, "判定", `${verdict}。差 ${formatQuantity(Math.abs(result.delta), variant.unit)} は許容 ${formatQuantity(result.tolerance, variant.unit)} の${within}`);
     return n;
   });
+}
+
+/** 条件の採用値。検査を通った直近 repeats 回の平均と、二本の時計の差・回どうしのばらつきの大きいほう */
+function averageOf(rec: StudyRecord, cond: CondKey, repeats: number): { value: number; unc: number } {
+  const values = rec.measurements
+    .filter((m) => m.condition === cond && m.pass)
+    .slice(-repeats)
+    .map((m) => measuredValue(m.features));
+  const mean = (xs: number[]) => xs.reduce((s, x) => s + x, 0) / xs.length;
+  const nums = values.map((v) => v.value);
+  const spread = nums.length > 1 ? (Math.max(...nums) - Math.min(...nums)) / 2 : 0;
+  return { value: mean(nums), unc: Math.max(mean(values.map((v) => v.unc)), spread) };
 }
 
 export function setExplain(rec: StudyRecord, text: string): void {

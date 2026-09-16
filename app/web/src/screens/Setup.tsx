@@ -8,13 +8,16 @@ export interface SetupProps {
   condition: Condition;
   index: 0 | 1;
   retry: number;
+  /** 何回のうちの何回目か（平均を取る実験。1 なら出さない） */
+  attempt: number;
+  repeats: number;
   onReady: () => void;
   onBack: () => void;
   onHome: () => void;
 }
 
 /** 条件の準備。ここではまだセンサーを読まない。「測る」を押した瞬間から読む */
-export function Setup({ theme, variant, condition, index, retry, onReady, onBack, onHome }: SetupProps) {
+export function Setup({ theme, variant, condition, index, retry, attempt, repeats, onReady, onBack, onHome }: SetupProps) {
   const sensors = theme.sensors.map((s) => SENSOR_LABEL[s]).join("・");
   const second = index === 1;
   return (
@@ -22,6 +25,7 @@ export function Setup({ theme, variant, condition, index, retry, onReady, onBack
       <Card panel>
         <Eyebrow>{index === 0 ? "1 つ目の条件" : "2 つ目の条件"}{retry > 0 ? `（再測定 ${retry} 回目）` : ""}</Eyebrow>
         <CardTitle>{condition.label}</CardTitle>
+        {repeats > 1 && <p className="card__hint">同じ条件を {repeats} 回測って、平均で判定します（いまは {Math.min(attempt, repeats)} 回目）</p>}
         <div className="setup-art" aria-hidden>
           {theme.measureProfile === "pitch" ? (
             <SoundArt strong={second && variant.variable === "strength"} short={second && variant.variable === "length"} bottle={variant.variable === "water"} water={second && variant.variable === "water"} />

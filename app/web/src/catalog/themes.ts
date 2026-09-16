@@ -31,6 +31,8 @@ export interface Variant {
   unit: Unit;
   /** 振り子の糸の長さ（最下点の速さの計算に使う） */
   lengthM?: number;
+  /** 1 条件を何回測って平均するか（既定 1）。手で放す高さのように、毎回ぶれる実験で 3 にする */
+  repeats?: number;
 }
 
 export interface Theme {
@@ -70,6 +72,8 @@ export const SENSOR_LABEL: Record<Sensor, string> = {
 };
 
 const PENDULUM_LENGTH_M = 0.8;
+/** 放す高さは手で合わせるので毎回ぶれる。3 回測って平均する（音は 5 秒の中で何十回分を中央値にしているので 1 回） */
+const PENDULUM_REPEATS = 3;
 const SPEED_TOLERANCE_MS = 0.15;
 const PITCH_TOLERANCE_REL = 0.03;
 const PERIOD_TOLERANCE_S = 0.05;
@@ -116,6 +120,7 @@ const CATALOG: Theme[] = [
         toleranceKind: "abs",
         unit: "m/s",
         lengthM: PENDULUM_LENGTH_M,
+        repeats: PENDULUM_REPEATS,
       },
       {
         id: "energy_mass",
@@ -131,6 +136,7 @@ const CATALOG: Theme[] = [
         toleranceKind: "abs",
         unit: "m/s",
         lengthM: PENDULUM_LENGTH_M,
+        repeats: PENDULUM_REPEATS,
       },
     ],
   },
@@ -349,6 +355,11 @@ export function placeholderVariant(theme: Theme): Variant {
   };
 }
 /** テーマの実験一覧。無ければ仮の実験 1 つ */
+/** 1 条件を何回測るか（既定 1） */
+export function repeatsOf(variant: Variant): number {
+  return variant.repeats ?? 1;
+}
+
 export function variantsOf(theme: Theme): Variant[] {
   return theme.variants.length ? theme.variants : [placeholderVariant(theme)];
 }

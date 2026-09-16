@@ -13,7 +13,7 @@ import { Halted } from "./screens/Halted";
 import { Teacher } from "./screens/Teacher";
 import { Settings } from "./screens/Settings";
 import { Chat } from "./screens/Chat";
-import { themeById, variantById, type Theme } from "./catalog/themes";
+import { repeatsOf, themeById, variantById, type Theme } from "./catalog/themes";
 import { matchRoute, nav, usePath, type Route } from "./router";
 import { activeRecordForTheme, clearAll, createRecord, recordById, setHalted, setSettings, setStudent, useStore, type StudyRecord } from "./store/records";
 import { DEFAULT_CLASS_POLICY, detectCaps, type DeviceCaps } from "./store/status";
@@ -217,6 +217,8 @@ export function App() {
           condition={variant!.conditions[idx]}
           index={idx}
           retry={r.retries[route.cond]}
+          attempt={(r.tries?.[route.cond] ?? 0) + 1}
+          repeats={repeatsOf(variant!)}
           onReady={() => {
             flow.startMeasure(r, route.cond);
             nav(`/x/${t.id}/measure/${route.cond}`);
@@ -254,9 +256,10 @@ export function App() {
             : { phase: "denied", elapsed: 0, seconds: t.seconds, conditionLabel: label, clocks: emptyClocks, unit, checks: [], sentBytes: null, allOk: false, deniedReason: s.phase === "denied" ? (s.message ?? (s.reason === "denied" ? "センサーの許可がありませんでした" : cannotRead)) : "測定が始まっていません。準備画面から「測る」を押してください" };
       const finish = (features: Features, demo: boolean) => {
         const hash = s.phase === "done" ? s.rawHash : "sha256:demo";
-        const outcome = flow.finishMeasure(r, route.cond, features, checksFor(features, variant!), hash, demo);
+        const outcome = flow.finishMeasure(r, route.cond, features, checksFor(features, variant!), hash, demo, repeatsOf(variant!));
         m.reset();
         if (outcome === "hold") nav(`/x/${t.id}/hold`);
+        else if (outcome === "again") nav(`/x/${t.id}/setup/${route.cond}`); // 平均を取るので同じ条件をもう一回
         else if (route.cond === "A") nav(`/x/${t.id}/setup/B`);
         else nav(`/x/${t.id}/result`);
       };
@@ -265,6 +268,7 @@ export function App() {
           view={view}
           onStop={() => { m.stop(); m.reset(); flow.stopMeasure(r, route.cond); nav(`/x/${t.id}/setup/${route.cond}`); }}
           onContinue={() => { if (s.phase === "done") finish(s.features, false); }}
+          onRemeasure={r.retries[route.cond] < flow.MAX_RETRY ? () => { m.reset(); flow.remeasure(r, route.cond); nav(`/x/${t.id}/setup/${route.cond}`); } : undefined}
           onDemo={s.phase === "denied" || s.phase === "requesting" ? () => finish(demoFeatures(t, variant!, idx), true) : undefined}
         />
       );
@@ -294,6 +298,10 @@ export function App() {
           explain={r.explain}
           nextVariant={nextVariant}
           nextDirection={r.nextPrediction?.direction ?? null}
+          retries={r.retries}
+          maxRetry={flow.MAX_RETRY}
+          repeats={repeatsOf(variant!)}
+          onRemeasure={(cond) => { if (flow.remeasure(r, cond)) nav(`/x/${t.id}/setup/${cond}`); }}
           onExplain={(x) => flow.setExplain(r, x)}
           onNext={(d) => flow.chooseNext(r, t, d)}
           onGoNext={async () => { const next = await flow.closeAndNext(r, t); nav(next ? `/x/${t.id}/plan` : "/"); }}

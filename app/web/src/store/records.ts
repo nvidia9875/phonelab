@@ -71,6 +71,8 @@ export interface StudyRecord {
   approvedAt: string | null;
   measurements: Measurement[];
   retries: Record<CondKey, number>;
+  /** 条件ごとに、検査を通った回数（何回か測って平均する実験で使う。測り直すと 0 に戻る） */
+  tries?: Record<CondKey, number>;
   holdCodes: string[];
   result: Judgement | null;
   explain: string;
@@ -171,6 +173,7 @@ export function createRecord(themeId: string): StudyRecord {
     approvedAt: null,
     measurements: [],
     retries: { A: 0, B: 0 },
+    tries: { A: 0, B: 0 },
     holdCodes: [],
     result: null,
     explain: "",

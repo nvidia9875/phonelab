@@ -48,6 +48,8 @@ export interface MeasureProps {
   onStop: () => void;
   onContinue: () => void;
   onDemo?: () => void;
+  /** 検査を通っても「うまく取れなかった」ときの測り直し。上限に達していたら渡さない */
+  onRemeasure?: () => void;
 }
 
 const BADGE: Record<MeasureView["phase"], string> = {
@@ -59,7 +61,7 @@ const BADGE: Record<MeasureView["phase"], string> = {
 };
 
 /** 画面 2: 測定と検査。測定中はトップへのリンクを出さない */
-export function Measure({ view, onStop, onContinue, onDemo }: MeasureProps) {
+export function Measure({ view, onStop, onContinue, onDemo, onRemeasure }: MeasureProps) {
   const done = view.phase === "done";
   const waiting = view.phase === "requesting";
   const counting = view.phase === "countdown";
@@ -122,6 +124,7 @@ export function Measure({ view, onStop, onContinue, onDemo }: MeasureProps) {
       <Foot>
         <FootNote>{view.sentBytes !== null ? `送るのは特徴量だけ、約 ${view.sentBytes} バイト。波形は端末の中` : "波形は端末の中。送るのは速さや高さなどの数値だけ"}</FootNote>
         {done && <Button onClick={onContinue}>{view.allOk ? "次へ" : "検査の結果を見る"}</Button>}
+        {done && onRemeasure && <Button secondary onClick={onRemeasure}>うまく取れなかった。もう一度測る</Button>}
         {(view.phase === "denied" || waiting) && onDemo && (
           <Button secondary={waiting} onClick={onDemo}>{waiting ? "許可を出せない端末なら、サンプルの測定で進む（デモ）" : "この端末では測れないので、サンプルの測定で進む（デモ）"}</Button>
         )}
