@@ -128,7 +128,10 @@ export function useMeasurement({ onMotionUnavailable }: MeasurementOptions = {})
 
   const stop = useCallback(() => {
     stoppedRef.current = true;
-    stopRef.current?.();
+    // 収集中なら早めに終える。許可待ち・カウントダウン中なら、その run 自体を無効にして
+    // 待ちが明けても収集を始めない（先生の停止で「画面は止まったのにマイクが動く」を防ぐ。9/18 Codex F3）
+    if (stopRef.current) stopRef.current();
+    else runRef.current++;
   }, []);
 
   const reset = useCallback(() => {

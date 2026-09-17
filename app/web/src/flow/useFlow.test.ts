@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { themeById } from "../catalog/themes";
+import { themeById, variantById } from "../catalog/themes";
 import type { Features } from "../measure/features";
 import type { LocalCheck } from "../measure/checks";
 import { clearAll, createRecord, recordById, updateRecord, type CondKey, type Measurement, type StudyRecord } from "../store/records";
@@ -269,5 +269,18 @@ describe("submitPrediction", () => {
 
     expect(recordById(rec.id)!.variantId).toBe("sound_pluck_strength");
     expect(recordById(rec.id)!.plan?.source).toBe("stub");
+  });
+});
+
+describe("judge", () => {
+  it("does not call a prediction about a different variable 'supported', even if the direction matches", async () => {
+    const { judge } = await import("../agent/stub");
+    const lengthVariant = variantById(sound, "sound_string_length")!;
+
+    const j = judge(220, 440, 1, { variable: "strength", direction: "faster" }, lengthVariant);
+
+    expect(j.observed).toBe("faster");
+    expect(j.consistent).toBeNull();
+    expect(j.detail).toContain("別のもの");
   });
 });

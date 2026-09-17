@@ -17,6 +17,7 @@ export interface PlanRequest {
   planner_calls: number;
   /** 学級コード。停止中ならサーバが 409 で断る */
   class_code: string | null;
+  number: string | null;
 }
 
 export interface PlanReply {

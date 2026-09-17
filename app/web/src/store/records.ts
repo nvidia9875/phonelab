@@ -187,6 +187,9 @@ export function setClassState(classState: ClassState | null): void {
 export function currentClassCode(): string | null {
   return state.student?.classCode ?? null;
 }
+export function currentNumber(): string | null {
+  return state.student?.number ?? null;
+}
 
 /* ---------- 記録 ---------- */
 export const nowIso = (): string => new Date().toISOString();

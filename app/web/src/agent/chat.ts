@@ -3,7 +3,7 @@
  * 先生の説明は、生徒が自分の考えを書いたあとだけサーバが Gemini に渡す。端末は「聞かせて」と頼むだけ。
  */
 import type { School, Theme, Variant } from "../catalog/themes";
-import { currentClassCode, type ChatMessage, type StudyRecord } from "../store/records";
+import { currentClassCode, currentNumber, type ChatMessage, type StudyRecord } from "../store/records";
 
 export type ChatSituation = "hold" | "mismatch" | "match" | "unjudged";
 
@@ -29,6 +29,7 @@ export interface ChatRequest {
   turns_used: number;
   reveal: boolean;
   class_code: string | null;
+  number: string | null;
 }
 
 export interface ChatReply {
@@ -95,6 +96,7 @@ export function chatRequestFor({ rec, theme, variant, school, message, reveal }:
     turns_used: rec.chat?.turnsUsed ?? 0,
     reveal,
     class_code: currentClassCode(),
+    number: currentNumber(),
   };
 }
 
