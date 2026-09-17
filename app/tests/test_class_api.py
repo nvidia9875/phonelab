@@ -293,3 +293,30 @@ def test_correct_pins_are_not_counted_against_the_attempt_limit(store, fake_llm)
     assert codes == [200] * 5
     assert wrong == [403, 403, 429]
     assert still_ok == 200
+
+
+def test_an_older_summary_arriving_late_does_not_replace_the_current_one(client):
+    """再接続で端末が全記録を送り直しても、古いものが「いま」を上書きしない（9/18 Codex I5）"""
+    _, secret = post_record(
+        client, summary(status="judged", stage="result", updated_at="2026-09-18T02:00:00Z")
+    )
+    post_record(
+        client,
+        summary(status="held", stage="measure_A", updated_at="2026-09-18T01:00:00Z"),
+        secret=secret,
+    )
+
+    rows = client.post("/api/class/DEMO-2026/dashboard", json={"pin": PIN}).json()["students"]
+
+    assert [s["current"]["status"] for s in rows if s["number"] == "S-04"] == ["judged"]
+
+
+def test_the_dashboard_carries_the_allowed_sensors_so_a_new_teacher_pc_does_not_reset_them(client):
+    client.put(
+        "/api/class/DEMO-2026/policy",
+        json={"pin": PIN, "allowed_sensors": ["microphone"], "teacher_enabled": []},
+    )
+
+    assert client.post("/api/class/DEMO-2026/dashboard", json={"pin": PIN}).json()[
+        "allowed_sensors"
+    ] == ["microphone"]

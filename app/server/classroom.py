@@ -141,7 +141,8 @@ class MemoryClassStore:
 
     async def put_record(self, code: str, number: str, summary: Summary) -> None:
         code = normalize_code(code)
-        self._current.setdefault(code, {})[number] = summary
+        if newer_or_same(summary, self._current.get(code, {}).get(number)):
+            self._current.setdefault(code, {})[number] = summary
         self._history.setdefault(code, {}).setdefault(number, {})[str(summary["record_id"])] = (
             summary
         )
@@ -219,7 +220,12 @@ class FirestoreClassStore:
 
     async def put_record(self, code: str, number: str, summary: Summary) -> None:
         student = self._doc(code).collection("students").document(number)
-        await student.set({"last_seen_at": now_iso(), "current": summary}, merge=True)
+        snap = await student.get()
+        current = (snap.to_dict() or {}).get("current") if snap.exists else None
+        fields: dict[str, object] = {"last_seen_at": now_iso()}
+        if newer_or_same(summary, current):
+            fields["current"] = summary
+        await student.set(fields, merge=True)
         await student.collection("records").document(str(summary["record_id"])).set(summary)
 
     async def get_student_auth(self, code: str, number: str) -> StudentAuth | None:
@@ -276,6 +282,16 @@ async def seed_demo(store: ClassStore) -> None:
         return
     await store.put(new_class(DEMO_CLASS_CODE, "jhs", pin))
     logger.info("学級 %s を作成", DEMO_CLASS_CODE)
+
+
+def newer_or_same(incoming: Summary, current: Summary | None) -> bool:
+    """再接続で古い記録が「いま」を上書きしないように、updated_at（ISO 8601）で比べる（9/18 Codex I5）。
+    別の記録なら常に新しい方を「いま」にする（次の実験に進んだ）"""
+    if not current:
+        return True
+    if current.get("record_id") != incoming.get("record_id"):
+        return str(incoming.get("updated_at", "")) >= str(current.get("updated_at", ""))
+    return str(incoming.get("updated_at", "")) >= str(current.get("updated_at", ""))
 
 
 def updated(policy: ClassPolicy, **changes: object) -> ClassPolicy:

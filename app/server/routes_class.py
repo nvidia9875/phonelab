@@ -138,6 +138,7 @@ class StudentOut(BaseModel):
 class DashboardOut(BaseModel):
     class_code: str
     halted: bool
+    allowed_sensors: list[str]
     teacher_enabled: list[str]
     students: list[StudentOut]
     fetched_at: str
@@ -313,6 +314,7 @@ async def dashboard(
     return DashboardOut(
         class_code=record.policy.class_code,
         halted=record.policy.halted,
+        allowed_sensors=list(record.policy.allowed_sensors),
         teacher_enabled=list(record.policy.teacher_enabled),
         students=[_student_out(r) for r in rows],
         fetched_at=_now(),

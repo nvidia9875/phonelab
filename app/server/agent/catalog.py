@@ -62,8 +62,8 @@ CATALOG: dict[str, CatalogTheme] = {
             CatalogVariant(
                 id="energy_mass",
                 variable="mass",
-                title="同じ高さから、重さだけ2倍にして放す",
-                changes="重さ（消しゴム1個から2個へ）",
+                title="同じ高さから、重さだけ増やして放す",
+                changes="重さ（消しゴムを 1 個足す。端末も入っているので 2 倍にはならない）",
                 holds="放す高さ 15 cm、糸の長さ 80 cm",
             ),
         ),
@@ -121,8 +121,8 @@ CATALOG: dict[str, CatalogTheme] = {
             CatalogVariant(
                 id="pendulum_mass",
                 variable="mass",
-                title="同じ長さの糸で、重さだけ2倍にする",
-                changes="重さ（消しゴム1個から2個へ）",
+                title="同じ長さの糸で、重さだけ増やす",
+                changes="重さ（消しゴムを 1 個足す。端末も入っているので 2 倍にはならない）",
                 holds="糸の長さ、振れ幅",
             ),
             CatalogVariant(
