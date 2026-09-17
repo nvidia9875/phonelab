@@ -279,7 +279,7 @@ flowchart LR
 
 - [x] C′0 文書: `docs/personas.md`（ゆい・佐藤先生・母、前後の台詞、時間割、差別化表）、`docs/ux-flow.md` §11、`docs/idea-sheet.md` の対象ユーザーと差別化（9/16）
 - [x] C′1 **学級を Firestore に**（= C8、9/16）: `server/classroom.py` + `server/routes_class.py`。学級コード＋番号で入場（`/me` で 404 なら「学級コードが見つかりません」）、先生の許可・有効化・停止をサーバに。全端末停止は 2 秒ポーリングで届き（ローカル実測 2.0 秒）、`/api/plan` `/api/chat` は 409、`before_run_callback` で Runner も止める。教員画面は学級コード＋PIN で停止・許可・有効化が本物に（生徒一覧はまだサンプル → C′2）。`DEMO-2026` は `PHONELAB_DEMO_PIN` で起動時に作る。pytest 66 件。**未**: 学級コードに学校種を持たせたので `Settings` の切り替えは入場していない端末だけに効く、`X-PhoneLab-Halted` ヘッダは未、学級ごとの Gemini 回数上限は未
-- [ ] C′2 **教員画面を作り直す**: 上に予想の向きの分布、下に保留・却下の子のリスト、右上に停止。`sample/data.ts` を捨てて C′1 の実データ。旧表記（振り子の周期、Agent／Policy）を消す
+- [x] C′2 **教員画面を作り直す**（9/17）: 生徒の端末が記録の**要約**（予想・状態・検査・出来事 8 件。波形などの生データ無し）を `POST /api/records` に送り（`web/src/agent/sync.ts`、変更から 0.8 秒で）、教員画面は PIN 付き `POST /api/class/{code}/dashboard` を 5 秒ごとに取る。上に予想の向きの分布（量の言葉で: 高くなる／変わらない／低くなる／まだ読めない）、次に「いま見に行く子」（保留 → 却下 → 予想で止まっている）、全員の表、接続・保留・却下・記録済みの数、右に許可と選んだ子の記録の流れ。`sample/data.ts` は削除。Firestore は `students/{no}.current` に最新、`records/{id}` に履歴。pytest 71・vitest 54。**未**: Cloud Trace への直リンク、記録済み（署名）の件数はサーバ署名（C′4 以降）
 - [x] C′3 **家の続き**（9/17）: `themesFor(school, teacherEnabled)` が `home: true` のテーマを学校種をまたいで含め、`pendulum`（振り子の周期）を `enabledBy: teacher` + `home` に。カードに「家で」の印と「先生が有効化すると、家で自分のスマホからできます」。教員画面のトグル（C′1）で有効化 → 生徒のトップに 6 番目として出る。**未**: 記録が学校と家で同じ列に並ぶのは C′2 の記録サーバ保存から
 - [ ] C′4 **実機検証に足す**（B7 と一緒に）: 班で順番に測るとき隣の班の音が混ざるか → 保留理由「まわりの音」の文言。iPad で振り子の閾値
 - [ ] C′5 **記録の URL**（名前なし。予想・値・検査・署名・「AI は答えを言わない」）→ 保護者と Classroom 貼り付け用

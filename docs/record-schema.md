@@ -153,7 +153,7 @@ Cloud Logging には span と同じ属性を構造化ログで出す（`jsonPayl
 
 ```
 classes/{class_code}                    ← policy.md 5 章の学級ポリシー（halted を含む）
-classes/{class_code}/students/{no}      ← { current_record_id, last_seen_at }
+classes/{class_code}/students/{no}      ← { last_seen_at, current }  current = 記録の要約（9/17 実装。routes_class.RecordSummary。生データ無し）
 classes/{class_code}/students/{no}/records/{record_id}
 classes/{class_code}/proposals/{id}     ← ClassAgent の提案（policy.md 5.1）。教師が承認して初めて classes/{code} に反映
 classes/{class_code}/briefs/{id}        ← ClassAgent の要約文と trigger、trace_id
