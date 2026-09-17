@@ -3,7 +3,7 @@ import { themeById, variantById } from "../catalog/themes";
 import type { Features } from "../measure/features";
 import type { LocalCheck } from "../measure/checks";
 import { clearAll, createRecord, recordById, updateRecord, type CondKey, type Measurement, type StudyRecord } from "../store/records";
-import { MAX_RETRY, ensureJudged, finishMeasure, remeasure, submitPrediction } from "./useFlow";
+import { MAX_RETRY, ensureJudged, finishMeasure, remeasure, submitPrediction, switchExperiment } from "./useFlow";
 import type { PlanReply } from "../agent/plan";
 
 const sound = themeById("sound")!;
@@ -282,5 +282,29 @@ describe("judge", () => {
     expect(j.observed).toBe("faster");
     expect(j.consistent).toBeNull();
     expect(j.detail).toContain("別のもの");
+  });
+});
+
+describe("switchExperiment", () => {
+  beforeEach(() => clearAll());
+
+  it("closes the held record as stopped and opens a fresh prediction for another experiment of the theme", () => {
+    const rec = record(sound.id, "sound_pluck_strength", { status: "held", stage: "measure_A", retries: { A: 3, B: 0 } });
+
+    const next = switchExperiment(rec, sound)!;
+
+    expect(recordById(rec.id)!.status).toBe("stopped");
+    expect(next.id).not.toBe(rec.id);
+    expect(next.stage).toBe("predict");
+    expect(next.variantId).toBeNull();
+    expect(next.prediction.questionBack).toContain("震える部分の長さ");
+  });
+
+  it("returns null when every experiment of the theme is used up", () => {
+    record(sound.id, "sound_string_length", { status: "signed", stage: "result" });
+    const rec = record(sound.id, "sound_pluck_strength", { status: "held", stage: "measure_A" });
+
+    expect(switchExperiment(rec, sound)).toBeNull();
+    expect(recordById(rec.id)!.status).toBe("held");
   });
 });

@@ -16,7 +16,7 @@ export interface Clock {
 const CLOCK_LABELS: Record<MeasureProfile, [string, string]> = {
   pendulum_period: ["加速度", "ジャイロ（独立した2本目）"],
   pendulum_speed: ["ジャイロ", "加速度（独立した2本目）"],
-  pitch: ["基本周波数", "倍音から（独立した2本目）"],
+  pitch: ["基本周波数", "倍音との整合（2 本目）"],
   freefall_time: ["着地のコマ", "着地音（独立した2本目）"],
   later: ["1本目", "2本目"],
 };

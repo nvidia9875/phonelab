@@ -121,6 +121,7 @@ export interface StudentRow {
 export interface DashboardInfo {
   class_code: string;
   halted: boolean;
+  allowed_sensors: string[];
   teacher_enabled: string[];
   students: StudentRow[];
   fetched_at: string;

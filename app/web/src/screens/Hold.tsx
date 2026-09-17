@@ -66,7 +66,7 @@ export function Hold({ checks, conditionLabel, retry, maxRetry, onRetry, onOther
       <Foot>
         {canRetry && <Button onClick={onRetry}>同じ条件で再測定する（{retry + 1} / {maxRetry} 回目）</Button>}
         <Button secondary onClick={onChat}>ラボ先生と、保留になった理由を考える</Button>
-        <Button secondary onClick={onOther}>別の実験にする</Button>
+        <Button secondary onClick={onOther}>同じテーマの別の実験にする（この記録は保留のまま閉じる）</Button>
         <FootNote>保留は失敗ではありません。データを信じない、という判断です。</FootNote>
       </Foot>
     </Screen>

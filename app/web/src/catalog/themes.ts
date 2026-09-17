@@ -127,12 +127,12 @@ const CATALOG: Theme[] = [
       {
         id: "energy_mass",
         variable: "mass",
-        title: "同じ高さから、重さだけ2倍にして放す",
-        changes: "重さ（消しゴム1個から2個へ）",
+        title: "同じ高さから、重さだけ増やして放す",
+        changes: "重さ（消しゴムを 1 個足す。端末も入っているので 2 倍にはならない）",
         holds: "放す高さ 15 cm、糸の長さ 80 cm",
         conditions: [
-          { key: "A", label: "重さ 1倍", setup: "消しゴム 1 個で、袋の底を 15 cm 持ち上げて持つ" },
-          { key: "B", label: "重さ 2倍", setup: "消しゴムを 2 個にして、同じ 15 cm 持ち上げて持つ" },
+          { key: "A", label: "消しゴム 1 個", setup: "消しゴム 1 個で、袋の底を 15 cm 持ち上げて持つ" },
+          { key: "B", label: "消しゴム 2 個", setup: "消しゴムを 2 個にして、同じ 15 cm 持ち上げて持つ" },
         ],
         tolerance: SPEED_TOLERANCE_MS,
         toleranceKind: "abs",
@@ -262,12 +262,12 @@ const CATALOG: Theme[] = [
       {
         id: "pendulum_mass",
         variable: "mass",
-        title: "同じ長さの糸で、重さだけ2倍にする",
-        changes: "重さ（消しゴム1個から2個へ）",
+        title: "同じ長さの糸で、重さだけ増やす",
+        changes: "重さ（消しゴムを 1 個足す。端末も入っているので 2 倍にはならない）",
         holds: "糸の長さ、振れ幅",
         conditions: [
-          { key: "A", label: "重さ 1倍", setup: "袋に消しゴムを 1 個入れて、糸で吊るす。小さく（20° 以内）振ってから「測る」" },
-          { key: "B", label: "重さ 2倍", setup: "消しゴムを 2 個にする。糸の長さと振れ幅は同じままで、もう一度振る" },
+          { key: "A", label: "消しゴム 1 個", setup: "袋に消しゴムを 1 個入れて、糸で吊るす。小さく（20° 以内）振ってから「測る」" },
+          { key: "B", label: "消しゴム 2 個", setup: "消しゴムを 2 個にする。糸の長さと振れ幅は同じままで、もう一度振る" },
         ],
         tolerance: PERIOD_TOLERANCE_S,
         toleranceKind: "abs",

@@ -178,10 +178,10 @@ export function periodChecks(f: PendulumFeatures, toleranceS: number): LocalChec
   return [
     ...samplingChecks(f),
     { code: "saturation", ok: f.saturation_runs === 0 && f.accel_norm_peak_ms2 < 39, text: f.saturation_runs === 0 ? "飽和なし" : "飽和。振りが強すぎる" },
-    { code: "no_signal", ok: f.accel_norm_std_ms2 >= 0.3 || f.gyro_std_dps >= 5, text: "信号あり" },
+    { code: "no_signal", ok: f.accel_norm_std_ms2 >= 0.3 || f.gyro_std_dps >= 5, text: f.accel_norm_std_ms2 >= 0.3 || f.gyro_std_dps >= 5 ? "信号あり" : "振り子が動いていない" },
     { code: "two_clocks_disagree", ok: agree, text: Number.isFinite(d) ? `二つのセンサーの周期が${agree ? "一致" : "一致しない"}（差 ${d.toFixed(2)} s、許容 ${toleranceS.toFixed(2)} s）` : "周期がはっきりしません" },
-    { code: "unstable", ok: u1 <= toleranceS && u2 <= toleranceS, text: "前半と後半で周期が安定" },
-    { code: "weak_autocorr", ok: f.autocorr_peak.accel >= 0.3 && f.autocorr_peak.gyro >= 0.3, text: "周期がはっきり出ている" },
+    { code: "unstable", ok: u1 <= toleranceS && u2 <= toleranceS, text: u1 <= toleranceS && u2 <= toleranceS ? "前半と後半で周期が安定" : "前半と後半で周期が変わった" },
+    { code: "weak_autocorr", ok: f.autocorr_peak.accel >= 0.3 && f.autocorr_peak.gyro >= 0.3, text: f.autocorr_peak.accel >= 0.3 && f.autocorr_peak.gyro >= 0.3 ? "周期がはっきり出ている" : "周期がはっきり出ない" },
   ];
 }
 

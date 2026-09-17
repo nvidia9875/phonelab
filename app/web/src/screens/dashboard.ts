@@ -73,19 +73,25 @@ export interface Distribution {
   bars: DistributionBar[];
 }
 
-/** いちばん多くの生徒が取り組んでいるテーマについて、予想の向きの分布 */
+/** いちばん多くの生徒が取り組んでいる実験（テーマ × 変える変数）について、予想の向きの分布。強さと長さの予想を混ぜない */
 export function distributionOf(students: StudentRow[]): Distribution | null {
-  const byTheme = new Map<string, RecordSummary[]>();
-  for (const s of students) if (s.current) byTheme.set(s.current.theme_id, [...(byTheme.get(s.current.theme_id) ?? []), s.current]);
-  if (byTheme.size === 0) return null;
-  const [themeId, recs] = [...byTheme.entries()].sort((a, b) => b[1].length - a[1].length)[0];
+  const byExperiment = new Map<string, RecordSummary[]>();
+  for (const s of students) {
+    if (!s.current) continue;
+    const key = `${s.current.theme_id}|${s.current.variant_id ?? ""}`;
+    byExperiment.set(key, [...(byExperiment.get(key) ?? []), s.current]);
+  }
+  if (byExperiment.size === 0) return null;
+  const [key, recs] = [...byExperiment.entries()].sort((a, b) => b[1].length - a[1].length)[0];
+  const [themeId, variantId] = key.split("|");
   const theme = themeById(themeId);
-  const unit = theme ? (variantById(theme, recs.find((r) => r.variant_id)?.variant_id ?? null)?.unit ?? theme.variants[0]?.unit ?? "Hz") : "Hz";
+  const variant = theme ? variantById(theme, variantId || null) : undefined;
+  const unit = variant?.unit ?? theme?.variants[0]?.unit ?? "Hz";
   const q = QUANTITY[unit];
   const count = (d: string) => recs.filter((r) => (r.claim?.direction ?? "unknown") === d).length;
   return {
     themeId,
-    themeTitle: theme?.title ?? themeId,
+    themeTitle: variant ? `${theme?.title ?? themeId}・${variant.changes.split("（")[0]}を変える` : (theme?.title ?? themeId),
     total: recs.length,
     bars: [
       { label: q.choiceFaster, count: count("faster") },

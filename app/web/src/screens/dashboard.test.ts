@@ -22,7 +22,7 @@ describe("distributionOf", () => {
 
     const d = distributionOf(students)!;
 
-    expect(d.themeTitle).toBe("音の高さ");
+    expect(d.themeTitle).toBe("音の高さ・はじく強さを変える");
     expect(d.total).toBe(3);
     expect(d.bars.map((b) => [b.label, b.count])).toEqual([["高くなる", 1], ["変わらない", 1], ["低くなる", 0], ["まだ読めない", 1]]);
   });

@@ -149,12 +149,14 @@ function write(key: string, value: unknown): void {
 let state: State = { records: read(KEY_RECORDS, []), student: read(KEY_STUDENT, null), halted: read(KEY_HALTED, false), settings: { ...DEFAULT_SETTINGS, ...read(KEY_SETTINGS, {}) }, classState: read(KEY_CLASS, null) };
 const listeners = new Set<() => void>();
 function emit(next: State): void {
+  const prev = state;
   state = next;
-  write(KEY_RECORDS, state.records);
-  write(KEY_STUDENT, state.student);
-  write(KEY_HALTED, state.halted);
-  write(KEY_SETTINGS, state.settings);
-  write(KEY_CLASS, state.classState);
+  // 変わったものだけ書く（学級のポーリングのたびに全記録を書き直さない）
+  if (next.records !== prev.records) write(KEY_RECORDS, next.records);
+  if (next.student !== prev.student) write(KEY_STUDENT, next.student);
+  if (next.halted !== prev.halted) write(KEY_HALTED, next.halted);
+  if (next.settings !== prev.settings) write(KEY_SETTINGS, next.settings);
+  if (next.classState !== prev.classState) write(KEY_CLASS, next.classState);
   listeners.forEach((l) => l());
 }
 function subscribe(l: () => void): () => void {
@@ -202,8 +204,15 @@ export const hhmm = (iso: string): string => {
   const d = new Date(iso);
   return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 };
+const ID_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+/** 6 文字の記録 id。端末内で衝突しないことを確かめる（4 桁の乱数だと同じ id の記録を一緒に更新していた） */
 function newId(): string {
-  return String(Math.floor(1000 + Math.random() * 9000));
+  for (let attempt = 0; attempt < 20; attempt++) {
+    let id = "";
+    for (let i = 0; i < 6; i++) id += ID_ALPHABET[Math.floor(Math.random() * ID_ALPHABET.length)];
+    if (!state.records.some((r) => r.id === id)) return id;
+  }
+  return `${Date.now().toString(36).toUpperCase()}`;
 }
 
 export function createRecord(themeId: string): StudyRecord {

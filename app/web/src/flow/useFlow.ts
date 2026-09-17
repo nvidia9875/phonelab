@@ -10,16 +10,35 @@ import { QUANTITY, formatQuantity, type Unit } from "../catalog/quantity";
 import { SENSOR_LABEL, repeatsOf, themeById, variantById, variantsOf, type Theme } from "../catalog/themes";
 import type { LocalCheck } from "../measure/checks";
 import { clocksSummary, measuredValue, type Features } from "../measure/features";
-import { activeRecordForTheme, addEvent, createRecord, currentClassCode, currentNumber, recordsForTheme, updateRecord, type ChatLog, type Claim, type CondKey, type Direction, type PlanInfo, type Rejection, type StudyRecord } from "../store/records";
+import { activeRecordForTheme, addEvent, createRecord, currentClassCode, currentNumber, recordById, recordsForTheme, updateRecord, type ChatLog, type Claim, type CondKey, type Direction, type PlanInfo, type Rejection, type StudyRecord } from "../store/records";
 
 export const MAX_RETRY = 3;
 const EMPTY_TRIES: Record<CondKey, number> = { A: 0, B: 0 };
 
+/** 済んだ実験。保留が続いて閉じたもの（stopped）も含め、Planner が同じ実験を選び直さないようにする */
 function doneVariantIds(themeId: string): string[] {
   return recordsForTheme(themeId)
-    .filter((r) => r.status === "signed" || r.status === "judged")
+    .filter((r) => r.status === "signed" || r.status === "judged" || r.status === "stopped")
     .map((r) => r.variantId)
     .filter((v): v is string => !!v);
+}
+
+/**
+ * 保留が続いたとき、同じテーマの別の実験へ切り替える。いまの記録は「途中で停止」として残し（先生の画面にも残る）、
+ * 新しい記録を予想から始める。別の実験が無ければ null（トップへ）。9/18 Codex 教室の弱さ 3
+ */
+export function switchExperiment(rec: StudyRecord, theme: Theme): StudyRecord | null {
+  const stoppedIds = new Set([...doneVariantIds(theme.id), rec.variantId]);
+  const nv = variantsOf(theme).find((v) => !stoppedIds.has(v.id));
+  if (!nv) return null;
+  const current = variantById(theme, rec.variantId);
+  updateRecord(rec.id, (r) => addEvent({ ...r, status: "stopped" }, "切り替え", `保留が続いたので、この実験はここまで。${nv.title}へ`));
+  const next = createRecord(theme.id);
+  updateRecord(next.id, (r) => ({
+    ...r,
+    prediction: { ...r.prediction, questionBack: `「${current?.title ?? "前の実験"}」は保留のまま閉じました。今度は${nv.changes.split("（")[0]}を変えます。それについて、こうなると思う、を書こう` },
+  }));
+  return recordById(next.id) ?? null;
 }
 
 /** 予想の向きを、測る量に合わせた言葉にする（音は「高くなる」） */

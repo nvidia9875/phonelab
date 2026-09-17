@@ -44,7 +44,8 @@ export function Teacher({ classCode, cls, halted, onHalt, onPolicy, onResetStude
   const [dash, setDash] = useState<DashboardInfo | null>(null);
   const [dashError, setDashError] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
-  const allowed = new Set<Sensor>(cls?.allowedSensors ?? ["accelerometer", "gyroscope", "microphone"]);
+  // 許可はサーバの学級から（この端末の学級状態が無い教員 PC でも、既定値で上書きしない）
+  const allowed = new Set<Sensor>((dash?.allowed_sensors as Sensor[] | undefined) ?? cls?.allowedSensors ?? ["accelerometer", "gyroscope", "microphone"]);
   const enabled = new Set(dash?.teacher_enabled ?? cls?.teacherEnabled ?? []);
   const live = !!cls && cls.classCode === code.trim().toUpperCase();
   const unlocked = pin.length > 0 && code.trim().length >= 3;

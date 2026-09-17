@@ -22,6 +22,8 @@ export interface MeasureView {
   countdown?: number;
   /** 0 の合図と、測定中に大きく出す一言（「はじいて！」など） */
   cue?: string;
+  /** 音の実験: 0 のあと少し静か（雑音を測る）にしてから合図が出る */
+  quietFirst?: boolean;
 }
 
 type Row = { ok: boolean; text: string };
@@ -79,7 +81,7 @@ export function Measure({ view, onStop, onContinue, onDemo, onRemeasure }: Measu
         <div className="countdown" aria-live="assertive">
           <p className="countdown__ready">準備はいい？</p>
           <p key={view.countdown} className="countdown__n">{view.countdown}</p>
-          <p className="countdown__cue">0 になったら「{view.cue}」</p>
+          <p className="countdown__cue">{view.quietFirst ? `0 のあと、まず静かに。合図が出たら「${view.cue}」` : `0 になったら「${view.cue}」`}</p>
           <p className="countdown__label">{view.conditionLabel}</p>
         </div>
       ) : (

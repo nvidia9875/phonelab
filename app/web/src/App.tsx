@@ -331,7 +331,7 @@ export function App() {
         s.phase === "measuring"
           ? { phase: "measuring", elapsed: s.elapsed, seconds: s.seconds, conditionLabel: label, clocks: emptyClocks, unit, checks: [], sentBytes: null, allOk: false, cue: cueFor(t, s.elapsed) }
           : s.phase === "countdown"
-            ? { phase: "countdown", elapsed: 0, seconds: s.seconds, conditionLabel: label, clocks: emptyClocks, unit, checks: [], sentBytes: null, allOk: false, countdown: s.count, cue: t.goCue }
+            ? { phase: "countdown", elapsed: 0, seconds: s.seconds, conditionLabel: label, clocks: emptyClocks, unit, checks: [], sentBytes: null, allOk: false, countdown: s.count, cue: t.goCue, quietFirst: t.measureProfile === "pitch" }
           : s.phase === "requesting"
             ? { phase: "requesting", elapsed: 0, seconds: s.seconds, conditionLabel: label, clocks: emptyClocks, unit, checks: [], sentBytes: null, allOk: false, waitingFor: s.sensor === "microphone" ? "マイクの許可を待っています。ブラウザの確認で「許可」を押してください" : "センサーの許可を待っています。確認で「許可」を押してください" }
           : s.phase === "done"
@@ -367,7 +367,7 @@ export function App() {
           maxRetry={flow.MAX_RETRY}
           onRetry={() => { flow.retry(r, cond); nav(`/x/${t.id}/setup/${cond}`); }}
           onChat={() => nav(`/x/${t.id}/chat`)}
-          onOther={goHome}
+          onOther={() => { const next = flow.switchExperiment(r, t); nav(next ? `/x/${t.id}` : "/"); }}
           onHome={goHome}
         />
       );
