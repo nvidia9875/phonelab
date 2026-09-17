@@ -130,9 +130,41 @@ async def spike_agent(
     )
 
 
+def client_key(request: Request) -> str:
+    """Cloud Run（run.app）は利用者の IP を X-Forwarded-For の末尾に足す。先頭は利用者が書けるので使わない"""
+    forwarded = request.headers.get("x-forwarded-for", "").split(",")[-1].strip()
+    return forwarded or (request.client.host if request.client else "unknown")
+
+
+def student_key(class_code: str | None, number: str | None) -> str | None:
+    if class_code and number:
+        return f"{normalize_code(class_code)}|{number.strip().upper()}"
+    return None
+
+
+@lru_cache(maxsize=1)
+def get_student_limiter() -> SlidingWindowLimiter:
+    return SlidingWindowLimiter(limit=PER_STUDENT_REQUESTS_PER_WINDOW, window_s=CHAT_WINDOW_S)
+
+
+def check_limits(
+    request: Request,
+    ip_limiter: SlidingWindowLimiter,
+    student_limiter: SlidingWindowLimiter,
+    class_code: str | None,
+    number: str | None,
+    detail: str,
+) -> None:
+    key = student_key(class_code, number)
+    if key and not student_limiter.allow(key):
+        raise HTTPException(status_code=429, detail=detail)
+    if not ip_limiter.allow(client_key(request)):
+        raise HTTPException(status_code=429, detail=detail)
+
+
 # ---- Planner: 予想を読んで実験を一つ選ぶ（docs/architecture.md 2.2、docs/policy.md 3.2〜3.4） ----
 
-PLAN_REQUESTS_PER_WINDOW = 30
+PLAN_REQUESTS_PER_WINDOW = 240
 PLAN_WINDOW_S = 600
 PLAN_TIMEOUT_S = 12  # 端末はこれを超えたら端末内の縮退（stub）で進む
 MAX_DONE_IDS = 10
@@ -152,6 +184,7 @@ class PlanRequest(BaseModel):
     previous_question_back: str | None = Field(default=None, max_length=MAX_QUESTION_BACK_CHARS)
     planner_calls: int = Field(default=0, ge=0, le=PLANNER_CALLS_PER_EXPERIMENT)
     class_code: str | None = Field(default=None, max_length=MAX_CLASS_CODE_CHARS)
+    number: str | None = Field(default=None, max_length=8)
 
     @field_validator("theme_id")
     @classmethod
@@ -200,10 +233,17 @@ async def plan(
     runner: Annotated[Runner, Depends(get_planner_runner)],
     limiter: Annotated[SlidingWindowLimiter, Depends(get_plan_limiter)],
     store: Annotated[ClassStore, Depends(get_class_store)],
+    student_limiter: Annotated[SlidingWindowLimiter, Depends(get_student_limiter)],
 ) -> PlanResponse:
     """決定論の Policy → Planner（Gemini、構造化出力）→ PolicyPlugin の突き合わせ。答えは渡さない。"""
-    if not limiter.allow(client_key(request)):
-        raise HTTPException(status_code=429, detail="少し時間をおいてから、もう一度送ってください")
+    check_limits(
+        request,
+        limiter,
+        student_limiter,
+        body.class_code,
+        body.number,
+        "少し時間をおいてから、もう一度送ってください",
+    )
     halted = await class_is_halted(store, body.class_code)
     if halted:
         raise HTTPException(status_code=409, detail=HALTED_DETAIL)
@@ -328,8 +368,11 @@ MAX_CHAT_CHARS = 500
 MAX_CHAT_HISTORY = 20
 MAX_HOLD_REASONS = 6
 MIN_THINKING_CHARS = 8
-CHAT_REQUESTS_PER_WINDOW = 30
+# 学校は 31 人が同じ外向き IP なので、IP だけの上限は学級 1 つ分（生徒 40 人 × 6 回）を超える値にし、
+# 学級コード＋番号が付いていればその単位でも数える
+CHAT_REQUESTS_PER_WINDOW = 240
 CHAT_WINDOW_S = 600
+PER_STUDENT_REQUESTS_PER_WINDOW = 30
 # 返事を待たせすぎない。9/16 に gemini-3.8-flash が 25〜50 秒かかった時間帯があった
 CHAT_TIMEOUT_S = 25
 
@@ -356,6 +399,7 @@ class ChatRequest(BaseModel):
     turns_used: int = Field(default=0, ge=0, le=CHAT_TURNS_PER_RECORD)
     reveal: bool = False
     class_code: str | None = Field(default=None, max_length=MAX_CLASS_CODE_CHARS)
+    number: str | None = Field(default=None, max_length=8)
 
     @field_validator("variant_id")
     @classmethod
@@ -383,12 +427,6 @@ def get_chat_limiter() -> SlidingWindowLimiter:
     return SlidingWindowLimiter(limit=CHAT_REQUESTS_PER_WINDOW, window_s=CHAT_WINDOW_S)
 
 
-def client_key(request: Request) -> str:
-    """Cloud Run（run.app）は利用者の IP を X-Forwarded-For の末尾に足す。先頭は利用者が書けるので使わない"""
-    forwarded = request.headers.get("x-forwarded-for", "").split(",")[-1].strip()
-    return forwarded or (request.client.host if request.client else "unknown")
-
-
 @app.post("/api/chat")
 async def chat(
     body: ChatRequest,
@@ -396,12 +434,17 @@ async def chat(
     runner: Annotated[Runner, Depends(get_tutor_runner)],
     limiter: Annotated[SlidingWindowLimiter, Depends(get_chat_limiter)],
     store: Annotated[ClassStore, Depends(get_class_store)],
+    student_limiter: Annotated[SlidingWindowLimiter, Depends(get_student_limiter)],
 ) -> ChatResponse:
     """ラボ先生と実験をふり返る。先生の説明は、生徒が自分の考えを書いたあとだけ LLM に渡す。"""
-    if not limiter.allow(client_key(request)):
-        raise HTTPException(
-            status_code=429, detail="少し時間をおいてから、もう一度話しかけてください"
-        )
+    check_limits(
+        request,
+        limiter,
+        student_limiter,
+        body.class_code,
+        body.number,
+        "少し時間をおいてから、もう一度話しかけてください",
+    )
     halted = await class_is_halted(store, body.class_code)
     if halted:
         raise HTTPException(status_code=409, detail=HALTED_DETAIL)
@@ -477,8 +520,9 @@ if WEB_DIST.exists():
     def spa(path: str) -> FileResponse:
         if path.startswith("api/"):
             raise HTTPException(status_code=404, detail="Not Found")
-        candidate = WEB_DIST / path
-        if path and candidate.is_file():
+        # 公開ディレクトリの外は返さない（`..%2F` で server/agent/answers.py が読めた。9/18 の Codex レビュー F1）
+        candidate = (WEB_DIST / path).resolve()
+        if path and candidate.is_relative_to(WEB_DIST.resolve()) and candidate.is_file():
             return FileResponse(candidate)
         return FileResponse(WEB_DIST / "index.html", media_type="text/html")
 

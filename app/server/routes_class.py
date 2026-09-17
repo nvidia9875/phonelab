@@ -168,13 +168,14 @@ def _client_ip(request: Request) -> str:
 async def _teacher(
     store: ClassStore, limiter: SlidingWindowLimiter, request: Request, code: str, pin: str
 ) -> ClassRecord:
-    """PIN を確かめる。総当たりを防ぐため、学級 × 接続元で回数を数える"""
+    """PIN を確かめる。総当たりを防ぐため、**間違えた回数**を学級 × 接続元で数える。
+    正しい PIN は数えない（教員画面の 5 秒ごとの更新で上限を食いつぶさないように。9/18 Codex F2）"""
     record = await _load(store, code)
+    if record.verify(pin):
+        return record
     if not limiter.allow(f"{record.policy.class_code}|{_client_ip(request)}"):
         raise HTTPException(status_code=429, detail="PIN の入力が多すぎます。少し待ってください")
-    if not record.verify(pin):
-        raise HTTPException(status_code=403, detail="PIN が違います")
-    return record
+    raise HTTPException(status_code=403, detail="PIN が違います")
 
 
 @router.get("/{code}")

@@ -85,19 +85,22 @@ def test_the_teacher_changes_allowed_sensors_and_enables_home_experiments(client
     assert data["teacher_enabled"] == ["pendulum"]
 
 
-def test_pin_attempts_are_rate_limited(store, fake_llm):
+def test_wrong_pin_attempts_are_rate_limited(store, fake_llm):
     app.dependency_overrides[get_class_store] = lambda: store
     limiter = SlidingWindowLimiter(limit=2, window_s=600)
     app.dependency_overrides[get_pin_limiter] = lambda: limiter
     try:
         client = TestClient(app)
-        for _ in range(2):
-            client.post("/api/class/DEMO-2026/halt", json={"pin": "0000", "halted": True})
-        res = client.post("/api/class/DEMO-2026/halt", json={"pin": PIN, "halted": True})
+        codes = [
+            client.post(
+                "/api/class/DEMO-2026/halt", json={"pin": "0000", "halted": True}
+            ).status_code
+            for _ in range(3)
+        ]
     finally:
         app.dependency_overrides.clear()
 
-    assert res.status_code == 429
+    assert codes == [403, 403, 429]
 
 
 def test_the_planner_refuses_to_run_while_the_class_is_halted(client, fake_llm):
@@ -217,3 +220,29 @@ def test_a_record_summary_cannot_carry_raw_data(client):
     )
 
     assert res.status_code == 422
+
+
+def test_correct_pins_are_not_counted_against_the_attempt_limit(store, fake_llm):
+    """教員画面は 5 秒ごとに PIN 付きで更新する。正しい PIN で上限に当たってはいけない（9/18 Codex F2）"""
+    app.dependency_overrides[get_class_store] = lambda: store
+    limiter = SlidingWindowLimiter(limit=2, window_s=600)
+    app.dependency_overrides[get_pin_limiter] = lambda: limiter
+    try:
+        client = TestClient(app)
+        codes = [
+            client.post("/api/class/DEMO-2026/dashboard", json={"pin": PIN}).status_code
+            for _ in range(5)
+        ]
+        wrong = [
+            client.post(
+                "/api/class/DEMO-2026/halt", json={"pin": "0000", "halted": True}
+            ).status_code
+            for _ in range(3)
+        ]
+        still_ok = client.post("/api/class/DEMO-2026/dashboard", json={"pin": PIN}).status_code
+    finally:
+        app.dependency_overrides.clear()
+
+    assert codes == [200] * 5
+    assert wrong == [403, 403, 429]
+    assert still_ok == 200

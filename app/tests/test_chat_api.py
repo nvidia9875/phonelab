@@ -190,3 +190,12 @@ def test_lets_the_teacher_restate_the_result_once_it_is_on_screen(client, fake_l
     res = client.post("/api/chat", json=body())
 
     assert res.json()["reply"] == fake_llm.reply
+
+
+def test_does_not_serve_files_outside_the_web_folder(client):
+    """`..%2F` で server/agent/answers.py が読めた（9/18 Codex レビュー F1）。公開ディレクトリの外は index.html に落とす"""
+    res = client.get("/..%2F..%2Fserver%2Fagent%2Fanswers.py")
+
+    assert res.status_code in (200, 404)
+    assert "leak_phrases" not in res.text
+    assert "MODEL_ANSWERS" not in res.text
