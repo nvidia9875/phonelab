@@ -55,3 +55,13 @@
 /* 学級コードと PIN（ヘッダの右）。停止ボタンと同じ高さ */
 .tinput { width: 128px; padding: 8px 10px; border: 2px solid var(--ink); border-radius: 10px; font-size: 14px; background: var(--paper); }
 .tmessage { margin: 8px 0 0; padding: 8px 12px; border-radius: 10px; background: color-mix(in oklab, var(--teal) 14%, var(--paper)); font-size: 13px; font-weight: 700; }
+/* 予想の分布（先生の 1 画面の上段） */
+.dist { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; }
+.dist__row { display: grid; grid-template-columns: 110px minmax(0, 1fr) 56px; gap: 10px; align-items: center; font-size: 14px; }
+.dist__label { font-weight: 700; }
+.dist__track { height: 14px; border-radius: 7px; background: var(--sand); overflow: hidden; }
+.dist__bar { height: 100%; background: var(--orange); border-radius: 7px; transition: width 300ms var(--ease-out, ease-out); }
+.dist__n { text-align: right; font-size: 13px; color: var(--muted); }
+.trow--btn { width: 100%; text-align: left; background: transparent; border: 0; border-bottom: 1px solid var(--sand); cursor: pointer; font: inherit; color: inherit; }
+.trow--btn:hover, .trow--selected { background: color-mix(in oklab, var(--teal) 10%, transparent); }
+.trow--btn:focus-visible { outline: 3px solid var(--teal); outline-offset: -3px; }

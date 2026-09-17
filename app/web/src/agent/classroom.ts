@@ -74,3 +74,66 @@ export function setClassHalt(classCode: string, pin: string, halted: boolean): P
 export function setClassPolicyOnServer(classCode: string, pin: string, allowedSensors: Sensor[], teacherEnabled: string[]): Promise<ClassInfo> {
   return call(`/api/class/${enc(classCode)}/policy`, { method: "PUT", body: JSON.stringify({ pin, allowed_sensors: allowedSensors, teacher_enabled: teacherEnabled }) });
 }
+
+/* ---------- 記録の要約と、先生の 1 画面 ---------- */
+
+export interface RecordSummary {
+  record_id: string;
+  theme_id: string;
+  variant_id: string | null;
+  status: "open" | "held" | "judged" | "signed" | "stopped";
+  stage: string;
+  prediction: string;
+  claim: { variable: string; direction: "faster" | "slower" | "same" | "unknown" } | null;
+  hold_codes: string[];
+  retries: { A?: number; B?: number };
+  result: { observed: "faster" | "slower" | "same" | "unknown"; consistent: boolean | null; statement: string } | null;
+  plan_source: string | null;
+  trace_id: string | null;
+  rejection_title: string | null;
+  chat_turns: number;
+  events: { t: string; k: string; body: string }[];
+  updated_at: string;
+}
+
+export interface StudentRow {
+  number: string;
+  last_seen_at: string;
+  current: RecordSummary | null;
+}
+
+export interface DashboardInfo {
+  class_code: string;
+  halted: boolean;
+  teacher_enabled: string[];
+  students: StudentRow[];
+  fetched_at: string;
+}
+
+export async function postRecordSummary(classCode: string, number: string, record: RecordSummary): Promise<void> {
+  const res = await fetch("/api/records", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ class_code: classCode, number, record }) });
+  if (!res.ok) throw new ClassError(`記録の送信に失敗しました（${res.status}）`, res.status);
+}
+
+export async function fetchDashboard(classCode: string, pin: string): Promise<DashboardInfo> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  let res: Response;
+  try {
+    res = await fetch(`/api/class/${enc(classCode)}/dashboard`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pin }), signal: controller.signal, cache: "no-store" });
+  } catch {
+    throw new ClassError("学級につながりませんでした", 0);
+  } finally {
+    clearTimeout(timer);
+  }
+  if (!res.ok) {
+    let detail = "";
+    try {
+      detail = String(((await res.json()) as { detail?: unknown }).detail ?? "");
+    } catch {
+      /* JSON でない */
+    }
+    throw new ClassError(detail || `学級の情報を取れませんでした（${res.status}）`, res.status);
+  }
+  return (await res.json()) as DashboardInfo;
+}

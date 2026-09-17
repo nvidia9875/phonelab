@@ -162,6 +162,13 @@ function subscribe(l: () => void): () => void {
 export function useStore(): State {
   return useSyncExternalStore(subscribe, () => state);
 }
+/** 画面の外（記録の同期など）から状態の変化を聞く */
+export function subscribeStore(listener: () => void): () => void {
+  return subscribe(listener);
+}
+export function getState(): State {
+  return state;
+}
 
 /* ---------- 生徒 ---------- */
 export function setStudent(student: Student | null): void {

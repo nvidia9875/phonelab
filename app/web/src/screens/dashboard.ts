@@ -1,0 +1,110 @@
+/**
+ * 先生の 1 画面の計算（docs/personas.md §3、ux-flow §11）: 予想の向きの分布、いま見に行く子、状態の言葉。
+ * 入力はサーバの記録の要約だけ。名前は無い。
+ */
+import { QUANTITY } from "../catalog/quantity";
+import { themeById, variantById } from "../catalog/themes";
+import type { RecordSummary, StudentRow } from "../agent/classroom";
+
+export type Tone = "teal" | "navy" | "outline";
+
+export interface StateLabel {
+  text: string;
+  tone: Tone;
+}
+
+/** 生徒の「いま」。保留と却下は紺（先生が見に行く）、測定中は青緑 */
+export function stateOf(r: RecordSummary | null): StateLabel {
+  if (!r) return { text: "未着手", tone: "outline" };
+  if (r.status === "held") return { text: "保留", tone: "navy" };
+  if (r.rejection_title && r.stage === "plan") return { text: "却下 → 代替", tone: "navy" };
+  if (r.status === "signed") return { text: "記録済み", tone: "outline" };
+  if (r.status === "judged" || r.stage === "result") return { text: "次の予測", tone: "outline" };
+  switch (r.stage) {
+    case "predict": return { text: r.prediction ? "予想の続き" : "予想中", tone: "outline" };
+    case "plan": return { text: "承認待ち", tone: "outline" };
+    case "setup_A": case "measure_A": return { text: "測定 A", tone: "teal" };
+    case "setup_B": case "measure_B": return { text: "測定 B", tone: "teal" };
+    default: return { text: "進行中", tone: "outline" };
+  }
+}
+
+const CHECK_WORDS: Record<string, string> = {
+  low_snr: "雑音と区別できない",
+  low_voiced: "音が短い",
+  clipping: "音割れ",
+  out_of_range: "値が範囲外",
+  saturation: "飽和",
+  gap: "欠測",
+  low_rate: "サンプリングが遅い",
+  no_release: "動き出していない",
+  two_clocks_disagree: "二系統が不一致",
+  unstable: "周期が不安定",
+  weak_autocorr: "周期が読めない",
+  no_signal: "信号なし",
+};
+
+/** 検査の列。保留の理由か、通ったなら「二系統一致」 */
+export function checkTextOf(r: RecordSummary | null): { text: string; strong: boolean } {
+  if (!r) return { text: "—", strong: false };
+  if (r.hold_codes.length) return { text: r.hold_codes.map((c) => CHECK_WORDS[c] ?? c).join("・"), strong: true };
+  if (r.rejection_title) return { text: "代替実験を提示", strong: false };
+  if (r.result) return { text: "二系統一致", strong: false };
+  if (r.stage === "predict" || r.stage === "plan") return { text: "センサー未使用", strong: false };
+  return { text: "測定中", strong: false };
+}
+
+/** 「いまの予想」の列。短く */
+export function claimTextOf(r: RecordSummary | null, max = 22): string {
+  if (!r || !r.prediction) return "（まだ書いていない）";
+  const t = r.prediction.replace(/\s+/g, " ");
+  return t.length > max ? `${t.slice(0, max)}…` : t;
+}
+
+export interface DistributionBar {
+  label: string;
+  count: number;
+}
+
+export interface Distribution {
+  themeId: string;
+  themeTitle: string;
+  total: number;
+  bars: DistributionBar[];
+}
+
+/** いちばん多くの生徒が取り組んでいるテーマについて、予想の向きの分布 */
+export function distributionOf(students: StudentRow[]): Distribution | null {
+  const byTheme = new Map<string, RecordSummary[]>();
+  for (const s of students) if (s.current) byTheme.set(s.current.theme_id, [...(byTheme.get(s.current.theme_id) ?? []), s.current]);
+  if (byTheme.size === 0) return null;
+  const [themeId, recs] = [...byTheme.entries()].sort((a, b) => b[1].length - a[1].length)[0];
+  const theme = themeById(themeId);
+  const unit = theme ? (variantById(theme, recs.find((r) => r.variant_id)?.variant_id ?? null)?.unit ?? theme.variants[0]?.unit ?? "Hz") : "Hz";
+  const q = QUANTITY[unit];
+  const count = (d: string) => recs.filter((r) => (r.claim?.direction ?? "unknown") === d).length;
+  return {
+    themeId,
+    themeTitle: theme?.title ?? themeId,
+    total: recs.length,
+    bars: [
+      { label: q.choiceFaster, count: count("faster") },
+      { label: "変わらない", count: count("same") },
+      { label: q.choiceSlower, count: count("slower") },
+      { label: "まだ読めない", count: count("unknown") },
+    ],
+  };
+}
+
+const ONLINE_MS = 10 * 60 * 1000;
+
+export function isOnline(row: StudentRow, now = Date.now()): boolean {
+  const t = Date.parse(row.last_seen_at);
+  return Number.isFinite(t) && now - t < ONLINE_MS;
+}
+
+/** 先生が見に行く順: 保留 → 却下 → 予想で止まっている子 */
+export function attentionOf(students: StudentRow[]): StudentRow[] {
+  const rank = (s: StudentRow) => (s.current?.status === "held" ? 0 : s.current?.rejection_title ? 1 : s.current && s.current.stage === "predict" && (s.current.chat_turns > 0 || (s.current.retries.A ?? 0) > 0) ? 2 : 9);
+  return students.filter((s) => rank(s) < 9).sort((a, b) => rank(a) - rank(b) || a.number.localeCompare(b.number));
+}

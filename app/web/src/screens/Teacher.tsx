@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Icon } from "../components/ui";
 import type { Sensor } from "../catalog/themes";
-import { teacher } from "../sample/data";
+import { ClassError, fetchDashboard, type DashboardInfo, type StudentRow } from "../agent/classroom";
 import type { ClassState } from "../store/records";
+import { attentionOf, checkTextOf, claimTextOf, distributionOf, isOnline, stateOf } from "./dashboard";
 import "./teacher.css";
 
 export interface TeacherProps {
@@ -12,6 +13,8 @@ export interface TeacherProps {
   halted: boolean;
   onHalt: (classCode: string | null, pin: string, halted: boolean) => Promise<void>;
   onPolicy: (classCode: string, pin: string, allowedSensors: Sensor[], teacherEnabled: string[]) => Promise<void>;
+  /** テスト用。省略時はサーバから取る */
+  load?: (classCode: string, pin: string) => Promise<DashboardInfo>;
 }
 
 const TOGGLE_SENSORS: { sensor: Sensor; label: string }[] = [
@@ -21,21 +24,56 @@ const TOGGLE_SENSORS: { sensor: Sensor; label: string }[] = [
 ];
 /** 家でやる実験として先生が有効化できるテーマ */
 const HOME_THEMES: { id: string; label: string }[] = [{ id: "pendulum", label: "振り子の周期（家で・私物のスマホ）" }];
+const POLL_MS = 5000;
 
 function errorText(e: unknown): string {
   return e instanceof Error ? e.message : "うまくいきませんでした";
 }
 
-/** 教員画面。学級の許可・有効化、全端末停止（PIN）、生徒ごとのトレース（いまはサンプル）。名前は出さない、番号だけ */
-export function Teacher({ classCode, cls, halted, onHalt, onPolicy }: TeacherProps) {
-  const t = teacher;
+/**
+ * 教員画面（docs/personas.md §3）: 上に予想の向きの分布、下に保留・却下の子、右上に全端末停止。
+ * 生徒の名前は無い。番号だけ。学級コードと教師 PIN で開く。
+ */
+export function Teacher({ classCode, cls, halted, onHalt, onPolicy, load = fetchDashboard }: TeacherProps) {
   const [code, setCode] = useState(classCode);
   const [pin, setPin] = useState("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [dash, setDash] = useState<DashboardInfo | null>(null);
+  const [dashError, setDashError] = useState<string | null>(null);
+  const [selected, setSelected] = useState<string | null>(null);
   const allowed = new Set<Sensor>(cls?.allowedSensors ?? ["accelerometer", "gyroscope", "microphone"]);
-  const enabled = new Set(cls?.teacherEnabled ?? []);
+  const enabled = new Set(dash?.teacher_enabled ?? cls?.teacherEnabled ?? []);
   const live = !!cls && cls.classCode === code.trim().toUpperCase();
+  const unlocked = pin.length > 0 && code.trim().length >= 3;
+
+  // PIN が入っている間、5 秒ごとに学級の様子を取る
+  useEffect(() => {
+    if (!unlocked) {
+      setDash(null);
+      return;
+    }
+    let alive = true;
+    const tick = async () => {
+      try {
+        const d = await load(code, pin);
+        if (alive) {
+          setDash(d);
+          setDashError(null);
+        }
+      } catch (e: unknown) {
+        if (!alive) return;
+        setDashError(errorText(e));
+        if (e instanceof ClassError && e.status === 403) setDash(null);
+      }
+    };
+    void tick();
+    const id = setInterval(() => void tick(), POLL_MS);
+    return () => {
+      alive = false;
+      clearInterval(id);
+    };
+  }, [unlocked, code, pin, load]);
 
   async function run(work: () => Promise<void>, done: string) {
     if (busy) return;
@@ -63,51 +101,84 @@ export function Teacher({ classCode, cls, halted, onHalt, onPolicy }: TeacherPro
     else next.add(id);
     void run(() => onPolicy(code, pin, [...allowed], [...next]), next.has(id) ? "家でやる実験を有効化しました" : "家でやる実験を外しました");
   };
+
+  const students = dash?.students ?? [];
+  const dist = distributionOf(students);
+  const attention = attentionOf(students);
+  const online = students.filter((s) => isOnline(s)).length;
+  const held = students.filter((s) => s.current?.status === "held").length;
+  const rejected = students.filter((s) => !!s.current?.rejection_title).length;
+  const signed = students.filter((s) => s.current?.status === "signed").length;
+  const selectedRow = students.find((s) => s.number === selected) ?? attention[0] ?? null;
+  const isHalted = dash ? dash.halted : halted;
+
   return (
     <main className="teacher">
       <header className="teacher__head">
         <div className="teacher__crumb">
           <h1 className="teacher__brand">PhoneLab</h1>
-          <p className="teacher__where">教員画面 ／ 学級 {code || "—"}{live ? "" : "（この端末は未入場。停止は端末内だけ）"}</p>
+          <p className="teacher__where">教員画面 ／ 学級 {code || "—"}{live ? "" : "（この端末は未入場）"}</p>
         </div>
         <div className="teacher__actions">
           <input className="input tinput" value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} placeholder="学級コード" aria-label="学級コード" />
           <input className="input tinput" value={pin} onChange={(e) => setPin(e.target.value)} placeholder="教師 PIN" aria-label="教師 PIN" type="password" inputMode="numeric" />
           <button
             type="button"
-            className={`tbtn ${halted ? "tbtn--outline" : "tbtn--halt"}`}
+            className={`tbtn ${isHalted ? "tbtn--outline" : "tbtn--halt"}`}
             disabled={busy}
-            aria-pressed={halted}
-            onClick={() => void run(() => onHalt(live ? code : null, pin, !halted), halted ? "停止を解除しました" : "全端末の測定を止めました")}
+            aria-pressed={isHalted}
+            onClick={() => void run(() => onHalt(live || unlocked ? code : null, pin, !isHalted), isHalted ? "停止を解除しました" : "全端末の測定を止めました")}
           >
-            <Icon name="stop" /> {halted ? "停止を解除する" : "全端末の測定を止める"}
+            <Icon name="stop" /> {isHalted ? "停止を解除する" : "全端末の測定を止める"}
           </button>
         </div>
       </header>
       {message && <p className="tmessage" role="status">{message}</p>}
+      {!unlocked && <p className="tmessage">学級コードと教師 PIN を入れると、生徒の進み方が出ます（5 秒ごとに更新）。名前は出ません、番号だけです。</p>}
+      {dashError && <p className="tmessage" role="alert">{dashError}</p>}
 
       <div className="teacher__grid">
         <section className="tpanel">
           <div className="tpanel__head">
+            <h2>予想の分布</h2>
+            <p className="tpanel__hint">{dist ? `${dist.themeTitle}・${dist.total} 人` : "まだ予想がありません"}</p>
+          </div>
+          {dist && (
+            <div className="dist" role="list" aria-label="予想の向きの分布">
+              {dist.bars.map((b) => (
+                <div className="dist__row" role="listitem" key={b.label}>
+                  <p className="dist__label">{b.label}</p>
+                  <div className="dist__track"><div className="dist__bar" style={{ width: `${dist.total ? Math.round((b.count / dist.total) * 100) : 0}%` }} /></div>
+                  <p className="dist__n"><strong>{b.count}</strong> 人</p>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="tpanel__head" style={{ marginTop: 18 }}>
+            <h2>いま見に行く子</h2>
+            <p className="tpanel__hint">保留 → 却下 → 予想で止まっている、の順</p>
+          </div>
+          {attention.length === 0 ? (
+            <p className="tpanel__hint">いまはいません</p>
+          ) : (
+            attention.map((s) => <StudentLine key={s.number} s={s} onSelect={() => setSelected(s.number)} selected={selectedRow?.number === s.number} />)
+          )}
+
+          <div className="tpanel__head" style={{ marginTop: 18 }}>
             <h2>生徒の進み方</h2>
             <p className="tpanel__hint">名前は出さない。番号だけ</p>
           </div>
           <div className="trow trow--head">
             <p>番号</p><p>いまの予想</p><p>状態</p><p>検査</p>
           </div>
-          {t.students.map((s) => (
-            <div className="trow" key={s.no}>
-              <p className="trow__no">{s.no}</p>
-              <p>{s.claim}</p>
-              <span className={`tstate tstate--${s.tone}`}>{s.state}</span>
-              <p className={`trow__check${s.checkStrong ? " trow__check--strong" : ""}`}>{s.check}</p>
-            </div>
-          ))}
+          {students.length === 0 && <p className="tpanel__hint" style={{ padding: "8px 0" }}>{unlocked ? "まだ誰も入場していません" : "—"}</p>}
+          {students.map((s) => <StudentLine key={s.number} s={s} onSelect={() => setSelected(s.number)} selected={selectedRow?.number === s.number} />)}
           <div className="tstats">
-            <p><strong>{t.stats.connected}</strong> 人が接続</p>
-            <p><strong>{t.stats.held}</strong> 件 保留中</p>
-            <p><strong>{t.stats.dangerous}</strong> 件 危険実験の提示</p>
-            <p><strong>{t.stats.leaks}</strong> 件 答えの漏えい</p>
+            <p><strong>{online}</strong> 人が接続（10 分以内）</p>
+            <p><strong>{held}</strong> 件 保留中</p>
+            <p><strong>{rejected}</strong> 件 Policy の却下</p>
+            <p><strong>{signed}</strong> 件 記録済み</p>
           </div>
         </section>
 
@@ -118,7 +189,7 @@ export function Teacher({ classCode, cls, halted, onHalt, onPolicy }: TeacherPro
               {TOGGLE_SENSORS.map((p) => (
                 <div className="perm" key={p.sensor}>
                   <p>{p.label}</p>
-                  <button type="button" role="switch" aria-checked={allowed.has(p.sensor)} disabled={busy} className={`toggle${allowed.has(p.sensor) ? " toggle--on" : ""}`} aria-label={p.label} onClick={() => toggleSensor(p.sensor)}>
+                  <button type="button" role="switch" aria-checked={allowed.has(p.sensor)} disabled={busy || !unlocked} className={`toggle${allowed.has(p.sensor) ? " toggle--on" : ""}`} aria-label={p.label} onClick={() => toggleSensor(p.sensor)}>
                     <span className="toggle__knob" />
                   </button>
                 </div>
@@ -132,33 +203,56 @@ export function Teacher({ classCode, cls, halted, onHalt, onPolicy }: TeacherPro
               {HOME_THEMES.map((h) => (
                 <div className="perm" key={h.id}>
                   <p>{h.label}</p>
-                  <button type="button" role="switch" aria-checked={enabled.has(h.id)} disabled={busy} className={`toggle${enabled.has(h.id) ? " toggle--on" : ""}`} aria-label={h.label} onClick={() => toggleHome(h.id)}>
+                  <button type="button" role="switch" aria-checked={enabled.has(h.id)} disabled={busy || !unlocked} className={`toggle${enabled.has(h.id) ? " toggle--on" : ""}`} aria-label={h.label} onClick={() => toggleHome(h.id)}>
                     <span className="toggle__knob" />
                   </button>
                 </div>
               ))}
             </div>
             <div className="limits">
-              <p>ヒントの上限</p>
-              <span className="limit">{t.limits.hints}回 / 実験</span>
+              <p>ラボ先生に聞ける回数</p>
+              <span className="limit">5 回 / 実験</span>
               <p style={{ marginLeft: 8 }}>測定の上限</p>
-              <span className="limit">{t.limits.seconds}秒</span>
+              <span className="limit">30 秒</span>
             </div>
           </section>
 
           <section className="tpanel tpanel--navy">
-            <h2>{t.trace.student} のトレース</h2>
-            <div className="ttrace">
-              {t.trace.items.map((it, i) => (
-                <div className="ttrace__row" key={i}>
-                  <p className="ttrace__t">{it.t}</p>
-                  <p className={it.strong ? "ttrace__strong" : undefined}>{it.body}</p>
-                </div>
-              ))}
-            </div>
+            <h2>{selectedRow ? `${selectedRow.number} の記録` : "記録"}</h2>
+            {selectedRow?.current ? (
+              <div className="ttrace">
+                {selectedRow.current.events.map((it, i) => (
+                  <div className="ttrace__row" key={i}>
+                    <p className="ttrace__t">{it.t}</p>
+                    <p className={it.k === "却下" || it.k.includes("保留") ? "ttrace__strong" : undefined}>{it.k}: {it.body}</p>
+                  </div>
+                ))}
+                {selectedRow.current.trace_id && (
+                  <p className="ttrace__row" style={{ opacity: 0.7 }}>
+                    <span className="ttrace__t">trace</span>
+                    <span>{selectedRow.current.trace_id.slice(0, 16)}…（Cloud Trace）</span>
+                  </p>
+                )}
+              </div>
+            ) : (
+              <p className="tpanel__hint" style={{ color: "inherit", opacity: 0.8 }}>生徒の行を押すと、その子の記録の流れが出ます</p>
+            )}
           </section>
         </div>
       </div>
     </main>
+  );
+}
+
+function StudentLine({ s, onSelect, selected }: { s: StudentRow; onSelect: () => void; selected: boolean }) {
+  const st = stateOf(s.current);
+  const ck = checkTextOf(s.current);
+  return (
+    <button type="button" className={`trow trow--btn${selected ? " trow--selected" : ""}`} onClick={onSelect}>
+      <p className="trow__no">{s.number}</p>
+      <p>{claimTextOf(s.current)}</p>
+      <span className={`tstate tstate--${st.tone}`}>{st.text}</span>
+      <p className={`trow__check${ck.strong ? " trow__check--strong" : ""}`}>{ck.text}</p>
+    </button>
   );
 }

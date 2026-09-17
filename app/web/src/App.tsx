@@ -18,6 +18,7 @@ import { matchRoute, nav, usePath, type Route } from "./router";
 import { activeRecordForTheme, clearAll, createRecord, recordById, setClassState, setHalted, setSettings, setStudent, useStore, type ClassState, type StudyRecord } from "./store/records";
 import { DEFAULT_CLASS_POLICY, detectCaps, type ClassPolicy, type DeviceCaps } from "./store/status";
 import { ClassError, fetchClass, joinClass, setClassHalt, setClassPolicyOnServer, type ClassInfo } from "./agent/classroom";
+import { startRecordSync } from "./agent/sync";
 import { useMeasurement } from "./measure/useMeasurement";
 import { checksFor, clockLabels, clocksOf, type Features } from "./measure/features";
 import { demoFeatures } from "./measure/demo";
@@ -126,6 +127,8 @@ export function App() {
   const school = cls?.school ?? store.settings.school;
   // 準備・測定中と、止められて待っている間は 2 秒ごと（解除もすぐ届くように）
   useClassPoll(store.student?.classCode ?? null, route.name === "setup" || route.name === "measure" || halted);
+  // 記録の要約を先生の画面へ（学級に入っている端末だけ。生データは送らない）
+  useEffect(() => startRecordSync(), []);
   const markNoMotion = useCallback(() => setCaps((c) => ({ ...c, motionEvents: "no" })), []);
   const m = useMeasurement({ onMotionUnavailable: markNoMotion });
 
