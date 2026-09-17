@@ -60,6 +60,15 @@ export interface PlanInfo {
   why: string;
   traceId: string | null;
 }
+/** 保留のあとのラボ先生の提案（保留ごとに 1 回。measurementIndex でどの保留の分かを持つ） */
+export interface HoldAdvice {
+  measurementIndex: number;
+  action: "retry" | "switch";
+  experimentId: string | null;
+  advice: string;
+  source: "agent" | "policy" | "catalog" | "stub";
+  traceId: string | null;
+}
 export interface Rejection {
   title: string;
   reasons: string[];
@@ -76,6 +85,9 @@ export interface StudyRecord {
   rejection: Rejection | null;
   /** 古い記録には無い */
   plan?: PlanInfo | null;
+  holdAdvice?: HoldAdvice | null;
+  /** ラボ先生に再計画を聞いた回数（サーバの上限 3 回 / 記録） */
+  replanCalls?: number;
   /** ラボ先生（Planner）に聞いた回数。サーバの上限（5 回 / 実験）と同じ数を送る */
   plannerCalls?: number;
   approvedAt: string | null;

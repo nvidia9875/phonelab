@@ -5,12 +5,13 @@
  */
 import type { ChatReply } from "../agent/chat";
 import { requestPlan, type PlanReply } from "../agent/plan";
+import { requestReplan } from "../agent/replan";
 import { checkPolicy, choosePlan, judge, readClaim } from "../agent/stub";
 import { QUANTITY, formatQuantity, type Unit } from "../catalog/quantity";
 import { SENSOR_LABEL, repeatsOf, themeById, variantById, variantsOf, type Theme } from "../catalog/themes";
 import type { LocalCheck } from "../measure/checks";
 import { clocksSummary, measuredValue, type Features } from "../measure/features";
-import { activeRecordForTheme, addEvent, createRecord, currentClassCode, currentNumber, recordById, recordsForTheme, updateRecord, type ChatLog, type Claim, type CondKey, type Direction, type PlanInfo, type Rejection, type StudyRecord } from "../store/records";
+import { activeRecordForTheme, addEvent, createRecord, currentClassCode, currentNumber, recordById, recordsForTheme, updateRecord, type ChatLog, type Claim, type CondKey, type Direction, type HoldAdvice, type PlanInfo, type Rejection, type StudyRecord } from "../store/records";
 
 export const MAX_RETRY = 3;
 const EMPTY_TRIES: Record<CondKey, number> = { A: 0, B: 0 };
@@ -27,9 +28,9 @@ function doneVariantIds(themeId: string): string[] {
  * 保留が続いたとき、同じテーマの別の実験へ切り替える。いまの記録は「途中で停止」として残し（先生の画面にも残る）、
  * 新しい記録を予想から始める。別の実験が無ければ null（トップへ）。9/18 Codex 教室の弱さ 3
  */
-export function switchExperiment(rec: StudyRecord, theme: Theme): StudyRecord | null {
+export function switchExperiment(rec: StudyRecord, theme: Theme, preferredId: string | null = null): StudyRecord | null {
   const stoppedIds = new Set([...doneVariantIds(theme.id), rec.variantId]);
-  const nv = variantsOf(theme).find((v) => !stoppedIds.has(v.id));
+  const nv = variantsOf(theme).find((v) => v.id === preferredId && !stoppedIds.has(v.id)) ?? variantsOf(theme).find((v) => !stoppedIds.has(v.id));
   if (!nv) return null;
   const current = variantById(theme, rec.variantId);
   updateRecord(rec.id, (r) => addEvent({ ...r, status: "stopped" }, "切り替え", `保留が続いたので、この実験はここまで。${nv.title}へ`));
@@ -155,6 +156,38 @@ export async function submitPrediction(rec: StudyRecord, theme: Theme, text: str
     /* つながらない・遅い・返事が崩れている → 端末内で選ぶ。記録に stub と残る */
   }
   return applyDecision(rec, text, decideLocally(rec, theme, text, done), plannerCalls);
+}
+
+/**
+ * 保留の理由を読んで、ラボ先生に次の一手を聞く（結果を見て計画を直す小さなループ）。
+ * 保留ごとに 1 回。つながらなければ null（画面は定型の提案を出す）
+ */
+export async function askHoldAdvice(rec: StudyRecord, theme: Theme): Promise<HoldAdvice | null> {
+  const index = rec.measurements.length - 1;
+  const last = rec.measurements[index];
+  if (!last || last.pass || !rec.variantId) return null;
+  if (rec.holdAdvice && rec.holdAdvice.measurementIndex === index) return rec.holdAdvice;
+  try {
+    const reply = await requestReplan({
+      themeId: theme.id,
+      variantId: rec.variantId,
+      condition: last.condition,
+      holdCodes: last.checks.filter((c) => !c.ok).map((c) => c.code),
+      retries: rec.retries[last.condition],
+      prediction: rec.prediction.text,
+      doneVariantIds: doneVariantIds(theme.id),
+      replanCalls: rec.replanCalls ?? 0,
+    });
+    const traceId = /^0+$/.test(reply.trace_id) ? null : reply.trace_id;
+    const advice: HoldAdvice = { measurementIndex: index, action: reply.action, experimentId: reply.experiment_id, advice: reply.advice, source: reply.source, traceId };
+    updateRecord(rec.id, (r) => {
+      const label = reply.source === "agent" ? "ラボ先生（Gemini）が保留の理由を読んで提案" : "定型の提案";
+      return addEvent({ ...r, holdAdvice: advice, replanCalls: reply.replan_calls }, "再計画", `${reply.action === "switch" ? "別の実験へ" : "同じ実験で直す"}: ${reply.advice}（${label}）`);
+    });
+    return advice;
+  } catch {
+    return null;
+  }
 }
 
 export function planWhy(rec: StudyRecord, theme: Theme): string {

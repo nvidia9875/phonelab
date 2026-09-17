@@ -14,7 +14,15 @@ from google.adk.runners import Runner
 from google.adk.sessions import BaseSessionService, InMemorySessionService
 from google.genai import types
 
-from server.agent.planner import PLANNER_THINKING_LEVEL, PlanOutput, build_planner, parse_plan
+from server.agent.planner import (
+    PLANNER_THINKING_LEVEL,
+    PlanOutput,
+    ReplanOutput,
+    build_planner,
+    build_replanner,
+    parse_plan,
+    parse_replan,
+)
 from server.agent.policy_plugin import (
     ANSWER_LEAK_KEY,
     ANSWER_LOCKED_KEY,
@@ -24,6 +32,9 @@ from server.agent.policy_plugin import (
     PLAN_OFF_CATALOG_KEY,
     PLAN_WHY_REPLACED_KEY,
     PLANNER_CALLS_KEY,
+    REPLAN_CALLS_KEY,
+    REPLAN_CALLS_PER_RECORD,
+    REPLAN_CANDIDATES_KEY,
     SKIP_REASON_KEY,
     PolicyPlugin,
 )
@@ -61,6 +72,15 @@ class PlannerReply:
 
 
 @dataclass(frozen=True)
+class ReplanReply:
+    text: str
+    skipped: bool
+    plan: ReplanOutput | None
+    off_catalog: bool
+    advice_replaced: bool
+
+
+@dataclass(frozen=True)
 class TutorReply:
     text: str
     skipped: bool
@@ -84,6 +104,46 @@ def build_runner(
         agent=build_planner(model, generate_content_config),
         session_service=InMemorySessionService(),
         plugins=[PolicyPlugin(thinking_level=PLANNER_THINKING_LEVEL)],
+    )
+
+
+def build_replan_runner(model: str | BaseLlm) -> Runner:
+    return Runner(
+        app_name=APP_NAME,
+        agent=build_replanner(model),
+        session_service=InMemorySessionService(),
+        plugins=[
+            PolicyPlugin(
+                calls_key=REPLAN_CALLS_KEY,
+                call_limit=REPLAN_CALLS_PER_RECORD,
+                limit_text="この記録で提案できる回数の上限です。定型の提案で進めます。",
+                thinking_level=PLANNER_THINKING_LEVEL,
+            )
+        ],
+    )
+
+
+async def run_replan(
+    runner: Runner,
+    *,
+    prompt: str,
+    replan_calls: int,
+    candidates: list[str],
+    class_halted: bool = False,
+) -> ReplanReply:
+    state: dict[str, object] = {
+        REPLAN_CALLS_KEY: replan_calls,
+        REPLAN_CANDIDATES_KEY: list(candidates),
+        CLASS_HALTED_KEY: class_halted,
+    }
+    outcome = await _run_once(runner, SPIKE_USER_ID, prompt, state)
+    skipped = SKIP_REASON_KEY in outcome.flags or class_halted
+    return ReplanReply(
+        text=outcome.text,
+        skipped=skipped,
+        plan=None if skipped else parse_replan(outcome.text),
+        off_catalog=PLAN_OFF_CATALOG_KEY in outcome.flags,
+        advice_replaced=PLAN_WHY_REPLACED_KEY in outcome.flags,
     )
 
 

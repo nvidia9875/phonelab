@@ -25,14 +25,23 @@ from pydantic import BaseModel, Field, field_validator
 
 from server.agent.answers import MODEL_ANSWERS, phrases_for
 from server.agent.catalog import CATALOG, candidates_for, short_changes
-from server.agent.planner import PlanContext, build_plan_prompt, planner_model
+from server.agent.planner import (
+    PlanContext,
+    ReplanContext,
+    build_plan_prompt,
+    build_replan_prompt,
+    planner_model,
+    template_advice,
+)
 from server.agent.policy import PredictionCheck, check_prediction
-from server.agent.policy_plugin import PLANNER_CALLS_PER_EXPERIMENT
+from server.agent.policy_plugin import PLANNER_CALLS_PER_EXPERIMENT, REPLAN_CALLS_PER_RECORD
 from server.agent.runner import (
     CHAT_TURNS_PER_RECORD,
+    build_replan_runner,
     build_runner,
     build_tutor_runner,
     run_planner,
+    run_replan,
     run_tutor,
 )
 from server.agent.tutor import ChatTurn, TutorContext, build_tutor_prompt, chat_model
@@ -389,6 +398,135 @@ async def plan(
         planner_calls=reply.planner_calls,
         policy_fixed=reply.off_catalog or reply.why_replaced,
         source="agent",
+        trace_id=trace_id,
+    )
+
+
+# ---- Replanner: 保留の理由を読んで次の一手を提案する（結果を見て計画を修正する小さなループ） ----
+
+REPLAN_TIMEOUT_S = 12
+MAX_HOLD_CODES = 10
+HoldAction = Literal["retry", "switch"]
+
+
+class ReplanRequest(BaseModel):
+    theme_id: str
+    variant_id: str
+    condition: Literal["A", "B"]
+    hold_codes: list[Annotated[str, Field(max_length=30)]] = Field(
+        default_factory=list, max_length=MAX_HOLD_CODES
+    )
+    retries: int = Field(default=0, ge=0, le=10)
+    prediction: str = Field(default="", max_length=MAX_PREDICTION_CHARS)
+    done_variant_ids: list[Annotated[str, Field(max_length=60)]] = Field(
+        default_factory=list, max_length=MAX_DONE_IDS
+    )
+    replan_calls: int = Field(default=0, ge=0, le=REPLAN_CALLS_PER_RECORD)
+    class_code: str | None = Field(default=None, max_length=MAX_CLASS_CODE_CHARS)
+    number: str | None = Field(default=None, max_length=8)
+
+    @field_validator("theme_id")
+    @classmethod
+    def known_theme(cls, value: str) -> str:
+        if value not in CATALOG:
+            raise ValueError("カタログにないテーマです")
+        return value
+
+    @field_validator("variant_id")
+    @classmethod
+    def known_variant(cls, value: str) -> str:
+        if not any(v.id == value for t in CATALOG.values() for v in t.variants):
+            raise ValueError("カタログにない実験です")
+        return value
+
+
+class ReplanResponse(BaseModel):
+    action: HoldAction
+    experiment_id: str | None = None
+    advice: str
+    source: PlanSource
+    policy_fixed: bool = False
+    replan_calls: int
+    trace_id: str
+
+
+@lru_cache(maxsize=1)
+def get_replan_runner() -> Runner:
+    return build_replan_runner(planner_model())
+
+
+@app.post("/api/replan")
+async def replan(
+    body: ReplanRequest,
+    request: Request,
+    runner: Annotated[Runner, Depends(get_replan_runner)],
+    limiter: Annotated[SlidingWindowLimiter, Depends(get_plan_limiter)],
+    store: Annotated[ClassStore, Depends(get_class_store)],
+    student_limiter: Annotated[SlidingWindowLimiter, Depends(get_student_limiter)],
+) -> ReplanResponse:
+    """保留の理由（検査コード）を読み、同じ実験で直して測り直すか、別の実験へ切り替えるかを一つ提案する"""
+    check_limits(
+        request, limiter, student_limiter, body.class_code, body.number, "少し時間をおいてから"
+    )
+    halted = await class_is_halted(store, body.class_code)
+    if halted:
+        raise HTTPException(status_code=409, detail=HALTED_DETAIL)
+    others = tuple(
+        v for v in candidates_for(body.theme_id, body.done_variant_ids) if v.id != body.variant_id
+    )
+    prompt = build_replan_prompt(
+        ReplanContext(
+            theme_id=body.theme_id,
+            variant_id=body.variant_id,
+            condition=body.condition,
+            hold_codes=tuple(body.hold_codes),
+            retries=body.retries,
+            prediction=body.prediction,
+            candidates=others,
+        )
+    )
+    with _tracer.start_as_current_span("phonelab.replan") as span:
+        span.set_attribute("phonelab.theme", body.theme_id)
+        span.set_attribute("phonelab.hold_codes", ",".join(body.hold_codes))
+        span.set_attribute("phonelab.retries", body.retries)
+        trace_id = format(span.get_span_context().trace_id, "032x")
+        try:
+            reply = await asyncio.wait_for(
+                run_replan(
+                    runner,
+                    prompt=prompt,
+                    replan_calls=body.replan_calls,
+                    candidates=[v.id for v in others],
+                    class_halted=halted,
+                ),
+                timeout=REPLAN_TIMEOUT_S,
+            )
+        except TimeoutError as exc:
+            raise HTTPException(status_code=504, detail="ラボ先生の返事が遅れています") from exc
+        except Exception as exc:
+            logger.exception("Replanner の実行に失敗 (trace_id=%s)", trace_id)
+            raise HTTPException(status_code=502, detail="ラボ先生につながりませんでした") from exc
+        span.set_attribute("phonelab.skipped", reply.skipped)
+        span.set_attribute("phonelab.plan_readable", reply.plan is not None)
+
+    calls = body.replan_calls if reply.skipped else body.replan_calls + 1
+    if reply.skipped or reply.plan is None:
+        return ReplanResponse(
+            action="retry",
+            advice=template_advice(body.hold_codes),
+            source="catalog",
+            policy_fixed=reply.plan is None and not reply.skipped,
+            replan_calls=calls,
+            trace_id=trace_id,
+        )
+    out = reply.plan
+    return ReplanResponse(
+        action=out.action,
+        experiment_id=out.experiment_id if out.action == "switch" else None,
+        advice=out.advice[:200] or template_advice(body.hold_codes),
+        source="agent",
+        policy_fixed=reply.off_catalog or reply.advice_replaced,
+        replan_calls=calls,
         trace_id=trace_id,
     )
 

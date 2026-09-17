@@ -112,6 +112,10 @@ planner = LlmAgent(
 - 1 リクエスト = 1 セッション。会話履歴は持たない。トークンを固定でき、費用の上限になる
 - 未: 回数をサーバ側の状態（C8 Firestore）で数える（いまは端末が `planner_calls` を送る）、Model Armor（B6）
 
+### 2.2a Replanner（保留のあとの再計画、9/18）
+
+`POST /api/replan`。端末の検査で保留になった理由（検査コード → 日本語）、同じ条件で保留になった回数、生徒の予想、同じテーマの残りの実験を渡し、`ReplanOutput {action: retry | switch, experiment_id, advice}` を返す。`after_model_callback` は候補外への switch を retry に戻し、advice に結果の言葉があれば中立の文に差し替える。読めない・上限・12 秒超は検査コードごとの定型。保留画面は提案と出どころを出し、switch なら「提案どおり切り替える」で同じテーマの別の実験を予想から始める（いまの記録は「途中で停止」として残る）。これが「結果を見て計画を修正する」小さなループ。
+
 ### 2.2b ラボ先生（TutorAgent、ふり返りのチャット）
 
 - `server/agent/tutor.py` の `lab_teacher`（ツールなし）。モデルは `PHONELAB_CHAT_MODEL`（既定 `gemini-3.5-flash-lite`）

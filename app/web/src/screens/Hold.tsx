@@ -1,11 +1,20 @@
+import { useEffect, useState } from "react";
 import { Button, Card, CardBody, CardTitle, Check, Checks, Eyebrow, Foot, FootNote, Screen, Wave } from "../components/ui";
 import type { CheckCode, LocalCheck } from "../measure/checks";
+import type { HoldAdvice } from "../store/records";
 
 export interface HoldProps {
   checks: LocalCheck[];
   conditionLabel: string;
   retry: number;
   maxRetry: number;
+  /** ラボ先生の提案（保留ごとに 1 回聞く。null なら定型） */
+  advice: HoldAdvice | null;
+  /** 提案を取りに行く。戻り値 null は定型で続ける */
+  onLoadAdvice: () => Promise<HoldAdvice | null>;
+  /** 提案どおり別の実験へ（experimentId 付き） */
+  onSwitchTo: (experimentId: string | null) => void;
+  switchTitleOf: (experimentId: string | null) => string | null;
   onRetry: () => void;
   onOther: () => void;
   onChat: () => void;
@@ -29,12 +38,44 @@ const PROPOSAL: Record<CheckCode, string> = {
 };
 
 /** 画面 4: 保留。理由と再測定の提案。上限に達したら別の実験へ */
-export function Hold({ checks, conditionLabel, retry, maxRetry, onRetry, onOther, onChat, onHome }: HoldProps) {
+const SOURCE_NOTE: Record<HoldAdvice["source"], string> = {
+  agent: "ラボ先生（Gemini）が、保留の理由を読んで提案しました。結果は言っていません",
+  catalog: "ラボ先生に聞ける回数の上限のため、定型の提案です",
+  policy: "Policy の判断です",
+  stub: "いまはラボ先生につながらないので、定型の提案です",
+};
+
+export function Hold({ checks, conditionLabel, retry, maxRetry, advice, onLoadAdvice, onSwitchTo, switchTitleOf, onRetry, onOther, onChat, onHome }: HoldProps) {
   const failed = checks.filter((c) => !c.ok);
   const passed = checks.filter((c) => c.ok);
   const first = failed[0];
   const canRetry = retry < maxRetry;
   const gapCheck = failed.find((c) => c.code === "gap");
+  const [loading, setLoading] = useState(!advice);
+  const [current, setCurrent] = useState<HoldAdvice | null>(advice);
+  useEffect(() => {
+    if (advice) {
+      setCurrent(advice);
+      setLoading(false);
+      return;
+    }
+    let alive = true;
+    setLoading(true);
+    void onLoadAdvice().then((a) => {
+      if (!alive) return;
+      setCurrent(a);
+      setLoading(false);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [advice, onLoadAdvice]);
+  const switchTitle = current?.action === "switch" ? switchTitleOf(current.experimentId) : null;
+  const text = !canRetry
+    ? `この端末では${conditionLabel}が ${maxRetry} 回続けて保留になりました。この実験は保留のまま、別の実験へ進みます。`
+    : loading
+      ? "ラボ先生が保留の理由を読んでいます…"
+      : (current?.advice ?? PROPOSAL[first?.code ?? "gap"]);
   return (
     <Screen badge="検査：保留" onHome={onHome}>
       <Card variant="navy">
@@ -60,11 +101,13 @@ export function Hold({ checks, conditionLabel, retry, maxRetry, onRetry, onOther
 
       <Card variant="line">
         <Eyebrow>ラボ先生の提案</Eyebrow>
-        <p style={{ fontSize: 14, lineHeight: 1.6 }}>{canRetry ? PROPOSAL[first?.code ?? "gap"] : `この端末では${conditionLabel}が ${maxRetry} 回続けて保留になりました。この実験は保留のまま、別の実験へ進みます。`}</p>
+        <p style={{ fontSize: 14, lineHeight: 1.6 }}>{text}</p>
+        {canRetry && !loading && <p className="card__hint">{current ? SOURCE_NOTE[current.source] : SOURCE_NOTE.stub}</p>}
       </Card>
 
       <Foot>
-        {canRetry && <Button onClick={onRetry}>同じ条件で再測定する（{retry + 1} / {maxRetry} 回目）</Button>}
+        {canRetry && switchTitle && <Button onClick={() => onSwitchTo(current?.experimentId ?? null)}>提案どおり「{switchTitle}」に切り替える</Button>}
+        {canRetry && <Button secondary={!!switchTitle} onClick={onRetry}>同じ条件で再測定する（{retry + 1} / {maxRetry} 回目）</Button>}
         <Button secondary onClick={onChat}>ラボ先生と、保留になった理由を考える</Button>
         <Button secondary onClick={onOther}>同じテーマの別の実験にする（この記録は保留のまま閉じる）</Button>
         <FootNote>保留は失敗ではありません。データを信じない、という判断です。</FootNote>

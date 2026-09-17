@@ -21,7 +21,7 @@ from google.adk.plugins.base_plugin import BasePlugin
 from google.genai import types
 from opentelemetry import trace
 
-from server.agent.planner import parse_plan
+from server.agent.planner import parse_plan, parse_replan
 
 PLANNER_CALLS_PER_EXPERIMENT = 5  # docs/policy.md 上限表 planner_calls_per_experiment
 PLANNER_TEMPERATURE = 0.2
@@ -39,6 +39,12 @@ LIMIT_REACHED_TEXT = (
 )
 
 PLAN_CANDIDATES_KEY = "plan_candidates"
+REPLAN_CANDIDATES_KEY = "replan_candidates"
+REPLAN_CALLS_KEY = "replan_calls"
+REPLAN_CALLS_PER_RECORD = 3
+NEUTRAL_ADVICE = (
+    "やり方を一つだけ変えて、同じ条件でもう一度測ってみましょう。結果は測って見つけます"
+)
 PLAN_OFF_CATALOG_KEY = "phonelab.plan_off_catalog"
 PLAN_WHY_REPLACED_KEY = "phonelab.plan_why_replaced"
 # 「なぜこの実験か」に混じってはいけない、結果の言葉
@@ -119,6 +125,10 @@ class PolicyPlugin(BasePlugin):
         candidates = [str(c) for c in (state.get(PLAN_CANDIDATES_KEY) or [])]
         if candidates:
             return _check_plan(candidates, llm_response)
+        if state.get(REPLAN_CANDIDATES_KEY) is not None:
+            return _check_replan(
+                [str(c) for c in state.get(REPLAN_CANDIDATES_KEY) or []], llm_response
+            )
         if not state.get(ANSWER_LOCKED_KEY):
             return None
         text = _squash(_response_text(llm_response))
@@ -145,6 +155,29 @@ def _check_plan(candidates: list[str], llm_response: LlmResponse) -> LlmResponse
             flags[PLAN_OFF_CATALOG_KEY] = True
         if RESULT_WORDS.search(plan.why_this):
             plan = plan.model_copy(update={"why_this": NEUTRAL_WHY})
+            flags[PLAN_WHY_REPLACED_KEY] = True
+        span.set_attribute("phonelab.decision", "fixed" if flags else "allow")
+    if not flags:
+        return None
+    return _text_response(plan.model_dump_json(), flags)
+
+
+def _check_replan(candidates: list[str], llm_response: LlmResponse) -> LlmResponse | None:
+    """再計画の出力: 候補外への切り替えは測り直しに、助言に混じった結果の言葉は中立の文に"""
+    plan = parse_replan(_response_text(llm_response))
+    flags: dict[str, object] = {}
+    with _tracer.start_as_current_span("phonelab.policy") as span:
+        span.set_attribute("phonelab.check", "replan_output")
+        if plan is None:
+            span.set_attribute("phonelab.decision", "unreadable")
+            return None
+        if plan.action == "switch" and plan.experiment_id not in candidates:
+            plan = plan.model_copy(update={"action": "retry", "experiment_id": None})
+            flags[PLAN_OFF_CATALOG_KEY] = True
+        if plan.action == "retry" and plan.experiment_id is not None:
+            plan = plan.model_copy(update={"experiment_id": None})
+        if RESULT_WORDS.search(plan.advice):
+            plan = plan.model_copy(update={"advice": NEUTRAL_ADVICE})
             flags[PLAN_WHY_REPLACED_KEY] = True
         span.set_attribute("phonelab.decision", "fixed" if flags else "allow")
     if not flags:

@@ -361,10 +361,15 @@ export function App() {
       const cond = last.condition;
       return (
         <Hold
+          key={`${r.id}-${r.measurements.length}`}
           checks={last.checks}
           conditionLabel={variant!.conditions[cond === "A" ? 0 : 1].label}
           retry={r.retries[cond]}
           maxRetry={flow.MAX_RETRY}
+          advice={r.holdAdvice && r.holdAdvice.measurementIndex === r.measurements.length - 1 ? r.holdAdvice : null}
+          onLoadAdvice={() => flow.askHoldAdvice(r, t)}
+          onSwitchTo={(id) => { const next = flow.switchExperiment(r, t, id); nav(next ? `/x/${t.id}` : "/"); }}
+          switchTitleOf={(id) => variantById(t, id)?.title ?? null}
           onRetry={() => { flow.retry(r, cond); nav(`/x/${t.id}/setup/${cond}`); }}
           onChat={() => nav(`/x/${t.id}/chat`)}
           onOther={() => { const next = flow.switchExperiment(r, t); nav(next ? `/x/${t.id}` : "/"); }}
