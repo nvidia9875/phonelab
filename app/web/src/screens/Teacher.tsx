@@ -13,6 +13,8 @@ export interface TeacherProps {
   halted: boolean;
   onHalt: (classCode: string | null, pin: string, halted: boolean) => Promise<void>;
   onPolicy: (classCode: string, pin: string, allowedSensors: Sensor[], teacherEnabled: string[]) => Promise<void>;
+  /** 番号の合言葉を消す（端末を替えた子）。次の入場で新しい合言葉が出る */
+  onResetStudent: (classCode: string, pin: string, number: string) => Promise<void>;
   /** テスト用。省略時はサーバから取る */
   load?: (classCode: string, pin: string) => Promise<DashboardInfo>;
 }
@@ -34,7 +36,7 @@ function errorText(e: unknown): string {
  * 教員画面（docs/personas.md §3）: 上に予想の向きの分布、下に保留・却下の子、右上に全端末停止。
  * 生徒の名前は無い。番号だけ。学級コードと教師 PIN で開く。
  */
-export function Teacher({ classCode, cls, halted, onHalt, onPolicy, load = fetchDashboard }: TeacherProps) {
+export function Teacher({ classCode, cls, halted, onHalt, onPolicy, onResetStudent, load = fetchDashboard }: TeacherProps) {
   const [code, setCode] = useState(classCode);
   const [pin, setPin] = useState("");
   const [busy, setBusy] = useState(false);
@@ -233,6 +235,9 @@ export function Teacher({ classCode, cls, halted, onHalt, onPolicy, load = fetch
                     <span>{selectedRow.current.trace_id.slice(0, 16)}…（Cloud Trace）</span>
                   </p>
                 )}
+                <button type="button" className="tbtn tbtn--outline tbtn--sm" disabled={busy} onClick={() => void run(() => onResetStudent(code, pin, selectedRow.number), `${selectedRow.number} の合言葉を消しました。次の入場で新しい合言葉が出ます`)}>
+                  この番号の合言葉をリセット（端末を替えた子）
+                </button>
               </div>
             ) : (
               <p className="tpanel__hint" style={{ color: "inherit", opacity: 0.8 }}>生徒の行を押すと、その子の記録の流れが出ます</p>

@@ -59,8 +59,24 @@ async function call(path: string, init: RequestInit = {}): Promise<ClassInfo> {
 
 const enc = (code: string) => encodeURIComponent(code.trim().toUpperCase());
 
-export function joinClass(classCode: string, number: string): Promise<ClassInfo> {
-  return call(`/api/class/${enc(classCode)}/join`, { method: "POST", body: JSON.stringify({ number: number.trim().toUpperCase() }) });
+export interface JoinInfo extends ClassInfo {
+  number: string;
+  /** 最初の入場でだけ返る合言葉。2 台目（家のスマホ）は同じ番号にこれを添える */
+  secret: string | null;
+}
+
+export async function joinClass(classCode: string, number: string, secret?: string | null): Promise<JoinInfo> {
+  const body: Record<string, string> = { number: number.trim().toUpperCase() };
+  if (secret) body.secret = secret.trim().toUpperCase();
+  const info = await call(`/api/class/${enc(classCode)}/join`, { method: "POST", body: JSON.stringify(body) });
+  const j = info as JoinInfo;
+  return { ...j, number: typeof j.number === "string" ? j.number : body.number, secret: typeof j.secret === "string" ? j.secret : null };
+}
+
+/** 先生が番号の合言葉を消す（端末を替えた子のため） */
+export async function resetStudent(classCode: string, pin: string, number: string): Promise<void> {
+  const res = await fetch(`/api/class/${enc(classCode)}/students/${encodeURIComponent(number)}/reset`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pin }) });
+  if (!res.ok) throw new ClassError(`リセットに失敗しました（${res.status}）`, res.status);
 }
 
 export function fetchClass(classCode: string): Promise<ClassInfo> {
@@ -110,8 +126,8 @@ export interface DashboardInfo {
   fetched_at: string;
 }
 
-export async function postRecordSummary(classCode: string, number: string, record: RecordSummary): Promise<void> {
-  const res = await fetch("/api/records", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ class_code: classCode, number, record }) });
+export async function postRecordSummary(classCode: string, number: string, secret: string, record: RecordSummary): Promise<void> {
+  const res = await fetch("/api/records", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ class_code: classCode, number, secret, record }) });
   if (!res.ok) throw new ClassError(`記録の送信に失敗しました（${res.status}）`, res.status);
 }
 

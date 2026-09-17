@@ -28,7 +28,7 @@ describe("startRecordSync", () => {
 
   it("sends a changed record once, only for a device that joined a class", async () => {
     const send = vi.fn(async () => {});
-    setStudent({ classCode: "DEMO-2026", number: "S-04" });
+    setStudent({ classCode: "DEMO-2026", number: "S-04", secret: "ABC234" });
     setClassState({ classCode: "DEMO-2026", school: "jhs", allowedSensors: ["microphone"], teacherEnabled: [], halted: false, updatedAt: "", seenAt: "" });
     const stop = startRecordSync(send);
 
@@ -37,7 +37,7 @@ describe("startRecordSync", () => {
     await vi.advanceTimersByTimeAsync(1000);
 
     expect(send).toHaveBeenCalledTimes(1);
-    expect(send.mock.calls[0]).toMatchObject(["DEMO-2026", "S-04", { record_id: rec.id, prediction: "高くなる" }]);
+    expect(send.mock.calls[0]).toMatchObject(["DEMO-2026", "S-04", "ABC234", { record_id: rec.id, prediction: "高くなる" }]);
     stop();
   });
 

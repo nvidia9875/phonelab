@@ -10,7 +10,7 @@ export interface MeProps {
   caps: DeviceCaps;
   policy: ClassPolicy;
   recordCount: number;
-  /** 学級コードで入場する。失敗したら理由の文を返す */
+  /** 学級コードで入場する。失敗したら理由の文を返す。2 台目は合言葉を添える */
   onSave: (s: Student) => Promise<string | null>;
   onClear: () => void;
   onHome: () => void;
@@ -20,15 +20,17 @@ export interface MeProps {
 export function Me({ student, caps, policy, recordCount, onSave, onClear, onHome }: MeProps) {
   const [classCode, setClassCode] = useState(student?.classCode ?? "");
   const [number, setNumber] = useState(student?.number ?? "");
+  const [secret, setSecret] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const ok = classCode.trim().length >= 3 && number.trim().length >= 1 && !pending;
+  const needsSecret = !!error && error.includes("合言葉");
   async function save() {
     if (!ok) return;
     setPending(true);
     setError(null);
     try {
-      const err = await onSave({ classCode: classCode.trim().toUpperCase(), number: number.trim().toUpperCase() });
+      const err = await onSave({ classCode: classCode.trim().toUpperCase(), number: number.trim().toUpperCase(), secret: secret.trim().toUpperCase() || undefined });
       if (err) setError(err);
     } finally {
       setPending(false);
@@ -42,6 +44,14 @@ export function Me({ student, caps, policy, recordCount, onSave, onClear, onHome
           <input className="input" placeholder="出席番号（例: S-04）" value={number} onChange={(e) => setNumber(e.target.value.toUpperCase())} />
         </div>
         {error && <p className="card__hint" role="alert" style={{ color: "var(--ink)", fontWeight: 700 }}>{error}</p>}
+        {(needsSecret || secret) && (
+          <input className="input" placeholder="合言葉（最初の端末に出た 6 文字）" value={secret} onChange={(e) => setSecret(e.target.value.toUpperCase())} autoCapitalize="characters" aria-label="合言葉" style={{ marginTop: 8 }} />
+        )}
+        {student?.secret && student.classCode === classCode.trim().toUpperCase() && student.number === number.trim().toUpperCase() && (
+          <p className="card__hint" style={{ marginTop: 8 }}>
+            この番号の合言葉: <strong style={{ letterSpacing: "0.12em" }}>{student.secret}</strong>　家のスマホで同じ番号を使うときに入れます。人に見せないでください
+          </p>
+        )}
       </Section>
 
       <Card variant="line">

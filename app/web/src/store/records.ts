@@ -98,6 +98,8 @@ export interface StudyRecord {
 export interface Student {
   classCode: string;
   number: string;
+  /** 番号の合言葉。最初の入場でサーバが一度だけ渡す。記録の送信と説明の解禁に要る */
+  secret?: string;
 }
 
 /** サーバの学級（/api/class）。先生の許可・有効化・停止。入場したときと、測定中のポーリングで更新する */
@@ -189,6 +191,9 @@ export function currentClassCode(): string | null {
 }
 export function currentNumber(): string | null {
   return state.student?.number ?? null;
+}
+export function currentSecret(): string | null {
+  return state.student?.secret ?? null;
 }
 
 /* ---------- 記録 ---------- */

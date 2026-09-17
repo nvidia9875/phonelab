@@ -16,8 +16,8 @@ import { Chat } from "./screens/Chat";
 import { repeatsOf, themeById, variantById, type Theme } from "./catalog/themes";
 import { matchRoute, nav, usePath, type Route } from "./router";
 import { activeRecordForTheme, clearAll, createRecord, recordById, setClassState, setHalted, setSettings, setStudent, useStore, type ClassState, type StudyRecord } from "./store/records";
-import { DEFAULT_CLASS_POLICY, detectCaps, type ClassPolicy, type DeviceCaps } from "./store/status";
-import { ClassError, fetchClass, joinClass, setClassHalt, setClassPolicyOnServer, type ClassInfo } from "./agent/classroom";
+import { DEFAULT_CLASS_POLICY, detectCaps, themeStatus, type ClassPolicy, type DeviceCaps } from "./store/status";
+import { ClassError, fetchClass, joinClass, resetStudent, setClassHalt, setClassPolicyOnServer, type ClassInfo } from "./agent/classroom";
 import { startRecordSync } from "./agent/sync";
 import { useMeasurement } from "./measure/useMeasurement";
 import { checksFor, clockLabels, clocksOf, type Features } from "./measure/features";
@@ -85,11 +85,12 @@ function useClassPoll(classCode: string | null, measuring: boolean): void {
 }
 
 /** 描画中に副作用を起こさないため、リダイレクト先と「描画前にやること」をここで決める */
-function resolve(route: Route, rec: StudyRecord | undefined, theme: Theme | undefined, hasStudent: boolean, halted: boolean): { redirect?: string; need?: "create" | "judge" } {
+function resolve(route: Route, rec: StudyRecord | undefined, theme: Theme | undefined, hasStudent: boolean, halted: boolean, allowed: boolean): { redirect?: string; need?: "create" | "judge" } {
   const inTheme = route.name === "predict" || route.name === "plan" || route.name === "rejected" || route.name === "setup" || route.name === "measure" || route.name === "hold" || route.name === "result" || route.name === "chat";
   if (!inTheme) return {};
   if (!theme) return { redirect: "/" };
   if (!hasStudent) return { redirect: "/me" };
+  if (!allowed) return { redirect: "/" }; // 学級の許可・端末の能力で選べないテーマは URL 直打ちでも開かない（9/18 Codex I2）
   if (halted && (route.name === "setup" || route.name === "measure")) return { redirect: "/halted" };
   if (route.name === "predict") {
     if (!rec) return { need: "create" };
@@ -147,7 +148,8 @@ export function App() {
   const themeId = "theme" in route ? route.theme : null;
   const theme = themeId ? themeById(themeId) : undefined;
   const rec = theme ? activeRecordForTheme(theme.id, store.records) : undefined;
-  const { redirect, need } = resolve(route, rec, theme, !!store.student, halted);
+  const allowed = !theme || themeStatus(theme, store.records, caps, policy, store.settings.testMode).kind !== "unavailable";
+  const { redirect, need } = resolve(route, rec, theme, !!store.student, halted, allowed);
 
   useEffect(() => {
     if (redirect) {
@@ -196,6 +198,7 @@ export function App() {
           onPolicy={async (code, pin, sensors, enabled) => {
             setClassState(classStateFrom(await setClassPolicyOnServer(code, pin, sensors, enabled)));
           }}
+          onResetStudent={(code, pin, number) => resetStudent(code, pin, number)}
         />
       );
     case "halted":
@@ -210,15 +213,20 @@ export function App() {
           policy={policy}
           recordCount={store.records.length}
           onSave={async (s) => {
+            // 同じ端末で同じ番号なら、保存済みの合言葉を使う（入力欄が空のとき）
+            const known = store.student && store.student.classCode === s.classCode && store.student.number === s.number ? store.student.secret : undefined;
+            let secret = s.secret ?? known;
             try {
-              const info = await joinClass(s.classCode, s.number);
+              const info = await joinClass(s.classCode, s.number, secret);
               setClassState(classStateFrom(info));
+              if (info.secret) secret = info.secret; // 最初の入場。合言葉はこの端末に保存する
             } catch (e: unknown) {
-              // テストモードだけ、学級が無くても端末内で進める
-              if (!store.settings.testMode) return e instanceof ClassError ? e.message : "学級につながりませんでした";
+              // テストモードだけ、学級が無くても端末内で進める（404 のときだけ。番号の取り合いは通さない）
+              const notFound = e instanceof ClassError && e.status === 404;
+              if (!(store.settings.testMode && notFound)) return e instanceof ClassError ? e.message : "学級につながりませんでした";
               setClassState(null);
             }
-            setStudent(s);
+            setStudent({ classCode: s.classCode, number: s.number, secret });
             goHome();
             return null;
           }}

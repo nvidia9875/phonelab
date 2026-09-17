@@ -36,7 +36,8 @@ export function startRecordSync(send: typeof postRecordSummary = postRecordSumma
   const timers = new Map<string, ReturnType<typeof setTimeout>>();
   const tick = () => {
     const { student, classState, records } = getState();
-    if (!student || !classState) return;
+    if (!student?.secret || !classState) return; // 合言葉が無い端末は送らない（サーバも受け付けない）
+    const secret = student.secret;
     for (const rec of records) {
       if (sent.get(rec.id) === rec.updatedAt || timers.has(rec.id)) continue;
       timers.set(
@@ -46,7 +47,7 @@ export function startRecordSync(send: typeof postRecordSummary = postRecordSumma
           const latest = getState().records.find((r) => r.id === rec.id);
           if (!latest) return;
           sent.set(latest.id, latest.updatedAt);
-          send(student.classCode, student.number, summarizeRecord(latest)).catch(() => sent.delete(latest.id));
+          send(student.classCode, student.number, secret, summarizeRecord(latest)).catch(() => sent.delete(latest.id));
         }, DEBOUNCE_MS),
       );
     }
