@@ -73,10 +73,23 @@ def new_class(code: str, school: str, pin: str) -> ClassRecord:
     return ClassRecord(policy=policy, pin_hash=hash_pin(pin, salt), salt=salt)
 
 
+# 生徒の端末が送る記録の要約（生データ無し）。教員画面はこれだけを見る。中身の形は routes_class.RecordSummary
+Summary = dict[str, object]
+
+
+@dataclass(frozen=True)
+class StudentRow:
+    number: str
+    last_seen_at: str
+    current: Summary | None
+
+
 class ClassStore(Protocol):
     async def get(self, code: str) -> ClassRecord | None: ...
     async def put(self, record: ClassRecord) -> None: ...
     async def touch_student(self, code: str, number: str) -> None: ...
+    async def put_record(self, code: str, number: str, summary: Summary) -> None: ...
+    async def list_students(self, code: str) -> list[StudentRow]: ...
 
 
 class MemoryClassStore:
@@ -85,6 +98,8 @@ class MemoryClassStore:
     def __init__(self) -> None:
         self._classes: dict[str, ClassRecord] = {}
         self.students: dict[str, dict[str, str]] = {}
+        self._current: dict[str, dict[str, Summary]] = {}
+        self._history: dict[str, dict[str, dict[str, Summary]]] = {}
 
     def seed(self, record: ClassRecord) -> None:
         self._classes[record.policy.class_code] = record
@@ -97,6 +112,23 @@ class MemoryClassStore:
 
     async def touch_student(self, code: str, number: str) -> None:
         self.students.setdefault(normalize_code(code), {})[number] = now_iso()
+
+    async def put_record(self, code: str, number: str, summary: Summary) -> None:
+        code = normalize_code(code)
+        self._current.setdefault(code, {})[number] = summary
+        self._history.setdefault(code, {}).setdefault(number, {})[str(summary["record_id"])] = (
+            summary
+        )
+        self.students.setdefault(code, {})[number] = now_iso()
+
+    async def list_students(self, code: str) -> list[StudentRow]:
+        code = normalize_code(code)
+        seen = self.students.get(code, {})
+        current = self._current.get(code, {})
+        return sorted(
+            (StudentRow(number=n, last_seen_at=t, current=current.get(n)) for n, t in seen.items()),
+            key=lambda r: r.number,
+        )
 
 
 class FirestoreClassStore:
@@ -145,6 +177,24 @@ class FirestoreClassStore:
             .document(number)
             .set({"last_seen_at": now_iso()}, merge=True)
         )
+
+    async def put_record(self, code: str, number: str, summary: Summary) -> None:
+        student = self._doc(code).collection("students").document(number)
+        await student.set({"last_seen_at": now_iso(), "current": summary}, merge=True)
+        await student.collection("records").document(str(summary["record_id"])).set(summary)
+
+    async def list_students(self, code: str) -> list[StudentRow]:
+        rows: list[StudentRow] = []
+        async for snap in self._doc(code).collection("students").stream():
+            data = snap.to_dict() or {}
+            rows.append(
+                StudentRow(
+                    number=snap.id,
+                    last_seen_at=str(data.get("last_seen_at", "")),
+                    current=data.get("current"),
+                )
+            )
+        return sorted(rows, key=lambda r: r.number)
 
 
 def store_from_env() -> ClassStore:

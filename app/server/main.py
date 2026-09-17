@@ -38,7 +38,7 @@ from server.agent.runner import (
 from server.agent.tutor import ChatTurn, TutorContext, build_tutor_prompt, chat_model
 from server.classroom import ClassStore, normalize_code, seed_demo
 from server.ratelimit import SlidingWindowLimiter
-from server.routes_class import get_class_store
+from server.routes_class import get_class_store, records_router
 from server.routes_class import router as class_router
 from server.telemetry import disable_content_capture, setup_cloud_tracing
 
@@ -65,6 +65,7 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 
 app = FastAPI(title="PhoneLab", version="0.0.1", lifespan=lifespan)
 app.include_router(class_router)
+app.include_router(records_router)
 
 MAX_CLASS_CODE_CHARS = 20
 HALTED_DETAIL = "先生が学級の測定を止めています。解除されるまで待ってください"

@@ -134,3 +134,86 @@ def test_seeds_the_demo_class_from_the_environment(monkeypatch):
     assert rec.policy.school == "jhs"
     assert rec.verify("9876") is True
     assert rec.verify("0000") is False
+
+
+def summary(**overrides):
+    base = {
+        "record_id": "7641",
+        "theme_id": "sound",
+        "variant_id": "sound_pluck_strength",
+        "status": "held",
+        "stage": "measure_A",
+        "prediction": "強くはじくと高くなると思う",
+        "claim": {"variable": "strength", "direction": "faster"},
+        "hold_codes": ["low_snr"],
+        "retries": {"A": 1, "B": 0},
+        "result": None,
+        "plan_source": "agent",
+        "trace_id": "a" * 32,
+        "rejection_title": None,
+        "chat_turns": 0,
+        "events": [{"t": "10:12", "k": "予想", "body": "強くはじくと高くなると思う"}],
+        "updated_at": "2026-09-17T01:00:00Z",
+    }
+    return {**base, **overrides}
+
+
+def test_a_device_posts_its_record_summary_and_the_teacher_sees_it_on_the_dashboard(client):
+    res = client.post(
+        "/api/records", json={"class_code": "DEMO-2026", "number": "S-04", "record": summary()}
+    )
+    assert res.status_code == 200
+
+    dash = client.post("/api/class/DEMO-2026/dashboard", json={"pin": PIN})
+
+    assert dash.status_code == 200
+    data = dash.json()
+    assert data["halted"] is False
+    rows = {s["number"]: s for s in data["students"]}
+    assert rows["S-04"]["current"]["status"] == "held"
+    assert rows["S-04"]["current"]["hold_codes"] == ["low_snr"]
+    assert rows["S-04"]["current"]["claim"] == {"variable": "strength", "direction": "faster"}
+
+
+def test_the_newest_summary_replaces_the_current_one(client):
+    client.post(
+        "/api/records", json={"class_code": "DEMO-2026", "number": "S-04", "record": summary()}
+    )
+    client.post(
+        "/api/records",
+        json={
+            "class_code": "DEMO-2026",
+            "number": "S-04",
+            "record": summary(status="judged", stage="result", hold_codes=[]),
+        },
+    )
+
+    rows = client.post("/api/class/DEMO-2026/dashboard", json={"pin": PIN}).json()["students"]
+
+    assert [s["current"]["status"] for s in rows if s["number"] == "S-04"] == ["judged"]
+
+
+def test_the_dashboard_needs_the_pin(client):
+    assert client.post("/api/class/DEMO-2026/dashboard", json={"pin": "0000"}).status_code == 403
+
+
+def test_a_record_for_an_unknown_class_is_refused(client):
+    res = client.post(
+        "/api/records", json={"class_code": "NOPE-1", "number": "S-04", "record": summary()}
+    )
+
+    assert res.status_code == 404
+
+
+def test_a_record_summary_cannot_carry_raw_data(client):
+    """生データ（波形など）は要約に入らない。知らない項目は落ちる、大きすぎる文は 422"""
+    res = client.post(
+        "/api/records",
+        json={
+            "class_code": "DEMO-2026",
+            "number": "S-04",
+            "record": summary(prediction="あ" * 501),
+        },
+    )
+
+    assert res.status_code == 422
