@@ -26,6 +26,10 @@ class CatalogTheme:
     question: str
     unit: str
     variants: tuple[CatalogVariant, ...]
+    # 学級の許可と突き合わせるセンサー（web の themes.ts と同じ）
+    sensors: tuple[str, ...] = ()
+    # 先生が有効化して家でやる実験（web の home: true）
+    home: bool = False
 
 
 # 予想の向き（faster / slower / same）を、測る量ごとの言葉にする。web の QUANTITY と同じ向き
@@ -44,6 +48,7 @@ CATALOG: dict[str, CatalogTheme] = {
         id="energy",
         school="jhs",
         title="振り子とエネルギー",
+        sensors=("accelerometer", "gyroscope"),
         question="高さや重さを変えたら、いちばん下を通る速さはどうなりそう？",
         unit="m/s",
         variants=(
@@ -67,6 +72,7 @@ CATALOG: dict[str, CatalogTheme] = {
         id="sound",
         school="jhs",
         title="音の高さ",
+        sensors=("microphone",),
         question="強さや長さを変えたら、音の高さはどうなりそう？",
         unit="Hz",
         variants=(
@@ -90,6 +96,7 @@ CATALOG: dict[str, CatalogTheme] = {
         id="bottle",
         school="jhs",
         title="ペットボトルの音",
+        sensors=("microphone",),
         question="水を増やすと、音は高くなる？低くなる？",
         unit="Hz",
         variants=(
@@ -106,6 +113,8 @@ CATALOG: dict[str, CatalogTheme] = {
         id="pendulum",
         school="hs",
         title="振り子の周期",
+        sensors=("accelerometer", "gyroscope"),
+        home=True,
         question="重さや糸の長さを変えたら、周期はどうなりそう？",
         unit="s",
         variants=(

@@ -67,6 +67,28 @@ def normalize_code(code: str) -> str:
     return code.strip().upper()
 
 
+SECRET_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"  # 0/O/1/I を除く
+
+
+def new_secret() -> str:
+    """生徒の合言葉。番号を最初に使った端末に一度だけ見せ、家の端末でも同じ番号を使うときに入れる"""
+    return "".join(secrets.choice(SECRET_ALPHABET) for _ in range(6))
+
+
+@dataclass(frozen=True)
+class StudentAuth:
+    secret_hash: str
+    salt: str
+
+    def verify(self, secret: str) -> bool:
+        return hmac.compare_digest(hash_pin(secret.strip().upper(), self.salt), self.secret_hash)
+
+
+def auth_for(secret: str) -> StudentAuth:
+    salt = secrets.token_hex(8)
+    return StudentAuth(secret_hash=hash_pin(secret.strip().upper(), salt), salt=salt)
+
+
 def new_class(code: str, school: str, pin: str) -> ClassRecord:
     salt = secrets.token_hex(8)
     policy = ClassPolicy(class_code=normalize_code(code), school=school, updated_at=now_iso())
@@ -88,7 +110,10 @@ class ClassStore(Protocol):
     async def get(self, code: str) -> ClassRecord | None: ...
     async def put(self, record: ClassRecord) -> None: ...
     async def touch_student(self, code: str, number: str) -> None: ...
+    async def get_student_auth(self, code: str, number: str) -> StudentAuth | None: ...
+    async def set_student_auth(self, code: str, number: str, auth: StudentAuth | None) -> None: ...
     async def put_record(self, code: str, number: str, summary: Summary) -> None: ...
+    async def get_current(self, code: str, number: str) -> Summary | None: ...
     async def list_students(self, code: str) -> list[StudentRow]: ...
 
 
@@ -100,6 +125,7 @@ class MemoryClassStore:
         self.students: dict[str, dict[str, str]] = {}
         self._current: dict[str, dict[str, Summary]] = {}
         self._history: dict[str, dict[str, dict[str, Summary]]] = {}
+        self._auth: dict[str, dict[str, StudentAuth]] = {}
 
     def seed(self, record: ClassRecord) -> None:
         self._classes[record.policy.class_code] = record
@@ -120,6 +146,19 @@ class MemoryClassStore:
             summary
         )
         self.students.setdefault(code, {})[number] = now_iso()
+
+    async def get_student_auth(self, code: str, number: str) -> StudentAuth | None:
+        return self._auth.get(normalize_code(code), {}).get(number)
+
+    async def set_student_auth(self, code: str, number: str, auth: StudentAuth | None) -> None:
+        bucket = self._auth.setdefault(normalize_code(code), {})
+        if auth is None:
+            bucket.pop(number, None)
+        else:
+            bucket[number] = auth
+
+    async def get_current(self, code: str, number: str) -> Summary | None:
+        return self._current.get(normalize_code(code), {}).get(number)
 
     async def list_students(self, code: str) -> list[StudentRow]:
         code = normalize_code(code)
@@ -182,6 +221,28 @@ class FirestoreClassStore:
         student = self._doc(code).collection("students").document(number)
         await student.set({"last_seen_at": now_iso(), "current": summary}, merge=True)
         await student.collection("records").document(str(summary["record_id"])).set(summary)
+
+    async def get_student_auth(self, code: str, number: str) -> StudentAuth | None:
+        snap = await self._doc(code).collection("students").document(number).get()
+        data = snap.to_dict() if snap.exists else None
+        if not data or not data.get("secret_hash"):
+            return None
+        return StudentAuth(
+            secret_hash=str(data["secret_hash"]), salt=str(data.get("secret_salt", ""))
+        )
+
+    async def set_student_auth(self, code: str, number: str, auth: StudentAuth | None) -> None:
+        student = self._doc(code).collection("students").document(number)
+        fields = {
+            "secret_hash": auth.secret_hash if auth else None,
+            "secret_salt": auth.salt if auth else None,
+        }
+        await student.set({**fields, "last_seen_at": now_iso()}, merge=True)
+
+    async def get_current(self, code: str, number: str) -> Summary | None:
+        snap = await self._doc(code).collection("students").document(number).get()
+        data = snap.to_dict() if snap.exists else None
+        return data.get("current") if data else None
 
     async def list_students(self, code: str) -> list[StudentRow]:
         rows: list[StudentRow] = []

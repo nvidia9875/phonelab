@@ -45,6 +45,35 @@ def test_a_student_joins_with_the_class_code_and_gets_the_class_policy(client):
     assert data["halted"] is False
     assert set(data["allowed_sensors"]) == {"accelerometer", "gyroscope", "microphone"}
     assert "pin" not in json.dumps(data)
+    assert len(data["secret"]) == 6  # 最初の入場でだけ合言葉が出る
+
+
+def join(client, number="S-04", secret=None):
+    body = {"number": number}
+    if secret:
+        body["secret"] = secret
+    return client.post("/api/class/DEMO-2026/join", json=body)
+
+
+def test_a_second_device_needs_the_secret_to_use_the_same_number(client):
+    """他人の番号を横取りできない（9/18 Codex F4）。家の端末は合言葉で同じ番号に入る"""
+    secret = join(client).json()["secret"]
+
+    assert join(client).status_code == 409
+    assert join(client, secret="ZZZZZZ").status_code == 403
+    again = join(client, secret=secret)
+    assert again.status_code == 200
+    assert again.json()["secret"] is None  # 二度は見せない
+
+
+def test_the_teacher_can_reset_a_number_so_the_student_gets_a_new_secret(client):
+    first = join(client).json()["secret"]
+
+    reset = client.post("/api/class/DEMO-2026/students/S-04/reset", json={"pin": PIN})
+    assert reset.status_code == 200
+    second = join(client).json()["secret"]
+
+    assert second is not None and second != first
 
 
 def test_an_unknown_class_code_is_refused(client):
@@ -161,10 +190,14 @@ def summary(**overrides):
     return {**base, **overrides}
 
 
+def post_record(client, rec, number="S-04", secret=None):
+    secret = secret or join(client, number).json()["secret"]
+    body = {"class_code": "DEMO-2026", "number": number, "secret": secret, "record": rec}
+    return client.post("/api/records", json=body), secret
+
+
 def test_a_device_posts_its_record_summary_and_the_teacher_sees_it_on_the_dashboard(client):
-    res = client.post(
-        "/api/records", json={"class_code": "DEMO-2026", "number": "S-04", "record": summary()}
-    )
+    res, _ = post_record(client, summary())
     assert res.status_code == 200
 
     dash = client.post("/api/class/DEMO-2026/dashboard", json={"pin": PIN})
@@ -179,17 +212,8 @@ def test_a_device_posts_its_record_summary_and_the_teacher_sees_it_on_the_dashbo
 
 
 def test_the_newest_summary_replaces_the_current_one(client):
-    client.post(
-        "/api/records", json={"class_code": "DEMO-2026", "number": "S-04", "record": summary()}
-    )
-    client.post(
-        "/api/records",
-        json={
-            "class_code": "DEMO-2026",
-            "number": "S-04",
-            "record": summary(status="judged", stage="result", hold_codes=[]),
-        },
-    )
+    _, secret = post_record(client, summary())
+    post_record(client, summary(status="judged", stage="result", hold_codes=[]), secret=secret)
 
     rows = client.post("/api/class/DEMO-2026/dashboard", json={"pin": PIN}).json()["students"]
 
@@ -201,25 +225,48 @@ def test_the_dashboard_needs_the_pin(client):
 
 
 def test_a_record_for_an_unknown_class_is_refused(client):
-    res = client.post(
-        "/api/records", json={"class_code": "NOPE-1", "number": "S-04", "record": summary()}
-    )
+    body = {"class_code": "NOPE-1", "number": "S-04", "secret": "ABCDEF", "record": summary()}
+    assert client.post("/api/records", json=body).status_code == 404
 
-    assert res.status_code == 404
+
+def test_a_record_for_someone_elses_number_is_refused(client):
+    """他人の番号に記録を書けない（9/18 Codex F4）"""
+    join(client, "S-11")  # S-11 は別の端末が使っている
+    body = {"class_code": "DEMO-2026", "number": "S-11", "secret": "ABCDEF", "record": summary()}
+    assert client.post("/api/records", json=body).status_code == 403
 
 
 def test_a_record_summary_cannot_carry_raw_data(client):
     """生データ（波形など）は要約に入らない。知らない項目は落ちる、大きすぎる文は 422"""
+    res, _ = post_record(client, summary(prediction="あ" * 501))
+
+    assert res.status_code == 422
+
+
+def test_the_planner_refuses_a_theme_whose_sensor_the_class_does_not_allow(client, fake_llm):
+    """学級の許可は画面だけでなく Planner の入口でも効く（9/18 Codex I2）"""
+    client.put(
+        "/api/class/DEMO-2026/policy",
+        json={"pin": PIN, "allowed_sensors": ["microphone"], "teacher_enabled": []},
+    )
+
     res = client.post(
-        "/api/records",
+        "/api/plan",
         json={
+            "theme_id": "energy",
+            "school": "jhs",
+            "text": "高いほど速くなると思う",
+            "done_variant_ids": [],
+            "previous_question_back": None,
+            "planner_calls": 0,
             "class_code": "DEMO-2026",
-            "number": "S-04",
-            "record": summary(prediction="あ" * 501),
         },
     )
 
-    assert res.status_code == 422
+    assert res.status_code == 200
+    assert res.json()["kind"] == "hint"
+    assert "許可" in res.json()["question_back"]
+    assert fake_llm.requests == []
 
 
 def test_correct_pins_are_not_counted_against_the_attempt_limit(store, fake_llm):

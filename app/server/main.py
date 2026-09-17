@@ -26,7 +26,7 @@ from pydantic import BaseModel, Field, field_validator
 from server.agent.answers import MODEL_ANSWERS, phrases_for
 from server.agent.catalog import CATALOG, candidates_for, short_changes
 from server.agent.planner import PlanContext, build_plan_prompt, planner_model
-from server.agent.policy import check_prediction
+from server.agent.policy import PredictionCheck, check_prediction
 from server.agent.policy_plugin import PLANNER_CALLS_PER_EXPERIMENT
 from server.agent.runner import (
     CHAT_TURNS_PER_RECORD,
@@ -38,7 +38,7 @@ from server.agent.runner import (
 from server.agent.tutor import ChatTurn, TutorContext, build_tutor_prompt, chat_model
 from server.classroom import ClassStore, normalize_code, seed_demo
 from server.ratelimit import SlidingWindowLimiter
-from server.routes_class import get_class_store, records_router
+from server.routes_class import get_class_store, records_router, verify_student
 from server.routes_class import router as class_router
 from server.telemetry import disable_content_capture, setup_cloud_tracing
 
@@ -69,6 +69,37 @@ app.include_router(records_router)
 
 MAX_CLASS_CODE_CHARS = 20
 HALTED_DETAIL = "先生が学級の測定を止めています。解除されるまで待ってください"
+
+
+async def class_denies_theme(store: ClassStore, code: str | None, theme) -> str | None:
+    """学級の許可を、画面だけでなく Planner の入口でも検査する（9/18 Codex I2）"""
+    if not code:
+        return None
+    record = await store.get(normalize_code(code))
+    if record is None:
+        return None
+    policy = record.policy
+    if any(sensor not in policy.allowed_sensors for sensor in theme.sensors):
+        return "この実験で使うセンサーは、学級で許可されていません。先生に聞くか、別の実験を選んでください"
+    if theme.home and theme.id not in policy.teacher_enabled:
+        return "この実験は、先生が有効化したときだけできます"
+    return None
+
+
+async def judged_on_server(
+    store: ClassStore, code: str, number: str | None, secret: str | None, record_id: str | None
+) -> bool:
+    """この記録は、この生徒のもので、判定が出ているか。要約が届いていなければ開かない（9/18 Codex I3）"""
+    if not number or not record_id:
+        return False
+    await verify_student(store, normalize_code(code), number.strip().upper(), secret)
+    current = await store.get_current(normalize_code(code), number.strip().upper())
+    return bool(
+        current
+        and str(current.get("record_id")) == record_id
+        and current.get("status") in ("judged", "signed")
+        and current.get("result")
+    )
 
 
 async def class_is_halted(store: ClassStore, code: str | None) -> bool:
@@ -250,7 +281,9 @@ async def plan(
 
     candidates = candidates_for(body.theme_id, body.done_variant_ids)
     first = candidates[0]
-    variables = {v.variable for v in CATALOG[body.theme_id].variants}
+    theme = CATALOG[body.theme_id]
+    variables = {v.variable for v in theme.variants}
+    denied = await class_denies_theme(store, body.class_code, theme)
 
     with _tracer.start_as_current_span("phonelab.plan") as span:
         span.set_attribute("phonelab.theme", body.theme_id)
@@ -259,7 +292,9 @@ async def plan(
         trace_id = format(span.get_span_context().trace_id, "032x")
 
         check = check_prediction(body.text)
-        span.set_attribute("phonelab.policy", check.kind)
+        if denied:
+            check = PredictionCheck(kind="hint", message=denied)
+        span.set_attribute("phonelab.policy", "class_policy" if denied else check.kind)
         if check.kind == "hint":
             return PlanResponse(
                 kind="hint",
@@ -400,6 +435,9 @@ class ChatRequest(BaseModel):
     reveal: bool = False
     class_code: str | None = Field(default=None, max_length=MAX_CLASS_CODE_CHARS)
     number: str | None = Field(default=None, max_length=8)
+    # 学級に入っている端末は、合言葉と記録 id を付ける。説明の解禁はサーバの記録の状態で決める
+    secret: str | None = Field(default=None, max_length=6)
+    record_id: str | None = Field(default=None, max_length=12)
 
     @field_validator("variant_id")
     @classmethod
@@ -456,6 +494,11 @@ async def chat(
         and body.situation != "hold"
         and len(body.student_thinking.strip()) >= MIN_THINKING_CHARS
     )
+    if body.class_code and revealed:
+        # 学級に入っている端末は、端末の申告でなくサーバが持つ記録の要約で決める（9/18 Codex I3）
+        revealed = await judged_on_server(
+            store, body.class_code, body.number, body.secret, body.record_id
+        )
     context = TutorContext(
         school=body.school,
         theme_title=body.theme_title,

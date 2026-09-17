@@ -18,6 +18,8 @@ from server.classroom import (
     ClassRecord,
     ClassStore,
     StudentRow,
+    auth_for,
+    new_secret,
     normalize_code,
     store_from_env,
     updated,
@@ -38,8 +40,29 @@ NOT_FOUND = "学級コードが見つかりません。先生に確認してく�
 Sensor = Literal["accelerometer", "gyroscope", "microphone", "camera"]
 
 
+SECRET_RE = r"^[A-Za-z0-9]{6}$"
+NUMBER_TAKEN = "この番号はもう別の端末で使われています。その端末に出た合言葉を入れるか、先生に番号のリセットを頼んでください"
+BAD_SECRET = "合言葉が合いません"
+
+
 class JoinRequest(BaseModel):
     number: str = Field(pattern=NUMBER_RE)
+    # 家の端末など 2 台目から同じ番号で入るときの合言葉。最初の入場では無し
+    secret: str | None = Field(default=None, pattern=SECRET_RE)
+
+
+class JoinOut(BaseModel):
+    class_code: str
+    school: str
+    allowed_sensors: list[str]
+    teacher_enabled: list[str]
+    halted: bool
+    max_seconds: int
+    hints_per_experiment: int
+    updated_at: str
+    number: str
+    # 最初の入場でだけ返す。端末はこれを保存し、家の端末で同じ番号を使うときに見せる
+    secret: str | None = None
 
 
 class HaltRequest(BaseModel):
@@ -98,6 +121,7 @@ class RecordSummary(BaseModel):
 class RecordPost(BaseModel):
     class_code: str = Field(max_length=20)
     number: str = Field(pattern=NUMBER_RE)
+    secret: str = Field(pattern=SECRET_RE)
     record: RecordSummary
 
 
@@ -191,13 +215,50 @@ async def class_status(
 async def join(
     code: str,
     body: JoinRequest,
+    request: Request,
     response: Response,
     store: Annotated[ClassStore, Depends(get_class_store)],
-) -> ClassOut:
-    """学級コードと番号で入場。名前は受け取らない"""
+    limiter: Annotated[SlidingWindowLimiter, Depends(get_pin_limiter)],
+) -> JoinOut:
+    """学級コードと番号で入場。名前は受け取らない。
+    番号を最初に使った端末に合言葉を一度だけ渡し、2 台目からは合言葉が要る（他人の番号に記録を書けないように）"""
     record = await _load(store, code)
-    await store.touch_student(record.policy.class_code, body.number.upper())
-    return _out(record.policy, response)
+    number = body.number.upper()
+    existing = await store.get_student_auth(record.policy.class_code, number)
+    issued: str | None = None
+    if existing is None:
+        issued = new_secret()
+        await store.set_student_auth(record.policy.class_code, number, auth_for(issued))
+    elif body.secret is None:
+        raise HTTPException(status_code=409, detail=NUMBER_TAKEN)
+    elif not existing.verify(body.secret):
+        if not limiter.allow(f"{record.policy.class_code}|{number}|{_client_ip(request)}"):
+            raise HTTPException(
+                status_code=429, detail="合言葉の入力が多すぎます。少し待ってください"
+            )
+        raise HTTPException(status_code=403, detail=BAD_SECRET)
+    await store.touch_student(record.policy.class_code, number)
+    response.headers["Cache-Control"] = "no-store"
+    return JoinOut(**record.policy.to_dict(), number=number, secret=issued)  # type: ignore[arg-type]
+
+
+@router.post("/{code}/students/{number}/reset")
+async def reset_student(
+    code: str,
+    number: str,
+    body: DashboardRequest,
+    request: Request,
+    response: Response,
+    store: Annotated[ClassStore, Depends(get_class_store)],
+    limiter: Annotated[SlidingWindowLimiter, Depends(get_pin_limiter)],
+) -> dict[str, bool]:
+    """先生が番号の合言葉を消す（端末を替えた・合言葉をなくした子のため）。次の入場で新しい合言葉が出る"""
+    record = await _teacher(store, limiter, request, code, body.pin)
+    if not re.match(NUMBER_RE, number):
+        raise HTTPException(status_code=404, detail="番号の形が違います")
+    await store.set_student_auth(record.policy.class_code, number.upper(), None)
+    response.headers["Cache-Control"] = "no-store"
+    return {"ok": True}
 
 
 @router.post("/{code}/halt")
@@ -288,6 +349,15 @@ async def post_record(
     if not limiter.allow(_client_ip(request)):
         raise HTTPException(status_code=429, detail="送信が多すぎます")
     record = await _load(store, body.class_code)
+    number = body.number.upper()
+    await verify_student(store, record.policy.class_code, number, body.secret)
     summary = body.record.model_dump()
-    await store.put_record(record.policy.class_code, body.number.upper(), summary)
+    await store.put_record(record.policy.class_code, number, summary)
     return {"ok": True}
+
+
+async def verify_student(store: ClassStore, code: str, number: str, secret: str | None) -> None:
+    """記録の書き込みと説明の解禁は、番号の合言葉を持つ端末だけ（9/18 Codex F4）"""
+    auth = await store.get_student_auth(code, number)
+    if auth is None or not secret or not auth.verify(secret):
+        raise HTTPException(status_code=403, detail=BAD_SECRET)

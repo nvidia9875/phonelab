@@ -11,8 +11,10 @@ import server.main as main_module
 from server.agent.answers import MODEL_ANSWERS
 from server.agent.policy_plugin import LEAK_FALLBACK_TEXT
 from server.agent.runner import build_tutor_runner
+from server.classroom import MemoryClassStore, new_class
 from server.main import app, get_chat_limiter, get_tutor_runner
 from server.ratelimit import SlidingWindowLimiter
+from server.routes_class import get_class_store
 from tests.conftest import FakeLlm
 
 THINKING = "強くはじくと大きくなるだけで、震える速さは同じだからだと思う"
@@ -199,3 +201,84 @@ def test_does_not_serve_files_outside_the_web_folder(client):
     assert res.status_code in (200, 404)
     assert "leak_phrases" not in res.text
     assert "MODEL_ANSWERS" not in res.text
+
+
+def class_summary(status="held"):
+    judged = status == "judged"
+    return {
+        "record_id": "7641",
+        "theme_id": "sound",
+        "variant_id": "sound_pluck_strength",
+        "status": status,
+        "stage": "result" if judged else "measure_A",
+        "prediction": "強くはじくと高くなると思う",
+        "claim": {"variable": "strength", "direction": "faster"},
+        "hold_codes": [] if judged else ["low_snr"],
+        "retries": {"A": 0, "B": 0},
+        "result": {"observed": "same", "consistent": False, "statement": "変わらなかった"}
+        if judged
+        else None,
+        "plan_source": "agent",
+        "trace_id": None,
+        "rejection_title": None,
+        "chat_turns": 0,
+        "events": [],
+        "updated_at": "2026-09-18T00:00:00Z",
+    }
+
+
+@pytest.fixture
+def class_client(fake_llm):
+    store = MemoryClassStore()
+    store.seed(new_class("DEMO-2026", "jhs", "1234"))
+    app.dependency_overrides[get_class_store] = lambda: store
+    app.dependency_overrides[get_tutor_runner] = lambda: build_tutor_runner(fake_llm)
+    app.dependency_overrides[get_chat_limiter] = lambda: SlidingWindowLimiter(
+        limit=100, window_s=60
+    )
+    client = TestClient(app)
+    secret = client.post("/api/class/DEMO-2026/join", json={"number": "S-04"}).json()["secret"]
+    yield client, secret
+    app.dependency_overrides.clear()
+
+
+def send_summary(client, secret, status):
+    body = {
+        "class_code": "DEMO-2026",
+        "number": "S-04",
+        "secret": secret,
+        "record": class_summary(status),
+    }
+    assert client.post("/api/records", json=body).status_code == 200
+
+
+def test_in_a_class_the_explanation_opens_only_when_the_server_knows_the_record_is_judged(
+    class_client, fake_llm
+):
+    """端末の申告（situation・reveal）でなく、サーバに届いた要約の状態で決める（9/18 Codex I3）"""
+    client, secret = class_client
+    ident = {"class_code": "DEMO-2026", "number": "S-04", "secret": secret, "record_id": "7641"}
+    send_summary(client, secret, "held")
+
+    lied = client.post(
+        "/api/chat",
+        json=body(reveal=True, student_thinking=THINKING, situation="mismatch", **ident),
+    )
+    assert lied.json()["revealed"] is False
+    assert MODEL_ANSWERS["sound_pluck_strength"].explanation not in prompt_sent(fake_llm)
+
+    send_summary(client, secret, "judged")
+    fake_llm.requests.clear()
+    honest = client.post(
+        "/api/chat",
+        json=body(reveal=True, student_thinking=THINKING, situation="mismatch", **ident),
+    )
+    assert honest.json()["revealed"] is True
+
+
+def test_in_a_class_a_wrong_secret_cannot_open_the_explanation(class_client):
+    client, _ = class_client
+    ident = {"class_code": "DEMO-2026", "number": "S-04", "secret": "ZZZZZZ", "record_id": "7641"}
+    res = client.post("/api/chat", json=body(reveal=True, student_thinking=THINKING, **ident))
+
+    assert res.status_code == 403
