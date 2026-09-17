@@ -1,0 +1,143 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>PhoneLab architecture</title>
+<style>
+  :root { --paper: #f6f2ea; --card: #fffdf8; --ink: #1f2b3a; --teal: #1f9e8f; --orange: #e8772e; --sand: #e8e1d3; --muted: #6b7280; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--paper); color: var(--ink); font-family: "Hiragino Sans", "Noto Sans JP", system-ui, sans-serif; }
+  .wrap { width: 1660px; padding: 34px 40px 30px; }
+  h1 { margin: 0 0 4px; font-size: 26px; letter-spacing: 0.02em; }
+  h1 small { font-size: 14px; color: var(--muted); font-weight: 600; margin-left: 12px; }
+  .sub { margin: 0 0 22px; font-size: 14px; color: var(--muted); }
+  .cols { display: grid; grid-template-columns: 370px 170px 520px 170px 350px; align-items: start; }
+  .col { display: flex; flex-direction: column; gap: 12px; }
+  .lane { font-size: 13px; font-weight: 800; color: var(--muted); letter-spacing: 0.06em; margin-bottom: 2px; }
+  .box { background: var(--card); border: 2px solid var(--ink); border-radius: 14px; padding: 12px 14px; }
+  .box h3 { margin: 0 0 6px; font-size: 15px; }
+  .box p, .box li { margin: 0; font-size: 12.5px; line-height: 1.55; }
+  .box ul { margin: 4px 0 0; padding-left: 16px; }
+  .teal { border-color: var(--teal); }
+  .orange { border-color: var(--orange); }
+  .navy { background: var(--ink); color: #fff; border-color: var(--ink); }
+  .navy p, .navy li { color: #e8eef5; }
+  .chip { display: inline-block; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; border: 1.5px solid currentColor; margin: 2px 4px 0 0; }
+  .chip.t { color: var(--teal); } .chip.o { color: var(--orange); }
+  .arrows { display: flex; flex-direction: column; gap: 16px; padding: 40px 10px 0; }
+  .arrow { position: relative; height: 44px; }
+  .arrow::before { content: ""; position: absolute; left: 4px; right: 4px; top: 50%; border-top: 2px dashed var(--ink); }
+  .arrow::after { content: ""; position: absolute; right: 0; top: 50%; width: 0; height: 0; border: 6px solid transparent; border-left: 10px solid var(--ink); transform: translateY(-50%); }
+  .arrow.back::after { right: auto; left: 0; border-left: 6px solid transparent; border-right: 10px solid var(--ink); }
+  .arrow span { position: absolute; left: 0; right: 0; top: -2px; text-align: center; font-size: 10.5px; line-height: 1.25; color: var(--muted); font-weight: 700; }
+  .callbacks { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-top: 8px; }
+  .cb { border: 1.5px solid var(--teal); border-radius: 10px; padding: 8px 10px; background: #fff; }
+  .cb b { display: block; font-size: 12px; color: var(--teal); margin-bottom: 2px; font-family: ui-monospace, Menlo, monospace; }
+  .cb p { font-size: 11.5px; color: var(--ink); }
+  .foot { margin-top: 18px; display: flex; gap: 22px; font-size: 12px; color: var(--muted); flex-wrap: wrap; }
+  .foot b { color: var(--ink); }
+  .mono { font-family: ui-monospace, Menlo, monospace; font-size: 11.5px; }
+  .never { color: var(--orange); font-weight: 700; }
+</style>
+<div class="wrap">
+  <h1>PhoneLab <small>スマホが実験器具。AI は答えを言わない。— 2026-09-17 時点で動いている範囲だけを描いた図</small></h1>
+  <p class="sub">生徒が予想を書く → ラボ先生（Gemini）が予想を壊せる実験をカタログから選ぶ → 端末のセンサーで測る → 機械が検査して怪しければ保留 → 先生は学級を一目で見て、必要なら全端末を止める</p>
+
+  <div class="cols">
+    <!-- 端末 -->
+    <div class="col">
+      <p class="lane">生徒の端末（PWA、学校の iPad ／ 家のスマホ）</p>
+      <div class="box orange">
+        <h3>予想ゲート</h3>
+        <p>「こうなると思う」を書くまで、実験もヒントもセンサーも出ない。理由が無ければラボ先生が 1 回だけ問い返す</p>
+      </div>
+      <div class="box teal">
+        <h3>端末内の測定と検査（生データは端末の外に出ない）</h3>
+        <p>DeviceMotion（加速度・ジャイロ）／ Web Audio（マイク）を、承認した実験の秒数だけ読む</p>
+        <ul>
+          <li>二本の時計: ジャイロ ω×L と 加速度 √((|a|−g)L)、基本周波数と倍音</li>
+          <li>検査: 欠測・飽和・雑音・二系統不一致 → <b>保留</b>（結論を出さない）</li>
+          <li>3, 2, 1 の合図、測り直し（3 回まで）、3 回の平均</li>
+        </ul>
+        <span class="chip t">加速度</span><span class="chip t">ジャイロ</span><span class="chip t">マイク</span><span class="chip o">位置情報は永久に不要</span>
+      </div>
+      <div class="box">
+        <h3>記録（localStorage）と、先生に送る要約</h3>
+        <p>予想・計画・許可・測定の特徴量・検査・判定・次の予測・ラボ先生との会話を一本に。先生へは <b>要約だけ</b>（波形・音声は送らない）</p>
+      </div>
+      <div class="box">
+        <h3>教員画面（PC、学級コード＋教師 PIN）</h3>
+        <p>予想の向きの分布 → いま見に行く子（保留・却下） → 全員の表（番号だけ） → 許可・家でやる実験の有効化 → <b>全端末停止</b>（5 秒ごとに更新）</p>
+      </div>
+    </div>
+
+    <div class="arrows">
+      <div class="arrow"><span>POST /api/plan（予想・候補の id・学級コード）</span></div>
+      <div class="arrow"><span>POST /api/chat（考えを書いてから）</span></div>
+      <div class="arrow"><span>POST /api/records（要約）</span></div>
+      <div class="arrow back"><span>GET /api/class（2 秒ごと、halted）</span></div>
+      <div class="arrow"><span>POST /api/class/…/halt・policy（PIN）</span></div>
+    </div>
+
+    <!-- Cloud Run -->
+    <div class="col">
+      <p class="lane">Cloud Run（asia-northeast1）— FastAPI ＋ Google ADK 2.8</p>
+      <div class="box">
+        <h3>決定論の Policy（LLM は読まない）</h3>
+        <p>禁止動作（落とす・高所・水・交通）／メモ内の指示（「検査を飛ばして」）／答えの要求 → <b>モデルを呼ばずに</b>却下・問い返し。却下は理由 3 つ＋代替実験</p>
+      </div>
+      <div class="box teal">
+        <h3>ラボ先生 = 2 つの LlmAgent（Gemini 3.5 Flash-Lite、thinking low）</h3>
+        <ul>
+          <li><b>Planner</b>: 予想を読み、そのテーマの候補だけから 1 つ選ぶ。構造化出力 <span class="mono">PlanOutput</span>（変数・向き・実験 id・理由・問い返し）。<span class="never">答え（answers.py）は渡さない</span></li>
+          <li><b>Tutor</b>: 測定のあとのふり返り。説明は生徒が自分の考えを書き、判定が出ているときだけプロンプトに入れる。10 往復まで</li>
+        </ul>
+      </div>
+      <div class="box navy">
+        <h3>統制層 PolicyPlugin（ADK BasePlugin、Runner に一度登録）</h3>
+        <div class="callbacks">
+          <div class="cb"><b>before_run</b><p>先生が学級を止めていれば、エージェントを走らせない</p></div>
+          <div class="cb"><b>before_model</b><p>回数上限（5 回 / 実験、10 往復 / 記録）ならモデルを呼ばない。温度・出力長・思考量を強制</p></div>
+          <div class="cb"><b>after_model</b><p>候補外の実験 id は差し替え。理由に混じった結果の言葉、説明の漏えい語句（保留中は結果の言い回しも）は問い返しに差し替え</p></div>
+        </div>
+      </div>
+      <div class="box">
+        <h3>学級と記録（サーバは要約だけを持つ）</h3>
+        <p><span class="mono">classes/{code}</span>: 許可センサー・家でやる実験・halted・PIN のハッシュ　<span class="mono">students/{no}</span>: いまの記録の要約　<span class="mono">records/{id}</span>: 履歴</p>
+        <p>レート制限（接続元ごと）、12 秒 / 25 秒でタイムアウト、停止中は 409</p>
+      </div>
+    </div>
+
+    <div class="arrows">
+      <div class="arrow"><span>generate_content（構造化出力）</span></div>
+      <div class="arrow"><span>OTLP（本文は送らない）</span></div>
+      <div class="arrow"><span>classes / students / records</span></div>
+      <div class="arrow back"><span>gcloud run deploy --source</span></div>
+    </div>
+
+    <!-- Google Cloud -->
+    <div class="col">
+      <p class="lane">Google Cloud</p>
+      <div class="box teal">
+        <h3>Vertex AI — Gemini 3.5 Flash-Lite</h3>
+        <p>Planner と Tutor。構造化出力、thinking low。1 回 1.4〜2.7 秒。3.8 Flash は 25〜50 秒かかる時間帯があり不採用</p>
+      </div>
+      <div class="box">
+        <h3>Cloud Trace（Telemetry API）</h3>
+        <p>1 実験 = 1 トレース。<span class="mono">phonelab.plan → invoke_agent planner → call_llm → phonelab.policy（decision）</span>。生徒の文は記録しない（<span class="mono">ADK_CAPTURE_MESSAGE_CONTENT_IN_SPANS=false</span>）</p>
+      </div>
+      <div class="box">
+        <h3>Firestore（native、asia-northeast1）</h3>
+        <p>学級・生徒・記録の要約。クライアント SDK は使わず、API 経由だけ。学級 <span class="mono">DEMO-2026</span> は起動時に作成</p>
+      </div>
+      <div class="box">
+        <h3>Cloud Build → Cloud Run</h3>
+        <p>ソースデプロイ（Dockerfile が Web もビルド）。min-instances 0、アイドル課金なし</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="foot">
+    <span><b>LLM が判断すること</b>: 予想の読み取りと実験の選択、ふり返りの問い返し</span>
+    <span><b>LLM が触れないこと</b>: 安全の判定、測定の検査、判定文、停止、署名</span>
+    <span><b>未実装（設計のみ）</b>: サーバ側 Verifier と Cloud KMS 署名、Model Armor、ClassAgent（教員側の観察と提案）</span>
+  </div>
+</div>

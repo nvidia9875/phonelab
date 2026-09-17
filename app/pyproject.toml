@@ -8,10 +8,7 @@ dependencies = [
     "uvicorn[standard]>=0.30",
     "google-adk[gcp]>=2.8",
     "google-genai>=2.22",
-    "google-cloud-modelarmor>=0.7",
     "google-cloud-firestore>=2.19",
-    "google-cloud-kms>=3.0",
-    "rfc8785>=0.1",
     "pydantic>=2.9",
 ]
 

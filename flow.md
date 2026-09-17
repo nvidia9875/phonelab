@@ -334,10 +334,10 @@ flowchart LR
   F5[F5 公式スキルで提出前チェック] --> F6[F6 Zenn 記事（任意、Idea カテゴリ）]
 ```
 
-- [ ] F1 アーキ図
+- [x] F1 アーキ図（9/18）: `docs/architecture-diagram.html` を Playwright で描画 → `docs/architecture.png`（実装済みの範囲だけ。未実装は脚注に明記）。直すときは HTML を編集して撮り直す
 - [ ] F2 デモ動画の絵コンテ → 撮影（実機の振り子を机で撮る） → 編集 → YouTube 公開
 - [ ] F3 説明文（S5 のアイデアシートから）
-- [ ] F4 README（LICENSE を置く。OSS ライセンス情報の明記は規約要件）
+- [x] F4 README（9/18）: ルートに `README.md`（動作確認の方法＝学級 `DEMO-2026`・PIN、エージェントと統制、構成と開発範囲、実装済み／設計だけの線引き、Google Cloud の使い方、ローカル実行）、`LICENSE`（MIT）、`THIRD_PARTY_LICENSES.md`。未使用だった依存（modelarmor / kms / rfc8785）は pyproject から外した
 - [ ] F5 提出前チェック（`.claude/skills/gc-hackathon-vol5/references/checklist.md`）
 - [ ] F6 Zenn 記事
 
