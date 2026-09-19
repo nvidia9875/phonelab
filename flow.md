@@ -15,9 +15,9 @@
 
 | 項目 | 状態 |
 |---|---|
-| 今日 | 2026-09-15（火） |
+| 今日 | 2026-09-19（金） |
 | 提出締切 | 2026-10-15（木）23:59 → 内部目標 **10/14** |
-| 残り | **30 日**（10/15 まで） |
+| 残り | **26 日**（10/15 まで。提出は 10/13） |
 | アイデア | **PhoneLab に決定**（`/Users/shun/Desktop/phonelab/idea/phonelab-idea-sheet.pdf`） |
 | 設計 | **B0 完了**（`docs/` 6 本。9/9。アーキテクチャは公式ドキュメントで裏取り済み） |
 | コード | **B5 完了**（ADK + PolicyPlugin + Cloud Trace が Cloud Run で動く、9/15）。B1〜B4・B7 は実機計測待ち、B6 未 |
@@ -229,9 +229,9 @@ flowchart TD
 ```
 
 - [~] B1 検証ページを配備済み: **https://phonelab-1094091671194.asia-northeast1.run.app/spike**（9/9）。糸 50 cm の振り子に入れて「許可して 20 秒測る」→ 加速度×2 とジャイロの T、検査 7 項目、特徴量 JSON が出る。**実機で測って JSON を記録するのが次**（iOS の `requestPermission()` はタップ内でのみ動く。この制約が許可チップの UI 根拠）
-- [ ] B2 Web Audio で基本周波数
+- [x] B2 Web Audio で基本周波数（`web/src/measure/pitch.ts`。自己相関＋倍音の Goertzel。実機の閾値は C′4）
 - [ ] B3 振り子の周期を端末内で計算し、理論値 `T = 2π√(L/g)` と比較。9/15 追加: 中 3 向けに、最下点の速さ（ジャイロ ω×L と加速度 √((|a|−g)L)）が理論値 √(2gh) と合うかも見る（糸 80 cm、高さ 10 cm / 20 cm）。`/spike` は周期しか出さないので、速さの表示を足す
-- [ ] B4 Go/No-Go 判定（**9/14 までに決める**）
+- [x] B4 Go（9/15。中学は音の高さを T0 の入口に、振り子は iPad と家で）
 - [x] B5 ADK エージェントを Cloud Run で動かし Cloud Trace に `invoke_agent` / `call_llm` が出る。`PolicyPlugin` の `before_model_callback` でモデル呼び出しをスキップできることも確認（`docs/architecture.md` 2.1）
   - 9/15 確認。入口は `POST /api/spike/agent`（env `PHONELAB_ENABLE_SPIKE_AGENT=1` のときだけ開く）。**検証後に env を外して閉じた**（revision `phonelab-00011-mm5`。公開 URL から回数制限なしで Gemini を呼べるため）。スパイクでは `planner_calls` をリクエストで受けているが、C3 の本 API では回数をサーバ側の状態（C8 Firestore）で数え、レート制限も置く。コードは `app/server/agent/`（`policy_plugin.py` / `planner.py` / `runner.py`）と `app/server/telemetry.py`、テスト 8 件は `app/tests/`
   - Trace の木: `phonelab.spike_agent → invocation → invoke_agent planner → call_llm → phonelab.policy / generate_content`。上限（`planner_calls=5`）では `call_llm` の下に `generate_content` が無く `phonelab.decision=skip_model`（応答 0.07 s）。スパンに予想文・応答は入っていない
@@ -259,11 +259,11 @@ flowchart LR
 - [~] C1 PWA 骨格: `app/web`（Vite + React + TS）。**UX の流れを `docs/ux-flow.md` に固め、トップ（テーマのカタログ＋状態）、生徒の情報、予想ゲート、計画、準備、測定、保留、却下、結果、記録、停止、教員の 12 画面を結線**。記録は localStorage、Agent/Policy/判定は端末内スタブ（`src/agent/stub.ts`）。ブラウザで全経路を一周して検証済み（9/9）。`manifest.json` とオフライン縮退は未
 - [x] C2 画面 1（承認から実測に結線済み。`app/web/src/measure/pendulum.ts` が端末内計算）
 - [x] C3 Planner（9/16）: `POST /api/plan`。決定論の Policy → Gemini `gemini-3.5-flash-lite`（構造化出力 `PlanOutput`、thinking low、1.4〜1.9 s）→ PolicyPlugin の突き合わせ（候補外の id・理由に混じった結果を差し替え）。端末は `source` と `trace_id` を記録に残し、つながらないときだけ stub。テスト 55 件（`app/tests/`）。未: 回数のサーバ側カウント（C8）、Model Armor（B6）
-- [~] C4 画面 2（実測の値と端末内検査を表示。サーバ Verifier 未）
+- [x] C4 画面 2（実測・検査・3,2,1・測り直し・平均。サーバ Verifier は C5）
 - [ ] C5 Verifier（サーバ側。特徴量だけを受け取る）
-- [~] C6 画面 3（見た目のみ。判定はサーバ実装後）
-- [~] C7 画面 4（見た目のみ）
-- [ ] C8 Firestore
+- [x] C6 画面 3（判定は端末のテンプレート。変数が違う予想は判定しない）
+- [x] C7 画面 4（保留・再測定・切り替え・Replanner の提案）
+- [x] C8 Firestore（= C′1・C′2。学級・生徒・記録の要約）
 - [ ] C9 CI/CD（push で自動 deploy。min-instances=0）
 - [~] C10 中学向けの組み替え（9/15 決定。`docs/curriculum-coverage.md` §5・§6、`docs/experiments.md` 3.1・3.3・7、`docs/verifier.md` 1.2b・1.4）: カタログに `school` / `grade` / `curriculum_ref` / `min_tier`、振り子を最下点の速さ（`pendulum_speed`）に、音の高さ（`pitch`、マイク）、トップの入口を中学 / 高校で分ける、端末のティア判定（イベントが届くか）
   - 9/15 実装: `app/web` のカタログに `school` / `course` / `curriculumRef` / `minTier` / `example`、中 3「振り子とエネルギー」（`measure/speed.ts`、ジャイロ ω×L と加速度 √((|a|−g)L)）、中 1「音の高さ」（`measure/pitch.ts`、自己相関と第 2 倍音）、測定プロファイルの窓口 `measure/features.ts`、判定を量ごと（周期 / 速さ / 音の高さ、音は相対 3%）に、トップの入口を中学 / 高校で分ける（設定で切り替え）、端末の段階の判定（`probeMotionEvents`）、許可待ちの表示と「サンプルで進む」
@@ -320,21 +320,21 @@ flowchart LR
   D4 --> D9
 ```
 
-- [ ] D1 Policy（決定論。テストを先に書く: `drop_phone` を含む要望は必ず却下）
-- [~] D2 画面 5（見た目のみ）
+- [x] D1 Policy（`server/agent/policy.py`、モデルを呼ぶ前）
+- [x] D2 画面 5（却下は本物。理由 3 つ＋代替）
 - [ ] D3 Model Armor（B6 の結果次第）
-- [ ] D4 Trace
+- [x] D4 Trace（plan / replan / chat / policy のスパン。教員画面からの直リンクは W3）
 - [ ] D5 署名＋画面 6（PDF 書き出しは時間があれば）
-- [~] D6 教員画面 `/teacher`（見た目のみ。許可トグル・停止・提案 UI はサーバ実装後）
-- [ ] D7 停止と上限（全端末停止は `GET /api/class/{code}/status` を測定中 2 秒ごとにポーリング。`halt_latency_ms` を Trace に）
-- [ ] D8 答えの漏えい検知（教員画面「0 件 答えの漏えい」の裏側。`after_model_callback`）
+- [x] D6 教員画面（実データ。提案 UI は切った）
+- [x] D7 停止と上限（2 秒ポーリング、before_run、409。`halt_latency_ms` は未）
+- [x] D8 答えの漏えい検知（after_model。教員画面の件数表示は未）
 - [ ] D9 ClassAgent（`docs/architecture.md` 2.3。時間が無ければ「要約だけ・提案なし」に縮退）
 - [ ] D10 提案の承認 UI（`classes/{code}/proposals`。承認したときだけサーバが学級ポリシーを書く）
 
 ### E. 審査対応（〜10/6）
 
 - [ ] E1 テスト学級 `DEMO-2026` と生徒番号 S-01〜S-06 のサンプル記録（保留・却下・署名済みを各 1 件以上含める）
-- [ ] E2 「動作確認の方法」の文章（学級コード、番号、教員画面の入り方、審査員が自分のスマホで振り子を測る手順）
+- [x] E2 「動作確認の方法」（README。合言葉の説明つき）
 - [ ] E3 実機 3 機種で 6 画面を通す（iOS Safari / Android Chrome / iPad）
 - [ ] E4 費用確認: 1 実験あたりの Gemini 呼び出し回数とコスト、Cloud Run のアイドル課金ゼロを数字で
 - [ ] E5 負荷: 31 端末同時（教員画面の想定値）で Cloud Run が耐えるか軽く確認
@@ -372,18 +372,22 @@ flowchart LR
 
 ---
 
-## 5. 週カレンダー
+## 5. 週カレンダー（9/19 に引き直し。締切 10/15 23:59、提出は 10/13、予備日 10/14）
 
-| 週 | 期間 | フェーズ | 週末に出来ているもの |
+凡例: **[あなた]** = 実機・撮影・ダッシュボード操作など本人が要るもの／[私] = コードと文書。
+
+| 週 | 期間 | やること | 週末に出来ているもの |
 |---|---|---|---|
-| W1 | 9/9–9/14 | A, B0, B | Cloud Run が HTTPS で動く。実機で振り子の周期が出る。**Go/No-Go 判定済み** |
-| W2 | 9/15–9/21 | C | 画面 1〜3 が Cloud Run 上で通しで動く（Planner が実験を選び、測って、判定する） |
-| W3 | 9/22–9/28 | C 仕上げ, D 前半 | 保留（画面 4）、Policy 却下（画面 5）、Trace |
-| W4 | 9/29–10/5 | D 後半, E | 署名（画面 6）、教員画面、停止、ClassAgent と提案 UI、テスト学級、3 機種検証。**9/29 オフィスアワーで質問** |
-| W5 | 10/6–10/13 | F | アーキ図、動画、説明文、README、提出前チェック |
-| — | 10/14 | G | **提出** |
+| W2 残り | 9/19（金）–9/21（日） | [私] C′5 記録の URL（名前なし・保護者用）と家での再開（本人の記録を取る API）。実機検証の手順書 `docs/device-check.md`。**[あなた]** 週末に iPhone / Android / iPad で手順書どおり測る（C′4・B7・E3: 振り子の速さと周期、音の高さ、隣の音、Android の devicemotion） | 3 機種の生データ（数値の表）が手元にある。記録 URL が本番で開く |
+| W3 | 9/22（月）–9/28（日） | [私] 実機の結果で閾値を決める（0.15 m/s・3%・倍音の強さ）と保留理由「まわりの音」。サーバ側 Verifier（C5: 要約に特徴量と検査を入れ、サーバで再検査して判定を記録）。教員画面から Cloud Trace への直リンク。CI/CD（C9: main への push で deploy）。費用の数字（E4）と 31 端末の負荷（E5）。**[あなた]** 9/29 のオフィスアワーで聞くことを 1 つ決める | 測定の閾値が実機の根拠つき。判定がサーバでも再検証される。数字（費用・負荷）が README にある |
+| W4 | 9/29（月）–10/5（日） | **10/1 ClassAgent の Go/No-Go**（いまの見込みは No-Go → 教員画面の「要約」だけ）。[私] 出典台帳の復元、説明文 F3（README と idea-sheet から）、動画の絵コンテと字幕案、Model Armor を 1 日だけ試す（B6。動かなければ「試した結果」を README に）、レギュレーション確認 E6。**[あなた]** 9/29 オフィスアワー、絵コンテの確認、撮影の準備（輪ゴム・箱・振り子・iPad・PC） | 説明文とアーキ図が最終稿。絵コンテが決まっている |
+| W5 | 10/6（月）–10/12（日） | **[あなた]** 撮影（教室の場面・先生の停止・家の続き）、YouTube 公開（限定公開でよい）。[私] 編集用の字幕・画面録画（教員画面と Cloud Trace）、README 最終、提出前チェック F5、Zenn 記事 F6（余力があれば）。**[あなた]** ダッシュボードの GitHub App 連携（A6/A7、パスキー） | 動画 URL がある。ダッシュボードに説明文・図・動画・URL が入っている |
+| 提出 | 10/13（月） | **[あなた]** ダッシュボードから提出（当日の混雑を避けて前日）。[私] デフォルトブランチ凍結、`dev` 作成 | **提出済み** |
+| 予備 | 10/14（火） | 直しが要れば | — |
+| 締切 | 10/15（水）23:59 | — | — |
+| 後 | 10/19 クレジット失効（請求画面で確認）、10/28 ファイナリスト発表、12/1 まで本番を止めない | | |
 
----
+切ったもの（9/16・9/18 決定）: ClassAgent の提案 UI と承認、Cloud KMS 署名、PDF 書き出し、カタログ拡張（自由落下・脈拍・回転椅子）、高校入口の作り込み。Zenn 記事は任意。
 
 ## 6. リスクと逃げ道
 
