@@ -156,13 +156,8 @@ async def teacher(base: str, code: str, pin: str, stats: Stats, halt_at: dict, s
 
 
 async def delete_class(store: FirestoreClassStore, code: str) -> None:
-    doc = store._doc(code)
-    async for st in doc.collection("students").stream():
-        for sub in ("records", "counters"):
-            async for c in st.reference.collection(sub).stream():
-                await c.reference.delete()
-        await st.reference.delete()
-    await doc.delete()
+    """下の集まり（生徒・記録・回数）ごと消す。文書の無い生徒の下に回数だけ残ることがあるので、再帰で"""
+    await store._client.recursive_delete(store._doc(code))
 
 
 async def main(base: str, students: int) -> None:
