@@ -271,14 +271,25 @@ class FirestoreClassStore:
         )
 
     async def put_record(self, code: str, number: str, summary: Summary) -> None:
+        """「いま」と履歴の更新を、読んで比べて書くまでトランザクションで（同時の送信で古い要約が勝たない。10/2 採点 3-2）"""
+        from google.cloud import firestore
+
         student = self._doc(code).collection("students").document(number)
-        snap = await student.get()
-        current = (snap.to_dict() or {}).get("current") if snap.exists else None
-        fields: dict[str, object] = {"last_seen_at": now_iso()}
-        if newer_or_same(summary, current):
-            fields["current"] = summary
-        await student.set(fields, merge=True)
-        await student.collection("records").document(str(summary["record_id"])).set(summary)
+        history = student.collection("records").document(str(summary["record_id"]))
+
+        @firestore.async_transactional
+        async def write(tx) -> None:
+            snap = await student.get(transaction=tx)
+            old = await history.get(transaction=tx)
+            current = (snap.to_dict() or {}).get("current") if snap.exists else None
+            fields: dict[str, object] = {"last_seen_at": now_iso()}
+            if newer_or_same(summary, current):
+                fields["current"] = summary
+            tx.set(student, fields, merge=True)
+            if newer_or_same(summary, old.to_dict() if old.exists else None):
+                tx.set(history, summary)
+
+        await write(self._client.transaction())
 
     async def get_student_auth(self, code: str, number: str) -> StudentAuth | None:
         snap = await self._doc(code).collection("students").document(number).get()

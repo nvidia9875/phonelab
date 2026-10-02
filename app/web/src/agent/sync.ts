@@ -7,6 +7,7 @@ import { postRecordSummary, type RecordSummary } from "./classroom";
 import { getState, isMine, subscribeStore, type StudyRecord } from "../store/records";
 
 const MAX_EVENTS = 12;
+const RETRY_MS = 5_000;
 const DEBOUNCE_MS = 800;
 
 export function summarizeRecord(rec: StudyRecord): RecordSummary {
@@ -35,6 +36,7 @@ export function summarizeRecord(rec: StudyRecord): RecordSummary {
 /** 変わった記録だけを、少し待ってからまとめて送る。戻り値で止められる */
 export function startRecordSync(send: typeof postRecordSummary = postRecordSummary): () => void {
   const sent = new Map<string, string>();
+  let stopped = false;
   const timers = new Map<string, ReturnType<typeof setTimeout>>();
   const tick = () => {
     const { student, classState, records } = getState();
@@ -51,7 +53,11 @@ export function startRecordSync(send: typeof postRecordSummary = postRecordSumma
           // 待っている間に番号が変わったら送らない
           if (!latest || !now.student?.secret || !isMine(latest, now.student)) return;
           sent.set(latest.id, latest.updatedAt);
-          send(now.student.classCode, now.student.number, now.student.secret, summarizeRecord(latest)).catch(() => sent.delete(latest.id));
+          send(now.student.classCode, now.student.number, now.student.secret, summarizeRecord(latest)).catch(() => {
+            // 送れなかったら、記録が変わるのを待たずに少しあとで送り直す（10/2 採点 3-2）
+            sent.delete(latest.id);
+            if (!stopped) setTimeout(tick, RETRY_MS);
+          });
         }, DEBOUNCE_MS),
       );
     }
@@ -59,6 +65,7 @@ export function startRecordSync(send: typeof postRecordSummary = postRecordSumma
   const unsubscribe = subscribeStore(tick);
   tick();
   return () => {
+    stopped = true;
     unsubscribe();
     timers.forEach((t) => clearTimeout(t));
   };

@@ -110,3 +110,27 @@ describe("記録は番号ごと（10/2 採点: 番号を変えると前の人の
     expect(activeRecordForTheme("sound")).toBeUndefined();
   });
 });
+
+describe("送れなかった記録は送り直す（10/2 採点 3-2）", () => {
+  beforeEach(() => {
+    clearAll();
+    setStudent(null);
+    setClassState(null);
+    vi.useFakeTimers();
+  });
+
+  it("retries a failed send without waiting for the record to change", async () => {
+    const send = vi.fn().mockRejectedValueOnce(new Error("offline")).mockResolvedValue(undefined);
+    setClassState({ classCode: "DEMO-2026", school: "jhs", allowedSensors: ["microphone"], teacherEnabled: [], halted: false, updatedAt: "", seenAt: "" });
+    setStudent({ classCode: "DEMO-2026", number: "S-04", secret: "ABC234" });
+    const stop = startRecordSync(send);
+    createRecord("sound");
+
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(send).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(6000);
+
+    expect(send).toHaveBeenCalledTimes(2);
+    stop();
+  });
+});
