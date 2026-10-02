@@ -9,7 +9,10 @@ import logging
 import uuid
 from dataclasses import dataclass, replace
 
+from google.adk.agents import BaseAgent
+from google.adk.apps import App
 from google.adk.models.base_llm import BaseLlm
+from google.adk.plugins.base_plugin import BasePlugin
 from google.adk.runners import Runner
 from google.adk.sessions import BaseSessionService, InMemorySessionService
 from google.genai import types
@@ -157,17 +160,23 @@ class _RunOutcome:
     state: dict[str, object]
 
 
+def _runner(agent: BaseAgent, plugins: list[BasePlugin]) -> Runner:
+    """統制層（PolicyPlugin）は App に登録する（ADK 2.8 で Runner の plugins 引数は非推奨）"""
+    return Runner(
+        app=App(name=APP_NAME, root_agent=agent, plugins=plugins),
+        session_service=InMemorySessionService(),
+    )
+
+
 def build_runner(
     model: str | BaseLlm,
     generate_content_config: types.GenerateContentConfig | None = None,
     with_tools: bool = False,
     armor: ArmorClient | None = None,
 ) -> Runner:
-    return Runner(
-        app_name=APP_NAME,
-        agent=build_planner(model, generate_content_config, with_tools=with_tools),
-        session_service=InMemorySessionService(),
-        plugins=[
+    return _runner(
+        build_planner(model, generate_content_config, with_tools=with_tools),
+        [
             PolicyPlugin(
                 thinking_level=PLANNER_THINKING_LEVEL,
                 allowed_tools=PLANNER_TOOLS if with_tools else (),
@@ -180,11 +189,9 @@ def build_runner(
 
 
 def build_replan_runner(model: str | BaseLlm) -> Runner:
-    return Runner(
-        app_name=APP_NAME,
-        agent=build_replanner(model),
-        session_service=InMemorySessionService(),
-        plugins=[
+    return _runner(
+        build_replanner(model),
+        [
             PolicyPlugin(
                 calls_key=REPLAN_CALLS_KEY,
                 call_limit=REPLAN_CALLS_PER_RECORD,
@@ -246,11 +253,9 @@ async def run_replan(
 
 
 def build_next_runner(model: str | BaseLlm) -> Runner:
-    return Runner(
-        app_name=APP_NAME,
-        agent=build_next_agent(model),
-        session_service=InMemorySessionService(),
-        plugins=[
+    return _runner(
+        build_next_agent(model),
+        [
             PolicyPlugin(
                 calls_key=NEXT_CALLS_KEY,
                 call_limit=NEXT_CALLS_PER_RECORD,
@@ -328,11 +333,9 @@ class InsightReply:
 
 
 def build_insight_runner(model: str | BaseLlm) -> Runner:
-    return Runner(
-        app_name=APP_NAME,
-        agent=build_class_agent(model),
-        session_service=InMemorySessionService(),
-        plugins=[
+    return _runner(
+        build_class_agent(model),
+        [
             PolicyPlugin(
                 calls_key=INSIGHT_CALLS_KEY,
                 call_limit=INSIGHT_MODEL_CALLS,
@@ -383,11 +386,9 @@ async def run_insight(
 
 
 def build_tutor_runner(model: str | BaseLlm, armor: ArmorClient | None = None) -> Runner:
-    return Runner(
-        app_name=APP_NAME,
-        agent=build_tutor(model),
-        session_service=InMemorySessionService(),
-        plugins=[
+    return _runner(
+        build_tutor(model),
+        [
             PolicyPlugin(
                 calls_key=CHAT_TURNS_KEY,
                 call_limit=CHAT_TURNS_PER_RECORD,
