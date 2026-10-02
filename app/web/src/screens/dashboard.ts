@@ -1,3 +1,4 @@
+import type { CheckCode } from "../measure/checks";
 /**
  * 先生の 1 画面の計算（docs/personas.md §3、ux-flow §11）: 予想の向きの分布、いま見に行く子、状態の言葉。
  * 入力はサーバの記録の要約だけ。名前は無い。
@@ -29,7 +30,8 @@ export function stateOf(r: RecordSummary | null): StateLabel {
   }
 }
 
-const CHECK_WORDS: Record<string, string> = {
+/** 検査コードの言葉。CheckCode を全部持たないと型検査で落ちる（足し忘れで英字のコードが先生に出た。10/2 採点） */
+const CHECK_WORDS: Record<CheckCode, string> = {
   low_snr: "雑音と区別できない",
   low_voiced: "音が短い",
   clipping: "音割れ",
@@ -42,12 +44,13 @@ const CHECK_WORDS: Record<string, string> = {
   unstable: "周期が不安定",
   weak_autocorr: "周期が読めない",
   no_signal: "信号なし",
+  too_uncertain: "ばらつきで決められない",
 };
 
 /** 検査の列。保留の理由か、通ったなら「二系統一致」 */
 export function checkTextOf(r: RecordSummary | null): { text: string; strong: boolean } {
   if (!r) return { text: "—", strong: false };
-  if (r.hold_codes.length) return { text: r.hold_codes.map((c) => CHECK_WORDS[c] ?? c).join("・"), strong: true };
+  if (r.hold_codes.length) return { text: r.hold_codes.map((c) => (CHECK_WORDS as Record<string, string>)[c] ?? "保留").join("・"), strong: true };
   if (r.rejection_title) return { text: "代替実験を提示", strong: false };
   if (r.result) return { text: "二系統一致", strong: false };
   if (r.stage === "predict" || r.stage === "plan") return { text: "センサー未使用", strong: false };
