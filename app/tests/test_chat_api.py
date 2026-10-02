@@ -203,19 +203,19 @@ def test_does_not_serve_files_outside_the_web_folder(client):
     assert "MODEL_ANSWERS" not in res.text
 
 
-def class_summary(status="held"):
+def class_summary(status="held", observed="same", variant_id="sound_pluck_strength"):
     judged = status == "judged"
     return {
         "record_id": "7641",
         "theme_id": "sound",
-        "variant_id": "sound_pluck_strength",
+        "variant_id": variant_id,
         "status": status,
         "stage": "result" if judged else "measure_A",
         "prediction": "強くはじくと高くなると思う",
         "claim": {"variable": "strength", "direction": "faster"},
         "hold_codes": [] if judged else ["low_snr"],
         "retries": {"A": 0, "B": 0},
-        "result": {"observed": "same", "consistent": False, "statement": "変わらなかった"}
+        "result": {"observed": observed, "consistent": False, "statement": "変わらなかった"}
         if judged
         else None,
         "plan_source": "agent",
@@ -242,12 +242,12 @@ def class_client(fake_llm):
     app.dependency_overrides.clear()
 
 
-def send_summary(client, secret, status):
+def send_summary(client, secret, status, **overrides):
     body = {
         "class_code": "DEMO-2026",
         "number": "S-04",
         "secret": secret,
-        "record": class_summary(status),
+        "record": class_summary(status, **overrides),
     }
     assert client.post("/api/records", json=body).status_code == 200
 
@@ -282,3 +282,27 @@ def test_in_a_class_a_wrong_secret_cannot_open_the_explanation(class_client):
     res = client.post("/api/chat", json=body(reveal=True, student_thinking=THINKING, **ident))
 
     assert res.status_code == 403
+
+
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {"observed": "unknown"},  # ばらつきに埋もれて保留した判定
+        {"variant_id": "sound_string_length"},  # 判定が出たのは別の実験
+    ],
+)
+def test_in_a_class_the_explanation_stays_closed_for_an_undecided_or_other_experiment(
+    class_client, fake_llm, overrides
+):
+    """10/2 採点 2-6: 説明の解禁を、聞いている実験そのものと、向きの決まった判定に限る"""
+    client, secret = class_client
+    ident = {"class_code": "DEMO-2026", "number": "S-04", "secret": secret, "record_id": "7641"}
+    send_summary(client, secret, "judged", **overrides)
+
+    res = client.post(
+        "/api/chat",
+        json=body(reveal=True, student_thinking=THINKING, situation="mismatch", **ident),
+    )
+
+    assert res.json()["revealed"] is False
+    assert MODEL_ANSWERS["sound_pluck_strength"].explanation not in prompt_sent(fake_llm)

@@ -69,7 +69,7 @@ export function Result({ variant, judgement, explain, nextVariant, nextDirection
       {sample && <p className="card__hint">テストモードのサンプル値です。実際の測定ではありません</p>}
 
       <Card variant="navy">
-        <Eyebrow>測定が言っていること</Eyebrow>
+        <Eyebrow>{j.undecided ? "保留 ― 測定が言っていること" : "測定が言っていること"}</Eyebrow>
         <CardTitle>{j.statement}</CardTitle>
         <CardBody>{j.detail}</CardBody>
       </Card>

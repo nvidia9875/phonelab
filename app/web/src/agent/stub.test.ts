@@ -54,3 +54,31 @@ describe("judge", () => {
     expect(j.consistent).toBe(true);
   });
 });
+
+describe("judge — ばらつきに埋もれた差は保留（10/2 採点 1-3）", () => {
+  const sound = themeById("sound")!;
+  const strength = variantById(sound, "sound_pluck_strength")!; // 許容誤差は相対 3%
+  const claim = { variable: "strength" as const, direction: "faster" as const };
+
+  it("says 'unchanged' only when the measurement is precise enough", () => {
+    const j = judge(220, 221, 1, claim, strength);
+    expect(j.observed).toBe("same");
+    expect(j.undecided).toBeUndefined();
+    expect(j.consistent).toBe(false);
+  });
+
+  it("holds instead of 'unchanged' when the noise is larger than the tolerance", () => {
+    const j = judge(220, 230, 20, claim, strength);
+    expect(j.undecided).toBe(true);
+    expect(j.observed).toBe("unknown");
+    expect(j.consistent).toBeNull();
+    expect(j.statement).toContain("保留");
+    expect(j.statement).not.toContain("変わらなかった");
+  });
+
+  it("still reports a difference that is bigger than the noise", () => {
+    const j = judge(220, 280, 20, claim, strength);
+    expect(j.observed).toBe("faster");
+    expect(j.consistent).toBe(true);
+  });
+});

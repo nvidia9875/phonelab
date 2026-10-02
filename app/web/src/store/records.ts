@@ -32,6 +32,8 @@ export interface Judgement {
   tolerance: number;
   observed: Direction;
   consistent: boolean | null;
+  /** 差が測定のばらつきに埋もれて、変わったとも変わらないとも言えない（保留） */
+  undecided?: boolean;
   statement: string;
   detail: string;
 }

@@ -109,18 +109,26 @@ app.include_router(insight_router)
 
 
 async def judged_on_server(
-    store: ClassStore, code: str, number: str | None, secret: str | None, record_id: str | None
+    store: ClassStore,
+    code: str,
+    number: str | None,
+    secret: str | None,
+    record_id: str | None,
+    variant_id: str,
 ) -> bool:
-    """この記録は、この生徒のもので、判定が出ているか。要約が届いていなければ開かない（9/18 Codex I3）"""
+    """この記録は、この生徒のもので、聞いている実験そのもので、向きの決まった判定が出ているか。
+    要約が届いていなければ開かない（9/18 Codex I3）。別の実験の判定や、ばらつきで保留した判定では開かない（10/2 採点 2-6）"""
     if not number or not record_id:
         return False
     await verify_student(store, normalize_code(code), number.strip().upper(), secret)
     current = await store.get_current(normalize_code(code), number.strip().upper())
+    result = (current or {}).get("result") or {}
     return bool(
         current
         and str(current.get("record_id")) == record_id
+        and current.get("variant_id") == variant_id
         and current.get("status") in ("judged", "signed")
-        and current.get("result")
+        and result.get("observed") in ("faster", "slower", "same")
     )
 
 
@@ -688,7 +696,7 @@ async def chat(
     if body.class_code and revealed:
         # 学級に入っている端末は、端末の申告でなくサーバが持つ記録の要約で決める（9/18 Codex I3）
         revealed = await judged_on_server(
-            store, body.class_code, body.number, body.secret, body.record_id
+            store, body.class_code, body.number, body.secret, body.record_id, body.variant_id
         )
     context = TutorContext(
         school=body.school,

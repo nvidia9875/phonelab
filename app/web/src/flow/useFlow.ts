@@ -297,7 +297,13 @@ export function ensureJudged(rec: StudyRecord, theme: Theme): StudyRecord | null
   const result = judge(ma.value, mb.value, ma.unc + mb.unc, rec.prediction.claim, variant);
   return updateRecord(rec.id, (r) => {
     const within = Math.abs(result.delta) <= result.tolerance ? "内側" : "外側";
-    const verdict = result.consistent === null ? "予想の向きが読めず判定なし" : result.consistent ? "予想は成り立った" : "予想は成り立たず";
+    const verdict = result.undecided
+      ? "保留: 差が測定のばらつきに埋もれて決められない"
+      : result.consistent === null
+        ? "予想の向きが読めず判定なし"
+        : result.consistent
+          ? "予想は成り立った"
+          : "予想は成り立たず";
     let n: StudyRecord = { ...r, result, status: "judged", stage: "result" };
     n = addEvent(n, "判定", `${verdict}。差 ${formatQuantity(Math.abs(result.delta), variant.unit)} は許容 ${formatQuantity(result.tolerance, variant.unit)} の${within}`);
     return n;
