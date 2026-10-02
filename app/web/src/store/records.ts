@@ -85,6 +85,8 @@ export interface NextSuggestion {
   source: "agent" | "catalog" | "stub";
   traceId: string | null;
   trail: string[];
+  /** 何を見て選んだか（理由を書いたか・判定）。変わったら聞き直す（古い記録には無い） */
+  basis?: string;
 }
 export interface Rejection {
   title: string;

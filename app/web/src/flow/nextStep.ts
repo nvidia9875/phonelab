@@ -1,6 +1,7 @@
 /**
  * 結果のあとの次の一手（X1）。予想 → 計画 → 測定 → 判定 → **次の予想**、のループの最後をラボ先生が閉じる。
- * 記録ごとに 1 回聞き、記録に残す（教員画面にも「次の一手」と「判断」の行が届く）。
+ * 理由を書いた・測り直して判定が変わった、のように読んだもの（basis）が変わったら聞き直す（10/2 採点 2-1）。
+ * 記録に残す（教員画面にも「次の一手」と「判断」の行が届く）。
  * つながらないときはカタログの順（まだやっていない実験）で、出どころを stub と残す。
  */
 import { requestNext } from "../agent/next";
@@ -10,6 +11,17 @@ import { addEvent, recordById, updateRecord, type NextSuggestion, type StudyReco
 import { doneVariantIds, trailText } from "./useFlow";
 
 const MIN_EXPLAIN_CHARS = 8;
+
+/** 次の一手が何を見て選ばれたか。これが変わったら、前の提案は古い */
+export function nextBasis(rec: StudyRecord): string {
+  const r = rec.result;
+  const explained = rec.explain.trim().length >= MIN_EXPLAIN_CHARS ? 1 : 0;
+  return r ? `${explained}|${r.observed}|${r.consistent}|${r.a.toPrecision(4)}|${r.b.toPrecision(4)}` : `${explained}|-`;
+}
+
+export function isNextStale(rec: StudyRecord): boolean {
+  return !!rec.result && rec.nextSuggestion?.basis !== nextBasis(rec);
+}
 
 function fallback(rec: StudyRecord, theme: Theme): NextSuggestion {
   const done = new Set([...doneVariantIds(theme.id), rec.variantId]);
@@ -29,7 +41,9 @@ function fallback(rec: StudyRecord, theme: Theme): NextSuggestion {
 
 export async function askNext(rec: StudyRecord, theme: Theme): Promise<NextSuggestion | null> {
   if (!rec.result || !rec.variantId) return null;
-  if (rec.nextSuggestion) return rec.nextSuggestion;
+  const basis = nextBasis(rec);
+  if (rec.nextSuggestion?.basis === basis) return rec.nextSuggestion;
+  const again = !!rec.nextSuggestion;
   let suggestion: NextSuggestion;
   let calls = rec.nextCalls ?? 0;
   try {
@@ -41,7 +55,7 @@ export async function askNext(rec: StudyRecord, theme: Theme): Promise<NextSugge
       claimDirection: rec.prediction.claim?.direction ?? "unknown",
       observed: rec.result.observed,
       consistent: rec.result.consistent,
-      explained: rec.explain.trim().length >= MIN_EXPLAIN_CHARS,
+      explained: basis.startsWith("1"),
       doneVariantIds: doneVariantIds(theme.id),
       nextCalls: calls,
     });
@@ -54,15 +68,16 @@ export async function askNext(rec: StudyRecord, theme: Theme): Promise<NextSugge
       source: reply.source,
       traceId: /^0+$/.test(reply.trace_id) ? null : reply.trace_id,
       trail: reply.trail ?? [],
+      basis,
     };
   } catch {
-    suggestion = fallback(rec, theme);
+    suggestion = { ...fallback(rec, theme), basis };
   }
-  // 待っている間に別の画面で次の一手が入っていたら、そちらを使う
+  // 待っている間に、同じものを見た次の一手が入っていたら、そちらを使う
   const latest = recordById(rec.id);
-  if (latest?.nextSuggestion) return latest.nextSuggestion;
+  if (latest?.nextSuggestion?.basis === basis) return latest.nextSuggestion;
   updateRecord(rec.id, (r) => {
-    const label = suggestion.source === "agent" ? "ラボ先生（Gemini）が結果を読んで選んだ" : "カタログの順";
+    const label = (suggestion.source === "agent" ? "ラボ先生（Gemini）が結果を読んで選んだ" : "カタログの順") + (again ? "。理由や判定が変わったので聞き直した" : "");
     const body = suggestion.action === "reflect" ? `先にふり返り: ${suggestion.why}（${label}）` : `${suggestion.question}（${label}）`;
     const n = addEvent({ ...r, nextSuggestion: suggestion, nextCalls: calls }, "次の一手", body.slice(0, 300), "orange");
     const trail = trailText(suggestion.trail);

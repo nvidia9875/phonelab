@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { themeById } from "../catalog/themes";
 import { clearAll, createRecord, recordById, updateRecord, type StudyRecord } from "../store/records";
-import { askNext } from "./nextStep";
+import { askNext, isNextStale } from "./nextStep";
 import { closeAndNext, chooseNext, nextVariantFor, trailText } from "./useFlow";
 
 const sound = themeById("sound")!;
@@ -92,6 +92,41 @@ describe("askNext（結果のあとの次の一手）", () => {
     expect(next?.plan?.source).toBe("agent");
     expect(next?.plan?.why).toBe(NEXT.why);
     expect(next?.plan?.trail).toEqual(NEXT.trail);
+  });
+});
+
+describe("聞き直し（10/2 採点 2-1）", () => {
+  beforeEach(() => clearAll());
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("asks again after the student writes why, and not before", async () => {
+    const fetchMock = serverAnswers({ ...NEXT, action: "reflect", experiment_id: null, question: "" });
+    const rec = judged();
+    await askNext(rec, sound);
+    expect(isNextStale(recordById(rec.id)!)).toBe(false);
+
+    updateRecord(rec.id, (r) => ({ ...r, explain: "強くしても震える速さは同じだったから" }));
+    const written = recordById(rec.id)!;
+    expect(isNextStale(written)).toBe(true);
+
+    fetchMock.mockImplementation(async () => ({ ok: true, status: 200, json: async () => NEXT }));
+    const s = await askNext(written, sound);
+
+    expect(s?.action).toBe("next");
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const sent = JSON.parse((fetchMock.mock.calls[1] as unknown as [string, { body: string }])[1].body);
+    expect(sent.explained).toBe(true);
+    expect(recordById(rec.id)!.events.filter((e) => e.k === "次の一手").at(-1)?.body).toContain("聞き直した");
+  });
+
+  it("asks again when re-measuring changes the result", async () => {
+    serverAnswers(NEXT);
+    const rec = judged();
+    await askNext(rec, sound);
+
+    updateRecord(rec.id, (r) => ({ ...r, result: { ...r.result!, b: 260, observed: "faster", consistent: true } }));
+
+    expect(isNextStale(recordById(rec.id)!)).toBe(true);
   });
 });
 

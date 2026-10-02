@@ -12,6 +12,8 @@ export interface ResultProps {
   nextDirection: Direction | null;
   /** ラボ先生の次の一手（記録ごとに 1 回聞く。null の間は聞いている途中） */
   suggestion: NextSuggestion | null;
+  /** 理由を書いた・測り直したなどで、次の一手を聞き直すとき */
+  stale: boolean;
   onLoadNext: () => Promise<NextSuggestion | null>;
   onExplain: (text: string) => void;
   onNext: (direction: Direction) => void;
@@ -35,24 +37,25 @@ const NEXT_SOURCE: Record<NextSuggestion["source"], string> = {
   stub: "いまはラボ先生につながらないので、カタログの順です",
 };
 
-export function Result({ variant, judgement, explain, nextVariant, nextDirection, suggestion, onLoadNext, onExplain, onNext, onGoNext, onFinish, onRecord, onChat, retries, maxRetry, repeats, sample = false, onRemeasure, onHome }: ResultProps) {
+export function Result({ variant, judgement, explain, nextVariant, nextDirection, suggestion, stale, onLoadNext, onExplain, onNext, onGoNext, onFinish, onRecord, onChat, retries, maxRetry, repeats, sample = false, onRemeasure, onHome }: ResultProps) {
   const [text, setText] = useState(explain);
-  const [loading, setLoading] = useState(!suggestion);
+  const [loading, setLoading] = useState(stale);
   useEffect(() => {
-    if (suggestion) {
+    if (!stale) {
       setLoading(false);
       return;
     }
     let alive = true;
+    setLoading(true);
     void onLoadNext().finally(() => {
       if (alive) setLoading(false);
     });
     return () => {
       alive = false;
     };
-    // 記録ごとに 1 回（key={r.id} で画面ごと作り直す）
+    // 読んだもの（理由・判定）が変わったときだけ聞き直す
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [stale]);
   const reflect = suggestion?.action === "reflect";
   const question = suggestion?.action === "next" && suggestion.variantId === nextVariant?.id ? suggestion.question : null;
   const j = judgement;
