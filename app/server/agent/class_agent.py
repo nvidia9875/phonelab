@@ -45,6 +45,15 @@ EVENT_KINDS = frozenset(
     }
 )
 EVENT_KIND_RE = re.compile(r"^測定 \d{1,2}$")
+# 先生に見せる言葉で渡す（10/2: 見立てが「open が 3 人、held が 3 人」と内部の名前で書いた）
+STATUS_WORDS = {
+    "not_started": "未着手",
+    "open": "進行中",
+    "held": "保留",
+    "judged": "判定済み",
+    "signed": "記録済み",
+    "stopped": "途中で停止",
+}
 STAGES = frozenset({"predict", "plan", "setup_A", "measure_A", "setup_B", "measure_B", "result"})
 TIMELINES_KEY = "class_timelines"
 KNOWN_NUMBERS_KEY = "class_numbers"
@@ -126,12 +135,12 @@ def build_snapshot(
     by_theme: dict[str, Counter[str]] = {}
     for number, seen, current in rows:
         if not current:
-            students.append({"number": number, "status": "not_started"})
-            status_count["not_started"] += 1
+            students.append({"number": number, "status": STATUS_WORDS["not_started"]})
+            status_count[STATUS_WORDS["not_started"]] += 1
             continue
         theme = CATALOG.get(str(current.get("theme_id")))
         theme_title = theme.title if theme else "不明"
-        status = str(current.get("status"))
+        status = STATUS_WORDS.get(str(current.get("status")), "不明")
         holds = [
             HOLD_WORDS[str(c)] for c in current.get("hold_codes") or [] if str(c) in HOLD_WORDS
         ]

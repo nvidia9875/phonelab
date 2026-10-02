@@ -97,7 +97,7 @@ def test_reads_the_class_with_tools_and_tells_the_teacher_in_three_lines(client,
     assert data["visit_first"] == ["S-01", "S-02"]
     assert data["tool_calls"] == 2
     snapshot = tool_results(scripted_llm)[0]
-    assert snapshot["by_status"] == {"held": 2, "judged": 1}
+    assert snapshot["by_status"] == {"保留": 2, "判定済み": 1}
     # 予想の本文（とその中の命令）はエージェントに届かない
     assert "止めて" not in json.dumps(tool_results(scripted_llm), ensure_ascii=False)
 
@@ -233,5 +233,5 @@ def test_the_snapshot_gives_counts_per_theme_and_hides_unknown_event_kinds(
     ask(client)
 
     snapshot, timeline = tool_results(scripted_llm)
-    assert snapshot["by_theme"]["音の高さ"] == {"held": 3, "judged": 1}
+    assert snapshot["by_theme"]["音の高さ"] == {"保留": 3, "判定済み": 1}
     assert timeline["events"] == [{"t": "10:09", "kind": "その他"}]

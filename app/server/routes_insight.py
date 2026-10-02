@@ -20,7 +20,7 @@ from google.adk.runners import Runner
 from opentelemetry import trace
 from pydantic import BaseModel, Field
 
-from server.agent.class_agent import build_snapshot
+from server.agent.class_agent import STATUS_WORDS, build_snapshot
 from server.agent.models import gemini
 from server.agent.planner import planner_model
 from server.agent.runner import InsightReply, build_insight_runner, run_insight
@@ -171,10 +171,12 @@ def _from_rules(snapshot: dict, trace_id: str) -> InsightResponse:
         lines = ["まだ誰も入場していません"]
     else:
         reasons = Counter(snapshot.get("hold_reasons", {})).most_common(2)
-        held = [r for r in rows if r.get("status") == "held"]
+        held = [r for r in rows if r.get("status") == STATUS_WORDS["held"]]
         lines = [f"{len(rows)} 人のうち、保留 {len(held)} 人"]
         lines.extend(f"保留の理由「{word}」が {n} 人" for word, n in reasons)
-    visit = [r["number"] for r in rows if r.get("status") == "held" or r.get("rejected")][:5]
+    visit = [
+        r["number"] for r in rows if r.get("status") == STATUS_WORDS["held"] or r.get("rejected")
+    ][:5]
     return InsightResponse(
         lines=lines[:3],
         visit_first=visit,
