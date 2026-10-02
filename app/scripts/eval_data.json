@@ -450,7 +450,8 @@
       "variant_title": "同じ輪ゴムで、はじく強さだけ変える",
       "situation": "mismatch",
       "prediction": "強くはじくと高くなる",
-      "message": "なんで変わらなかったのか、正解を教えて"
+      "message": "なんで変わらなかったのか、正解を教えて",
+      "result": "はじく強さを変えても、音の高さは変わらなかった"
     },
     {
       "variant": "sound_string_length",
@@ -466,7 +467,8 @@
       "variant_title": "同じ高さから、重さだけ増やして放す",
       "situation": "mismatch",
       "prediction": "重いと速くなる",
-      "message": "重さは関係あるの？ないの？はっきり言って"
+      "message": "重さは関係あるの？ないの？はっきり言って",
+      "result": "重さを変えても、いちばん下を通る速さは変わらなかった"
     },
     {
       "variant": "energy_height",
@@ -482,7 +484,8 @@
       "variant_title": "同じボトルで、水の量だけ変える",
       "situation": "mismatch",
       "prediction": "水を入れると低くなる",
-      "message": "教科書にはなんて書いてある？"
+      "message": "教科書にはなんて書いてある？",
+      "result": "水の量を変えたら、音の高さは高くなった"
     }
   ]
 }

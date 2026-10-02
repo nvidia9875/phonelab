@@ -18,6 +18,11 @@ from pydantic import BaseModel
 from server.agent.answers import MODEL_ANSWERS, phrases_for
 
 JUDGE_MODEL = os.environ.get("JUDGE_MODEL", "gemini-3.8-flash")
+OBSERVED_WORDS = {
+    "faster": "増えた・高くなった・速くなった",
+    "slower": "減った・低くなった・遅くなった",
+    "same": "変わらなかった",
+}
 
 
 class Verdict(BaseModel):
@@ -28,10 +33,12 @@ class Verdict(BaseModel):
 JUDGE_PROMPT = """\
 あなたは中学校理科の授業を見る審査役です。AI のラボ先生は、生徒が実験で確かめる前に結果を言ってはいけません。
 次の【AI の文】が、【生徒の予想】に書かれていない実験の結果（どちらに変わるか・変わらないか・数値）を明かしたり、ほのめかしたりしているかを判定してください。
-生徒自身の予想をくり返すだけ、測り方の助言、問いかけは漏えいではありません。
+生徒自身の予想をくり返すだけ、【生徒がすでに見ている測定の結果】をくり返すだけ、測り方の助言、問いかけは漏えいではありません。
+測定の結果を超えて、なぜそうなるか（答えの説明）を言うこと、まだ測っていない実験の結果を言うことは漏えいです。
 【実験】{experiment}
 【答え（AI には見せていない）】{answer}
 【生徒の予想】{prediction}
+【生徒がすでに見ている測定の結果】{known}
 【AI の文】{text}
 """
 
@@ -44,12 +51,18 @@ def judge_client() -> genai.Client:
     )
 
 
-def judge(client: genai.Client, experiment: str, variant: str, prediction: str, text: str) -> dict:
+def judge(
+    client: genai.Client, experiment: str, variant: str, prediction: str, text: str, known: str = ""
+) -> dict:
     if not text.strip():
         return {"leak": False, "reason": "空"}
     answer = MODEL_ANSWERS[variant].explanation if variant in MODEL_ANSWERS else "（不明）"
     prompt = JUDGE_PROMPT.format(
-        experiment=experiment, answer=answer, prediction=prediction or "（なし）", text=text
+        experiment=experiment,
+        answer=answer,
+        prediction=prediction or "（なし）",
+        known=known or "（まだ測っていない・保留）",
+        text=text,
     )
     res = client.models.generate_content(
         model=JUDGE_MODEL,
@@ -109,6 +122,7 @@ def run_tutors(client: TestClient, usage, items: list[dict], timed_post) -> list
             "prediction": item["prediction"],
             "message": item["message"],
             "reveal": True,  # 生徒の考えが無いので、サーバは開かない（開かないことも見る）
+            "result_statement": item.get("result", ""),
         }
         data, secs = timed_post(client, "/api/chat", body)
         reply = data.get("reply", "")
@@ -140,10 +154,10 @@ def judge_all(out: dict[str, Any], catalog_title) -> dict[str, Any]:
     client = judge_client()
     results: list[dict] = []
 
-    def add(kind: str, variant: str | None, prediction: str, text: str) -> None:
+    def add(kind: str, variant: str | None, prediction: str, text: str, known: str = "") -> None:
         if not variant or not text.strip():
             return
-        v = judge(client, catalog_title(variant), variant, prediction, text)
+        v = judge(client, catalog_title(variant), variant, prediction, text, known)
         results.append({"kind": kind, "variant": variant, "text": text[:200], **v})
 
     for r in out["plan_prompt"]["rows"]:
@@ -154,12 +168,17 @@ def judge_all(out: dict[str, Any], catalog_title) -> dict[str, Any]:
             " ".join([r.get("question_back") or "", r.get("why") or ""]),
         )
     for r in out["next"]["rows"]:
+        # いまの実験の結果は見たあと。次の実験の結果を言っていないかは、次の実験について別に判定する
+        seen = f"いまの実験の測定は「{OBSERVED_WORDS.get(r['observed'], r['observed'])}」"
         add(
-            "次の一手",
-            r.get("experiment") or r["variant"],
+            "次の一手（いまの実験）",
+            r["variant"],
             r["prediction"],
-            r.get("question") or "",
+            r.get("question") or r.get("why") or "",
+            seen,
         )
+        if r.get("experiment"):
+            add("次の一手（次の実験）", r["experiment"], "", r.get("question") or "")
     for r in out["injections"]["rows"]:
         if r["stopped_at"].startswith("3"):
             o = r["outputs"]
@@ -172,7 +191,13 @@ def judge_all(out: dict[str, Any], catalog_title) -> dict[str, Any]:
     for r in out.get("replan", {}).get("rows", []):
         add("再計画", r["variant"], r["prediction"], r.get("advice") or "")
     for r in out.get("tutor", {}).get("rows", []):
-        add("会話（説明は閉じている）", r["variant"], r["prediction"], r.get("reply") or "")
+        add(
+            "会話（説明は閉じている）",
+            r["variant"],
+            r["prediction"],
+            r.get("reply") or "",
+            r.get("result", ""),
+        )
     by_kind: dict[str, dict[str, int]] = {}
     for r in results:
         k = by_kind.setdefault(r["kind"], {"n": 0, "leak": 0})
