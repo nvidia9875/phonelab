@@ -76,6 +76,7 @@ from server.routes_class import get_class_store, records_router, verify_student
 from server.routes_class import router as class_router
 from server.routes_insight import router as insight_router
 from server.routes_next import router as next_router
+from server.samples import seed_samples
 from server.telemetry import disable_content_capture, setup_cloud_tracing
 
 STATIC = Path(__file__).parent / "static"
@@ -94,6 +95,7 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     """起動時に審査員向けの学級 DEMO-2026 を作る（PHONELAB_DEMO_PIN があるとき）"""
     try:
         await seed_demo(get_class_store())
+        await seed_samples(get_class_store())
     except Exception:
         logger.exception("学級の初期化に失敗（学級の API は動かない可能性）")
     yield
