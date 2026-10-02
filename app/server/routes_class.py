@@ -32,7 +32,10 @@ CODE_RE = re.compile(r"^[A-Z0-9-]{3,20}$")
 NUMBER_RE = r"^[A-Za-z0-9-]{1,8}$"
 PIN_ATTEMPTS_PER_WINDOW = 10
 PIN_WINDOW_S = 600
-RECORD_POSTS_PER_WINDOW = 120
+# 記録の送信は、合言葉の合った生徒ごとに数える（1 人 10 分 120 回）。
+# 学校は全員が同じ外向き IP なので、IP の上限は 40 人分の余裕を持たせる（10/2 の採点で 31 人の学級が止まると指摘）
+RECORD_POSTS_PER_STUDENT = 120
+RECORD_POSTS_PER_IP = 120 * 40
 RECORD_WINDOW_S = 600
 MAX_EVENTS = 12  # 判断の跡の行が増えたので 8 → 12（10/2）
 NOT_FOUND = "学級コードが見つかりません。先生に確認してください"
@@ -167,7 +170,12 @@ def get_pin_limiter() -> SlidingWindowLimiter:
 
 @lru_cache(maxsize=1)
 def get_record_limiter() -> SlidingWindowLimiter:
-    return SlidingWindowLimiter(limit=RECORD_POSTS_PER_WINDOW, window_s=RECORD_WINDOW_S)
+    return SlidingWindowLimiter(limit=RECORD_POSTS_PER_IP, window_s=RECORD_WINDOW_S)
+
+
+@lru_cache(maxsize=1)
+def get_student_record_limiter() -> SlidingWindowLimiter:
+    return SlidingWindowLimiter(limit=RECORD_POSTS_PER_STUDENT, window_s=RECORD_WINDOW_S)
 
 
 def _out(policy: ClassPolicy, response: Response) -> ClassOut:
@@ -346,6 +354,7 @@ async def post_record(
     request: Request,
     store: Annotated[ClassStore, Depends(get_class_store)],
     limiter: Annotated[SlidingWindowLimiter, Depends(get_record_limiter)],
+    student_limiter: Annotated[SlidingWindowLimiter, Depends(get_student_record_limiter)],
 ) -> dict[str, bool]:
     """生徒の端末が、記録が変わるたびに要約を送る（生データは端末の中）。学級が無ければ 404"""
     if not limiter.allow(_client_ip(request)):
@@ -353,6 +362,8 @@ async def post_record(
     record = await _load(store, body.class_code)
     number = body.number.upper()
     await verify_student(store, record.policy.class_code, number, body.secret)
+    if not student_limiter.allow(f"{record.policy.class_code}|{number}"):
+        raise HTTPException(status_code=429, detail="送信が多すぎます")
     summary = body.record.model_dump()
     await store.put_record(record.policy.class_code, number, summary)
     return {"ok": True}

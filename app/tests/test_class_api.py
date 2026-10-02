@@ -320,3 +320,31 @@ def test_the_dashboard_carries_the_allowed_sensors_so_a_new_teacher_pc_does_not_
     assert client.post("/api/class/DEMO-2026/dashboard", json={"pin": PIN}).json()[
         "allowed_sensors"
     ] == ["microphone"]
+
+
+def test_a_whole_class_behind_one_school_ip_can_keep_syncing(client):
+    """10/2 採点: IP ごと 120 回では、同じ IP の 31 人が 4 回ずつ送るだけで止まった。いまは生徒ごとに数える"""
+    for n in range(31):
+        number = f"S-{n + 1:02d}"
+        _, secret = post_record(client, summary(record_id=f"r{n}"), number=number)
+        for i in range(3):
+            res, _ = post_record(
+                client,
+                summary(record_id=f"r{n}", updated_at=f"2026-09-17T01:0{i + 1}:00Z"),
+                number=number,
+                secret=secret,
+            )
+            assert res.status_code == 200
+
+
+def test_one_student_cannot_flood_the_record_api(client):
+    from server.routes_class import get_student_record_limiter
+
+    limiter = SlidingWindowLimiter(limit=2, window_s=60)
+    app.dependency_overrides[get_student_record_limiter] = lambda: limiter
+    _, secret = post_record(client, summary())
+    post_record(client, summary(), secret=secret)
+
+    res, _ = post_record(client, summary(), secret=secret)
+
+    assert res.status_code == 429
