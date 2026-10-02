@@ -4,7 +4,7 @@
  * 学級に入っている端末だけが送る。送れなくても端末の記録は失われない。
  */
 import { postRecordSummary, type RecordSummary } from "./classroom";
-import { getState, subscribeStore, type StudyRecord } from "../store/records";
+import { getState, isMine, subscribeStore, type StudyRecord } from "../store/records";
 
 const MAX_EVENTS = 12;
 const DEBOUNCE_MS = 800;
@@ -37,17 +37,19 @@ export function startRecordSync(send: typeof postRecordSummary = postRecordSumma
   const tick = () => {
     const { student, classState, records } = getState();
     if (!student?.secret || !classState) return; // 合言葉が無い端末は送らない（サーバも受け付けない）
-    const secret = student.secret;
     for (const rec of records) {
-      if (sent.get(rec.id) === rec.updatedAt || timers.has(rec.id)) continue;
+      // 送るのは、いまの番号の記録だけ（前に同じ端末を使った人の記録を、新しい番号で送らない）
+      if (!isMine(rec, student) || sent.get(rec.id) === rec.updatedAt || timers.has(rec.id)) continue;
       timers.set(
         rec.id,
         setTimeout(() => {
           timers.delete(rec.id);
-          const latest = getState().records.find((r) => r.id === rec.id);
-          if (!latest) return;
+          const now = getState();
+          const latest = now.records.find((r) => r.id === rec.id);
+          // 待っている間に番号が変わったら送らない
+          if (!latest || !now.student?.secret || !isMine(latest, now.student)) return;
           sent.set(latest.id, latest.updatedAt);
-          send(student.classCode, student.number, secret, summarizeRecord(latest)).catch(() => sent.delete(latest.id));
+          send(now.student.classCode, now.student.number, now.student.secret, summarizeRecord(latest)).catch(() => sent.delete(latest.id));
         }, DEBOUNCE_MS),
       );
     }

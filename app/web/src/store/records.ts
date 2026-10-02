@@ -92,6 +92,8 @@ export interface Rejection {
 }
 export interface StudyRecord {
   id: string;
+  /** 誰の記録か（学級コード|番号）。学級に入っていない端末で作ったものは null。古い記録には無い（null 扱い） */
+  owner?: string | null;
   themeId: string;
   variantId: string | null;
   status: RecordStatus;
@@ -177,11 +179,26 @@ function write(key: string, value: unknown): void {
   }
 }
 
+/** 端末を共有しても、記録は番号ごとに分ける（10/2 採点: 番号を変えると前の人の記録が新しい番号で送られ得た） */
+export function ownerKey(student: Student | null): string | null {
+  return student ? `${student.classCode.trim().toUpperCase()}|${student.number.trim().toUpperCase()}` : null;
+}
+export function isMine(r: StudyRecord, student: Student | null = state.student): boolean {
+  return (r.owner ?? null) === ownerKey(student);
+}
+
 let state: State = { records: read(KEY_RECORDS, []), student: read(KEY_STUDENT, null), halted: read(KEY_HALTED, false), settings: { ...DEFAULT_SETTINGS, ...read(KEY_SETTINGS, {}) }, classState: read(KEY_CLASS, null) };
 const listeners = new Set<() => void>();
+/** 画面に出すのは、いまの番号の記録だけ（全部は state.records に残る） */
+function visible(s: State): State {
+  return { ...s, records: s.records.filter((r) => (r.owner ?? null) === ownerKey(s.student)) };
+}
+let snapshot: State = visible(state);
 function emit(next: State): void {
   const prev = state;
   state = next;
+  if (next.records !== prev.records || next.student !== prev.student) snapshot = visible(next);
+  else snapshot = { ...next, records: snapshot.records };
   // 変わったものだけ書く（学級のポーリングのたびに全記録を書き直さない）
   if (next.records !== prev.records) write(KEY_RECORDS, next.records);
   if (next.student !== prev.student) write(KEY_STUDENT, next.student);
@@ -195,7 +212,7 @@ function subscribe(l: () => void): () => void {
   return () => listeners.delete(l);
 }
 export function useStore(): State {
-  return useSyncExternalStore(subscribe, () => state);
+  return useSyncExternalStore(subscribe, () => snapshot);
 }
 /** 画面の外（記録の同期など）から状態の変化を聞く */
 export function subscribeStore(listener: () => void): () => void {
@@ -250,6 +267,7 @@ export function createRecord(themeId: string): StudyRecord {
   const at = nowIso();
   const rec: StudyRecord = {
     id: newId(),
+    owner: ownerKey(state.student),
     themeId,
     variantId: null,
     status: "open",
@@ -292,12 +310,12 @@ export function addEvent(r: StudyRecord, k: string, body: string, tone?: "orange
 export function recordById(id: string): StudyRecord | undefined {
   return state.records.find((r) => r.id === id);
 }
-export function recordsForTheme(themeId: string, records = state.records): StudyRecord[] {
-  return records.filter((r) => r.themeId === themeId);
+export function recordsForTheme(themeId: string, records = snapshot.records): StudyRecord[] {
+  return records.filter((r) => r.themeId === themeId && isMine(r));
 }
 /** テーマの「続き」になる記録（open / held / judged で最新のもの） */
-export function activeRecordForTheme(themeId: string, records = state.records): StudyRecord | undefined {
-  return records.find((r) => r.themeId === themeId && (r.status === "open" || r.status === "held" || r.status === "judged"));
+export function activeRecordForTheme(themeId: string, records = snapshot.records): StudyRecord | undefined {
+  return records.find((r) => r.themeId === themeId && isMine(r) && (r.status === "open" || r.status === "held" || r.status === "judged"));
 }
 export function clearAll(): void {
   emit({ records: [], student: state.student, halted: false, settings: state.settings, classState: state.classState });

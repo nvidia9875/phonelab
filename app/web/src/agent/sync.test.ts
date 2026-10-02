@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { clearAll, createRecord, recordById, setClassState, setStudent, updateRecord } from "../store/records";
+import { activeRecordForTheme, clearAll, createRecord, recordById, setClassState, setStudent, updateRecord } from "../store/records";
 import { startRecordSync, summarizeRecord } from "./sync";
 
 describe("summarizeRecord", () => {
@@ -49,5 +49,54 @@ describe("startRecordSync", () => {
 
     expect(send).not.toHaveBeenCalled();
     stop();
+  });
+});
+
+describe("記録は番号ごと（10/2 採点: 番号を変えると前の人の記録が新しい番号で送られ得た）", () => {
+  const cls = { classCode: "DEMO-2026", school: "jhs" as const, allowedSensors: ["microphone" as const], teacherEnabled: [], halted: false, updatedAt: "", seenAt: "" };
+  beforeEach(() => {
+    clearAll();
+    setStudent(null);
+    setClassState(null);
+    vi.useFakeTimers();
+  });
+
+  it("does not send the previous student's record under the new number", async () => {
+    const send = vi.fn(async () => {});
+    setClassState(cls);
+    setStudent({ classCode: "DEMO-2026", number: "S-04", secret: "ABC234" });
+    const old = createRecord("sound");
+    setStudent({ classCode: "DEMO-2026", number: "S-05", secret: "XYZ789" });
+    const stop = startRecordSync(send);
+
+    updateRecord(old.id, (r) => ({ ...r, explain: "書き足し" }));
+    const mine = createRecord("sound");
+    await vi.advanceTimersByTimeAsync(1000);
+
+    expect(send.mock.calls.map((c) => (c as unknown as [string, string, string, { record_id: string }])[3].record_id)).toEqual([mine.id]);
+    expect((send.mock.calls[0] as unknown as unknown[]).slice(0, 3)).toEqual(["DEMO-2026", "S-05", "XYZ789"]);
+    stop();
+  });
+
+  it("drops a pending send when the number changes before it goes out", async () => {
+    const send = vi.fn(async () => {});
+    setClassState(cls);
+    setStudent({ classCode: "DEMO-2026", number: "S-04", secret: "ABC234" });
+    const stop = startRecordSync(send);
+    createRecord("sound");
+
+    setStudent({ classCode: "DEMO-2026", number: "S-05", secret: "XYZ789" });
+    await vi.advanceTimersByTimeAsync(1000);
+
+    expect(send).not.toHaveBeenCalled();
+    stop();
+  });
+
+  it("the theme only continues the current student's record", () => {
+    setStudent({ classCode: "DEMO-2026", number: "S-04", secret: "ABC234" });
+    createRecord("sound");
+    setStudent({ classCode: "DEMO-2026", number: "S-05", secret: "XYZ789" });
+
+    expect(activeRecordForTheme("sound")).toBeUndefined();
   });
 });
