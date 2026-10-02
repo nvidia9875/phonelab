@@ -277,3 +277,13 @@ def test_a_rejection_trail_says_the_model_was_not_called(client, fake_llm):
     data = client.post("/api/plan", json=body(text="スマホを落として音を測りたい")).json()
 
     assert any("モデルは呼ばない" in line for line in data["trail"])
+
+
+def test_a_question_back_that_leads_to_a_result_is_replaced(client, fake_llm):
+    """10/2 採点 2-6: 問い返しも出口で検査する"""
+    fake_llm.reply = plan_json(question_back="強くはじいたら高くなるって思わない？")
+
+    data = client.post("/api/plan", json=body(text="高くなる")).json()
+
+    assert data["kind"] == "question"
+    assert "高くな" not in data["question_back"]

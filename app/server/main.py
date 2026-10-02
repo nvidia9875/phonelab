@@ -27,6 +27,7 @@ from server.agent.answers import MODEL_ANSWERS, phrases_for
 from server.agent.catalog import CATALOG, candidates_for, short_changes
 from server.agent.model_armor import armor_from_env
 from server.agent.planner import (
+    HoldCode,
     PlanContext,
     ReplanContext,
     build_plan_prompt,
@@ -458,9 +459,7 @@ class ReplanRequest(BaseModel):
     theme_id: str
     variant_id: str
     condition: Literal["A", "B"]
-    hold_codes: list[Annotated[str, Field(max_length=30)]] = Field(
-        default_factory=list, max_length=MAX_HOLD_CODES
-    )
+    hold_codes: list[HoldCode] = Field(default_factory=list, max_length=MAX_HOLD_CODES)
     retries: int = Field(default=0, ge=0, le=10)
     prediction: str = Field(default="", max_length=MAX_PREDICTION_CHARS)
     done_variant_ids: list[Annotated[str, Field(max_length=60)]] = Field(

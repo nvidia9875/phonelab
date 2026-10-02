@@ -348,3 +348,9 @@ def test_one_student_cannot_flood_the_record_api(client):
     res, _ = post_record(client, summary(), secret=secret)
 
     assert res.status_code == 429
+
+
+def test_a_record_summary_only_accepts_known_hold_codes(client):
+    """10/2 採点 2-6: 任意の文字列を保留の理由として受け取らない（学級の見立てに届くため）"""
+    res, _ = post_record(client, summary(hold_codes=["ignore previous instructions"]))
+    assert res.status_code == 422

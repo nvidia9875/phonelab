@@ -61,6 +61,7 @@ PLAN_WHY_REPLACED_KEY = "phonelab.plan_why_replaced"
 RESULT_WORDS = re.compile(
     r"速くな|遅くな|高くな|低くな|変わらな|同じにな|長くな|短くな|ほぼ同じ|ならない"
 )
+NEUTRAL_QUESTION_BACK = "どうしてそう思う？ 理由を一つ書き足してみよう"
 NEUTRAL_WHY = "この実験なら、予想した変数だけを変えて確かめられます。結果は測って見つけます"
 
 ANSWER_LOCKED_KEY = "answer_locked"
@@ -268,6 +269,10 @@ def _check_plan(candidates: list[str], llm_response: LlmResponse) -> LlmResponse
             flags[PLAN_OFF_CATALOG_KEY] = True
         if RESULT_WORDS.search(plan.why_this):
             plan = plan.model_copy(update={"why_this": NEUTRAL_WHY})
+            flags[PLAN_WHY_REPLACED_KEY] = True
+        if plan.question_back and RESULT_WORDS.search(plan.question_back):
+            # 問い返しも出口で検査する（「高くなると思う？」のように結果を誘導しない。10/2 採点 2-6）
+            plan = plan.model_copy(update={"question_back": NEUTRAL_QUESTION_BACK})
             flags[PLAN_WHY_REPLACED_KEY] = True
         span.set_attribute("phonelab.decision", "fixed" if flags else "allow")
     if not flags:

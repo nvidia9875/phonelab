@@ -19,8 +19,13 @@ logger = logging.getLogger(__name__)
 
 
 def disable_content_capture() -> None:
+    """既に true が入っていても上書きする（setdefault では外から入れた true を消せない。10/2 採点 2-5）"""
     for name in _CONTENT_CAPTURE_ENVS:
-        os.environ.setdefault(name, "false")
+        if os.environ.get(name, "").lower() not in {"", "false", "0"}:
+            logger.warning(
+                "%s=%s を false に上書き（生徒の文をスパンに入れない）", name, os.environ[name]
+            )
+        os.environ[name] = "false"
 
 
 def setup_cloud_tracing() -> bool:

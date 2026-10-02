@@ -12,6 +12,7 @@ from typing import Annotated, Literal
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, Field
 
+from server.agent.planner import HoldCode
 from server.classroom import (
     SENSORS,
     ClassPolicy,
@@ -108,9 +109,7 @@ class RecordSummary(BaseModel):
     stage: str = Field(max_length=20)
     prediction: str = Field(default="", max_length=500)
     claim: ClaimIn | None = None
-    hold_codes: list[Annotated[str, Field(max_length=30)]] = Field(
-        default_factory=list, max_length=10
-    )
+    hold_codes: list[HoldCode] = Field(default_factory=list, max_length=10)
     retries: dict[Literal["A", "B"], int] = Field(default_factory=dict)
     result: ResultIn | None = None
     plan_source: str | None = Field(default=None, max_length=10)

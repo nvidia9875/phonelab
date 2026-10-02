@@ -100,7 +100,10 @@ def build_snapshot(
             continue
         theme = CATALOG.get(str(current.get("theme_id")))
         status = str(current.get("status"))
-        holds = [HOLD_WORDS.get(str(c), str(c)) for c in current.get("hold_codes") or []]
+        # 知らないコードは渡さない（任意の文字列をエージェントに届けない）
+        holds = [
+            HOLD_WORDS[str(c)] for c in current.get("hold_codes") or [] if str(c) in HOLD_WORDS
+        ]
         result = current.get("result") or {}
         variant = str(current.get("variant_id") or "")
         status_count[status] += 1
