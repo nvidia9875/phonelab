@@ -393,7 +393,7 @@ def count_phrase(key: str, n: int) -> str:
     """〔キー〕を「何の・何人」まで言う句にする。数だけ埋めると、文がほかのテーマの話でも 3 人に見える（10/2 採点 4 回目）"""
     subject, _, status = key.partition("・")
     if subject == "理由":
-        return f"理由が「{status}」の子 {n} 人"
+        return f"「{status}」の子 {n} 人"
     if subject == "全体":
         return f"学級全体で{status} {n} 人" if status else f"学級全体 {n} 人"
     return f"{subject}で{status} {n} 人" if status else f"{subject} {n} 人"

@@ -433,6 +433,28 @@
       "retries": 2,
       "prediction": "高くすると速くなる",
       "expected": "switch"
+    },
+    {
+      "theme": "sound",
+      "variant": "sound_string_length",
+      "condition": "B",
+      "hold_codes": [
+        "clipping"
+      ],
+      "retries": 0,
+      "prediction": "短くすると高くなる",
+      "expected": "retry"
+    },
+    {
+      "theme": "bottle",
+      "variant": "bottle_water",
+      "condition": "B",
+      "hold_codes": [
+        "low_snr"
+      ],
+      "retries": 1,
+      "prediction": "水を入れると低くなる",
+      "expected": "retry"
     }
   ],
   "tutor": [
