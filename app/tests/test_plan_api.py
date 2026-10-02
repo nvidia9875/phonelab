@@ -211,3 +211,69 @@ def test_returns_a_timeout_the_app_can_fall_back_from(monkeypatch):
         app.dependency_overrides.clear()
 
     assert res.status_code == 504
+
+
+# ---- 自己修正（X2）と判断の跡（X4） ----
+
+
+def prompt_of(request) -> str:
+    return "".join(
+        part.text or "" for content in request.contents for part in (content.parts or [])
+    )
+
+
+def test_redoes_an_off_catalog_pick_once_with_the_reason(client, fake_llm):
+    """検査に落ちた出力は、理由を添えて 1 回だけ作り直させる。作り直しが通ればそれを使う"""
+    fake_llm.replies = [plan_json(experiment_id="energy_height"), plan_json()]
+
+    data = client.post("/api/plan", json=body()).json()
+
+    assert data["variant_id"] == "sound_pluck_strength"
+    assert data["fix_reasons"] == ["off_catalog"]
+    assert data["self_corrected"] is True
+    assert data["policy_fixed"] is False
+    assert data["planner_calls"] == 2
+    assert len(fake_llm.requests) == 2
+    assert "前回の出力の直すところ" in prompt_of(fake_llm.requests[1])
+    assert any("作り直し: 検査を通過" in line for line in data["trail"])
+
+
+def test_keeps_the_policy_replacement_when_the_redo_also_fails(client, fake_llm):
+    fake_llm.replies = [
+        plan_json(why_this="強くしても高さは変わらないので確かめます"),
+        plan_json(why_this="やっぱり変わらないので"),
+    ]
+
+    data = client.post("/api/plan", json=body()).json()
+
+    assert "変わらない" not in data["why"]
+    assert data["self_corrected"] is False
+    assert data["policy_fixed"] is True
+    assert any("統制層が差し替えた" in line for line in data["trail"])
+
+
+def test_does_not_redo_when_the_call_limit_is_reached(client, fake_llm):
+    fake_llm.replies = [plan_json(experiment_id="energy_height")]
+
+    data = client.post("/api/plan", json=body(planner_calls=4)).json()
+
+    assert len(fake_llm.requests) == 1
+    assert data["variant_id"] == "sound_pluck_strength"
+    assert any("回数の上限" in line for line in data["trail"])
+
+
+def test_a_clean_plan_is_called_once_and_leaves_a_trail(client, fake_llm):
+    data = client.post("/api/plan", json=body()).json()
+
+    assert len(fake_llm.requests) == 1
+    assert data["fix_reasons"] == []
+    assert data["trail"][0].startswith("読んだ:")
+    assert "モデルの後の検査: 通過" in data["trail"]
+    # 判断の跡に予想の本文は入れない
+    assert all("強くはじく" not in line for line in data["trail"])
+
+
+def test_a_rejection_trail_says_the_model_was_not_called(client, fake_llm):
+    data = client.post("/api/plan", json=body(text="スマホを落として音を測りたい")).json()
+
+    assert any("モデルは呼ばない" in line for line in data["trail"])

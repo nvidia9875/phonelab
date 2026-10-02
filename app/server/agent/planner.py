@@ -63,17 +63,21 @@ def planner_model() -> str:
 def build_planner(
     model: str | BaseLlm,
     generate_content_config: types.GenerateContentConfig | None = None,
+    with_tools: bool = False,
 ) -> LlmAgent:
+    from server.agent.planner_tools import TOOLS_NOTE, planner_tools
+
     return LlmAgent(
         name="planner",
         model=model,
-        instruction=PLANNER_INSTRUCTION,
+        instruction=PLANNER_INSTRUCTION + (TOOLS_NOTE if with_tools else ""),
+        tools=planner_tools() if with_tools else [],
         output_schema=PlanOutput,
         generate_content_config=generate_content_config,
     )
 
 
-def build_plan_prompt(ctx: PlanContext) -> str:
+def build_plan_prompt(ctx: PlanContext, with_tools: bool = False) -> str:
     theme = CATALOG[ctx.theme_id]
     words = DIRECTION_WORDS[theme.unit]
     lines = [
@@ -85,11 +89,14 @@ def build_plan_prompt(ctx: PlanContext) -> str:
         lines.append(
             f"【前回の問い返し】{ctx.previous_question_back}（すでに問い返したので、今回は必ず実験を選びます）"
         )
-    lines.append("【選べる実験】この中から experiment_id を一つ")
-    lines.extend(
-        f"- {v.id}: {v.title}（変える: {v.changes}／一定: {v.holds}／変数名: {v.variable}）"
-        for v in ctx.candidates
-    )
+    if with_tools:
+        lines.append("【選べる実験】list_experiments で読む")
+    else:
+        lines.append("【選べる実験】この中から experiment_id を一つ")
+        lines.extend(
+            f"- {v.id}: {v.title}（変える: {v.changes}／一定: {v.holds}／変数名: {v.variable}）"
+            for v in ctx.candidates
+        )
     lines.append("【向きの言葉】" + "、".join(f"{k} = {v}" for k, v in words.items()))
     return "\n".join(lines)
 

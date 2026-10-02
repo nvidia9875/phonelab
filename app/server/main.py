@@ -33,6 +33,12 @@ from server.agent.planner import (
     planner_model,
     template_advice,
 )
+from server.agent.planner_tools import (
+    CLASS_RULES_KEY,
+    PLAN_CATALOG_KEY,
+    catalog_for_tools,
+    planner_tools_enabled,
+)
 from server.agent.policy import PredictionCheck, check_prediction
 from server.agent.policy_plugin import PLANNER_CALLS_PER_EXPERIMENT, REPLAN_CALLS_PER_RECORD
 from server.agent.runner import (
@@ -44,11 +50,23 @@ from server.agent.runner import (
     run_replan,
     run_tutor,
 )
+from server.agent.trail import check_lines, chose_line, policy_before_line, read_line, trail
 from server.agent.tutor import ChatTurn, TutorContext, build_tutor_prompt, chat_model
 from server.classroom import ClassStore, normalize_code, seed_demo
+from server.guards import (
+    HALTED_DETAIL,
+    MAX_CLASS_CODE_CHARS,
+    check_limits,
+    class_denies_theme,
+    class_is_halted,
+    class_rules,
+    get_student_limiter,
+)
 from server.ratelimit import SlidingWindowLimiter
 from server.routes_class import get_class_store, records_router, verify_student
 from server.routes_class import router as class_router
+from server.routes_insight import router as insight_router
+from server.routes_next import router as next_router
 from server.telemetry import disable_content_capture, setup_cloud_tracing
 
 STATIC = Path(__file__).parent / "static"
@@ -75,24 +93,8 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 app = FastAPI(title="PhoneLab", version="0.0.1", lifespan=lifespan)
 app.include_router(class_router)
 app.include_router(records_router)
-
-MAX_CLASS_CODE_CHARS = 20
-HALTED_DETAIL = "先生が学級の測定を止めています。解除されるまで待ってください"
-
-
-async def class_denies_theme(store: ClassStore, code: str | None, theme) -> str | None:
-    """学級の許可を、画面だけでなく Planner の入口でも検査する（9/18 Codex I2）"""
-    if not code:
-        return None
-    record = await store.get(normalize_code(code))
-    if record is None:
-        return None
-    policy = record.policy
-    if any(sensor not in policy.allowed_sensors for sensor in theme.sensors):
-        return "この実験で使うセンサーは、学級で許可されていません。先生に聞くか、別の実験を選んでください"
-    if theme.home and theme.id not in policy.teacher_enabled:
-        return "この実験は、先生が有効化したときだけできます"
-    return None
+app.include_router(next_router)
+app.include_router(insight_router)
 
 
 async def judged_on_server(
@@ -109,14 +111,6 @@ async def judged_on_server(
         and current.get("status") in ("judged", "signed")
         and current.get("result")
     )
-
-
-async def class_is_halted(store: ClassStore, code: str | None) -> bool:
-    """学級コード付きの呼び出しは、停止中なら Runner を動かさない（PolicyPlugin の before_run と二重に）"""
-    if not code:
-        return False
-    record = await store.get(normalize_code(code))
-    return record is not None and record.policy.halted
 
 
 @app.get("/api/status")
@@ -144,7 +138,7 @@ def require_spike_agent_enabled() -> None:
 
 @lru_cache(maxsize=1)
 def get_planner_runner() -> Runner:
-    return build_runner(planner_model())
+    return build_runner(planner_model(), with_tools=planner_tools_enabled())
 
 
 @app.post("/api/spike/agent", dependencies=[Depends(require_spike_agent_enabled)])
@@ -168,38 +162,6 @@ async def spike_agent(
         planner_calls=reply.planner_calls,
         trace_id=trace_id,
     )
-
-
-def client_key(request: Request) -> str:
-    """Cloud Run（run.app）は利用者の IP を X-Forwarded-For の末尾に足す。先頭は利用者が書けるので使わない"""
-    forwarded = request.headers.get("x-forwarded-for", "").split(",")[-1].strip()
-    return forwarded or (request.client.host if request.client else "unknown")
-
-
-def student_key(class_code: str | None, number: str | None) -> str | None:
-    if class_code and number:
-        return f"{normalize_code(class_code)}|{number.strip().upper()}"
-    return None
-
-
-@lru_cache(maxsize=1)
-def get_student_limiter() -> SlidingWindowLimiter:
-    return SlidingWindowLimiter(limit=PER_STUDENT_REQUESTS_PER_WINDOW, window_s=CHAT_WINDOW_S)
-
-
-def check_limits(
-    request: Request,
-    ip_limiter: SlidingWindowLimiter,
-    student_limiter: SlidingWindowLimiter,
-    class_code: str | None,
-    number: str | None,
-    detail: str,
-) -> None:
-    key = student_key(class_code, number)
-    if key and not student_limiter.allow(key):
-        raise HTTPException(status_code=429, detail=detail)
-    if not ip_limiter.allow(client_key(request)):
-        raise HTTPException(status_code=429, detail=detail)
 
 
 # ---- Planner: 予想を読んで実験を一つ選ぶ（docs/architecture.md 2.2、docs/policy.md 3.2〜3.4） ----
@@ -257,6 +219,11 @@ class PlanResponse(BaseModel):
     skipped: bool = False
     # Policy が Planner の出力を直した（候補外の id、理由に混じった結果、読めない出力）
     policy_fixed: bool = False
+    # 1 回目が検査に落ち、理由を返して作り直させたら、その理由と結果
+    fix_reasons: list[str] = Field(default_factory=list)
+    self_corrected: bool = False
+    # 判断の跡（何を読み、何を選び、統制層が何を直したか）。本文は入れない
+    trail: list[str] = Field(default_factory=list)
     source: PlanSource
     trace_id: str
 
@@ -304,12 +271,14 @@ async def plan(
         if denied:
             check = PredictionCheck(kind="hint", message=denied)
         span.set_attribute("phonelab.policy", "class_policy" if denied else check.kind)
+        read = read_line(f"予想（{len(body.text)} 字）と、選べる実験 {len(candidates)} 件")
         if check.kind == "hint":
             return PlanResponse(
                 kind="hint",
                 question_back=check.message,
                 planner_calls=body.planner_calls,
                 source="policy",
+                trail=trail(read, policy_before_line("class_policy" if denied else "hint")),
                 trace_id=trace_id,
             )
         if check.kind == "reject" and check.rejection:
@@ -325,9 +294,11 @@ async def plan(
                 ),
                 planner_calls=body.planner_calls,
                 source="policy",
+                trail=trail(read, policy_before_line("reject")),
                 trace_id=trace_id,
             )
 
+        with_tools = planner_tools_enabled()
         prompt = build_plan_prompt(
             PlanContext(
                 school=body.school,
@@ -335,7 +306,16 @@ async def plan(
                 text=body.text,
                 candidates=candidates,
                 previous_question_back=body.previous_question_back,
-            )
+            ),
+            with_tools=with_tools,
+        )
+        tool_state = (
+            {
+                PLAN_CATALOG_KEY: catalog_for_tools(theme, candidates),
+                CLASS_RULES_KEY: await class_rules(store, body.class_code),
+            }
+            if with_tools
+            else None
         )
         try:
             reply = await asyncio.wait_for(
@@ -345,6 +325,7 @@ async def plan(
                     planner_calls=body.planner_calls,
                     candidates=[c.id for c in candidates],
                     class_halted=halted,
+                    tool_state=tool_state,
                 ),
                 timeout=PLAN_TIMEOUT_S,
             )
@@ -357,7 +338,10 @@ async def plan(
         span.set_attribute("phonelab.skipped", reply.skipped)
         span.set_attribute("phonelab.plan_readable", reply.plan is not None)
         span.set_attribute("phonelab.policy_fixed", reply.off_catalog or reply.why_replaced)
+        span.set_attribute("phonelab.self_corrected", reply.self_corrected)
 
+    checked = check_lines(reply.fix_reasons, reply.retried, reply.self_corrected)
+    fixes = {"fix_reasons": list(reply.fix_reasons), "self_corrected": reply.self_corrected}
     if reply.skipped:
         return PlanResponse(
             kind="plan",
@@ -366,6 +350,7 @@ async def plan(
             planner_calls=reply.planner_calls,
             skipped=True,
             source="catalog",
+            trail=trail(read, policy_before_line("limit"), chose_line(first.id)),
             trace_id=trace_id,
         )
     if reply.plan is None:
@@ -376,7 +361,14 @@ async def plan(
             planner_calls=reply.planner_calls,
             policy_fixed=True,
             source="catalog",
+            trail=trail(
+                read,
+                policy_before_line("allow"),
+                checked,
+                chose_line(f"{first.id}（カタログの順）"),
+            ),
             trace_id=trace_id,
+            **fixes,
         )
     out = reply.plan
     if out.question_back and not body.previous_question_back:
@@ -385,7 +377,11 @@ async def plan(
             question_back=out.question_back[:MAX_QUESTION_BACK_CHARS],
             planner_calls=reply.planner_calls,
             source="agent",
+            trail=trail(
+                read, policy_before_line("allow"), chose_line("理由を一つ問い返す"), checked
+            ),
             trace_id=trace_id,
+            **fixes,
         )
     return PlanResponse(
         kind="plan",
@@ -398,7 +394,14 @@ async def plan(
         planner_calls=reply.planner_calls,
         policy_fixed=reply.off_catalog or reply.why_replaced,
         source="agent",
+        trail=trail(
+            read,
+            policy_before_line("allow"),
+            chose_line(f"{out.experiment_id}（予想の変数: {out.claim_variable}）"),
+            checked,
+        ),
         trace_id=trace_id,
+        **fixes,
     )
 
 
@@ -446,6 +449,9 @@ class ReplanResponse(BaseModel):
     advice: str
     source: PlanSource
     policy_fixed: bool = False
+    fix_reasons: list[str] = Field(default_factory=list)
+    self_corrected: bool = False
+    trail: list[str] = Field(default_factory=list)
     replan_calls: int
     trace_id: str
 
@@ -509,7 +515,12 @@ async def replan(
         span.set_attribute("phonelab.skipped", reply.skipped)
         span.set_attribute("phonelab.plan_readable", reply.plan is not None)
 
-    calls = body.replan_calls if reply.skipped else body.replan_calls + 1
+    calls = min(body.replan_calls + reply.calls_used, REPLAN_CALLS_PER_RECORD)
+    read = read_line(
+        f"保留の理由 {len(body.hold_codes)} 件・同じ条件の保留 {body.retries} 回・ほかの実験 {len(others)} 件"
+    )
+    fixes = {"fix_reasons": list(reply.fix_reasons), "self_corrected": reply.self_corrected}
+    checked = check_lines(reply.fix_reasons, reply.retried, reply.self_corrected)
     if reply.skipped or reply.plan is None:
         return ReplanResponse(
             action="retry",
@@ -517,9 +528,18 @@ async def replan(
             source="catalog",
             policy_fixed=reply.plan is None and not reply.skipped,
             replan_calls=calls,
+            trail=trail(
+                read,
+                policy_before_line("limit") if reply.skipped else checked,
+                chose_line("定型の測り直し"),
+            ),
             trace_id=trace_id,
+            **fixes,
         )
     out = reply.plan
+    chose = (
+        f"別の実験 {out.experiment_id} へ" if out.action == "switch" else "同じ実験で直して測り直す"
+    )
     return ReplanResponse(
         action=out.action,
         experiment_id=out.experiment_id if out.action == "switch" else None,
@@ -527,7 +547,9 @@ async def replan(
         source="agent",
         policy_fixed=reply.off_catalog or reply.advice_replaced,
         replan_calls=calls,
+        trail=trail(read, chose_line(chose), checked),
         trace_id=trace_id,
+        **fixes,
     )
 
 
@@ -541,11 +563,8 @@ MAX_CHAT_CHARS = 500
 MAX_CHAT_HISTORY = 20
 MAX_HOLD_REASONS = 6
 MIN_THINKING_CHARS = 8
-# 学校は 31 人が同じ外向き IP なので、IP だけの上限は学級 1 つ分（生徒 40 人 × 6 回）を超える値にし、
-# 学級コード＋番号が付いていればその単位でも数える
 CHAT_REQUESTS_PER_WINDOW = 240
 CHAT_WINDOW_S = 600
-PER_STUDENT_REQUESTS_PER_WINDOW = 30
 # 返事を待たせすぎない。9/16 に gemini-3.8-flash が 25〜50 秒かかった時間帯があった
 CHAT_TIMEOUT_S = 25
 

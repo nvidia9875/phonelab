@@ -190,7 +190,7 @@ def _client_ip(request: Request) -> str:
     return forwarded or (request.client.host if request.client else "unknown")
 
 
-async def _teacher(
+async def authorize_teacher(
     store: ClassStore, limiter: SlidingWindowLimiter, request: Request, code: str, pin: str
 ) -> ClassRecord:
     """PIN を確かめる。総当たりを防ぐため、**間違えた回数**を学級 × 接続元で数える。
@@ -254,7 +254,7 @@ async def reset_student(
     limiter: Annotated[SlidingWindowLimiter, Depends(get_pin_limiter)],
 ) -> dict[str, bool]:
     """先生が番号の合言葉を消す（端末を替えた・合言葉をなくした子のため）。次の入場で新しい合言葉が出る"""
-    record = await _teacher(store, limiter, request, code, body.pin)
+    record = await authorize_teacher(store, limiter, request, code, body.pin)
     if not re.match(NUMBER_RE, number):
         raise HTTPException(status_code=404, detail="番号の形が違います")
     await store.set_student_auth(record.policy.class_code, number.upper(), None)
@@ -272,7 +272,7 @@ async def halt(
     limiter: Annotated[SlidingWindowLimiter, Depends(get_pin_limiter)],
 ) -> ClassOut:
     """全端末の測定を止める／解除する。止めるのは人だけ（ClassAgent の提案にこの種類は無い）"""
-    record = await _teacher(store, limiter, request, code, body.pin)
+    record = await authorize_teacher(store, limiter, request, code, body.pin)
     policy = updated(record.policy, halted=body.halted)
     await store.put(ClassRecord(policy=policy, pin_hash=record.pin_hash, salt=record.salt))
     return _out(policy, response)
@@ -288,7 +288,7 @@ async def set_policy(
     limiter: Annotated[SlidingWindowLimiter, Depends(get_pin_limiter)],
 ) -> ClassOut:
     """許可するセンサーと、先生が有効化する実験（家でやる振り子など）"""
-    record = await _teacher(store, limiter, request, code, body.pin)
+    record = await authorize_teacher(store, limiter, request, code, body.pin)
     policy = updated(
         record.policy,
         allowed_sensors=tuple(dict.fromkeys(body.allowed_sensors)),
@@ -308,7 +308,7 @@ async def dashboard(
     limiter: Annotated[SlidingWindowLimiter, Depends(get_pin_limiter)],
 ) -> DashboardOut:
     """先生の 1 画面の元データ: 生徒ごとの「いまの記録」の要約。番号だけで名前は無い"""
-    record = await _teacher(store, limiter, request, code, body.pin)
+    record = await authorize_teacher(store, limiter, request, code, body.pin)
     rows = await store.list_students(record.policy.class_code)
     response.headers["Cache-Control"] = "no-store"
     return DashboardOut(
