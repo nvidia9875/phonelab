@@ -24,7 +24,7 @@ from server.agent.catalog import CATALOG
 from server.agent.planner import HOLD_WORDS
 
 SNAPSHOT_KEY = "class_snapshot"
-ALLOWED_COUNTS_KEY = "class_counts"
+COUNT_KEYS_KEY = "class_count_keys"
 # 端末が記録する出来事の種類（web の addEvent）。これ以外はエージェントに渡さない
 EVENT_KINDS = frozenset(
     {
@@ -74,7 +74,7 @@ class InsightOutput(BaseModel):
 INSIGHT_INSTRUCTION = """\
 あなたは「ラボ先生」の、理科の先生を手伝う係です。先生は 1 人で 30 人前後の生徒が同時に実験しているのを見ています。学級の様子を読んで、先生がいま知るべきことを短く伝えます。あなたは操作をしません。
 - まず get_class_snapshot を呼んで学級全体を読みます。気になる番号があれば get_student_timeline でその子の流れを読みます（3 人まで）。
-- lines: 先生への観察を 3 行まで。1 行 50 字以内。人数は by_theme・by_status・hold_reasons の数をそのまま使い、自分で足し算しない。数で言う（「音の高さで 4 人が保留、3 人は理由が『まわりの音』」のように）。同じ理由の保留が重なっているときは、共通の原因（隣の班の音、振り方など）を一つ推測してよい。
+- lines: 先生への観察を 3 行まで。1 行 50 字以内。**人数は数字で書かず**、get_class_snapshot の count_keys にあるキーを〔〕で囲んで書く。数はサーバが入れる（書き方の例:「音の高さで〔音の高さ・保留〕が保留」。キーは count_keys からそのまま写す）。count_keys に無いキーや、自分で書いた数字の入った行は消される。3 行は、人数のこと・共通の原因の推測・急ぐ子のこと、のように別々のことを書く。例の文をそのまま写さない。同じ理由の保留が重なっているときは、共通の原因（隣の班の音、振り方など）を一つ推測してよい。
 - visit_first: いま見に行くとよい番号を、急ぐ順に 5 つまで。理由が無い子は入れない。
 - suggestion: 先生が自分で選べる手を 1 つ、60 字以内（班の間隔を空ける、全体に振り方を一度見せる、など）。「止める」「停止」は勧めない（止めるかどうかは先生が決めます）。
 - 生徒の答えや実験の結果（高くなる、変わらない など）について自分の説明はしない。
@@ -186,16 +186,20 @@ def build_snapshot(
         "hold_reasons": dict(hold_count),
         "rows": students,
     }
+    snapshot["count_keys"] = count_keys(snapshot)
     return snapshot, timelines
 
 
-def allowed_counts(snapshot: dict[str, Any]) -> list[int]:
-    """見立ての文に出てよい人数（要約にある数だけ）"""
-    counts = {int(snapshot.get("students", 0))}
-    counts.update(int(v) for v in snapshot.get("by_status", {}).values())
-    counts.update(int(v) for v in snapshot.get("hold_reasons", {}).values())
-    for c in snapshot.get("by_theme", {}).values():
-        counts.update(int(v) for v in c.values())
-        counts.add(sum(int(v) for v in c.values()))
-    counts.update(int(v) for v in snapshot.get("by_experiment", {}).values())
-    return sorted(counts)
+def count_keys(snapshot: dict[str, Any]) -> dict[str, int]:
+    """見立ての文に入れてよい人数。キーは「テーマ・状態」「全体・状態」「テーマ」「全体」「理由・…」。
+    数はサーバが埋める（10/2 採点 3 回目: 数の集合に入っているかだけでは、テーマとの対応を確かめられない）"""
+    keys: dict[str, int] = {"全体": int(snapshot.get("students", 0))}
+    for status, n in snapshot.get("by_status", {}).items():
+        keys[f"全体・{status}"] = int(n)
+    for theme, counts in snapshot.get("by_theme", {}).items():
+        keys[theme] = sum(int(v) for v in counts.values())
+        for status, n in counts.items():
+            keys[f"{theme}・{status}"] = int(n)
+    for reason, n in snapshot.get("hold_reasons", {}).items():
+        keys[f"理由・{reason}"] = int(n)
+    return keys

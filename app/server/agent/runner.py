@@ -19,14 +19,14 @@ from google.genai import types
 from opentelemetry import trace
 
 from server.agent.class_agent import (
-    ALLOWED_COUNTS_KEY,
+    COUNT_KEYS_KEY,
     INSIGHT_TOOLS,
     KNOWN_NUMBERS_KEY,
     SNAPSHOT_KEY,
     TIMELINES_KEY,
     InsightOutput,
-    allowed_counts,
     build_class_agent,
+    count_keys,
     parse_insight,
 )
 from server.agent.model_armor import ArmorClient
@@ -367,7 +367,7 @@ async def run_insight(
         SNAPSHOT_KEY: snapshot,
         TIMELINES_KEY: timelines,
         KNOWN_NUMBERS_KEY: list(known_numbers),
-        ALLOWED_COUNTS_KEY: allowed_counts(snapshot),
+        COUNT_KEYS_KEY: count_keys(snapshot),
         # 見立ては停止中でも読める（停止中こそ様子を見たい）。止めるのは先生の操作だけ
         CLASS_HALTED_KEY: False,
     }
@@ -379,7 +379,7 @@ async def run_insight(
     fixed = INSIGHT_FIXED_KEY in outcome.flags
     if plan is not None:
         # 構造化出力をツール経由で返すモデルでは after_model を通らないので、ここでも同じ検査をかける
-        plan, changed = sanitize_insight(plan, list(known_numbers), allowed_counts(snapshot))
+        plan, changed = sanitize_insight(plan, list(known_numbers), count_keys(snapshot))
         fixed = fixed or changed
     return InsightReply(
         skipped=skipped,

@@ -45,7 +45,10 @@ def store():
 
 def answer(**overrides) -> dict:
     base = {
-        "lines": ["音の高さで 2 人が保留、どちらも理由は「まわりの雑音」", "1 人は判定まで進んだ"],
+        "lines": [
+            "音の高さで〔音の高さ・保留〕が保留、理由は「まわりの雑音」",
+            "〔音の高さ・判定済み〕は判定まで進んだ",
+        ],
         "visit_first": ["S-01", "S-02"],
         "suggestion": "班の間隔を空けて、測る班のまわりは静かにしてもらう",
     }
@@ -93,7 +96,11 @@ def test_reads_the_class_with_tools_and_tells_the_teacher_in_three_lines(client,
     assert res.status_code == 200
     data = res.json()
     assert data["source"] == "agent"
-    assert data["lines"][0].startswith("音の高さで 2 人")
+    # 人数はモデルが書かず、サーバが要約から埋める
+    assert data["lines"] == [
+        "音の高さで 2 人が保留、理由は「まわりの雑音」",
+        "1 人は判定まで進んだ",
+    ]
     assert data["visit_first"] == ["S-01", "S-02"]
     assert data["tool_calls"] == 2
     snapshot = tool_results(scripted_llm)[0]
@@ -128,7 +135,7 @@ def test_only_three_students_can_be_read_one_by_one(client, scripted_llm):
 def test_never_suggests_halting_the_class(client, scripted_llm):
     scripted_llm.script = [
         answer(
-            lines=["保留が多いので全員を止めるべき", "2 人が保留"],
+            lines=["保留が多いので全員を止めるべき", "〔全体・保留〕が保留"],
             suggestion="全端末を停止してください",
             visit_first=["S-01", "S-77"],
         )
@@ -192,21 +199,24 @@ def test_denied_calls_count_and_the_agent_still_answers(client, scripted_llm):
     assert len(scripted_llm.requests) == 5
 
 
-def test_a_line_with_a_head_count_not_in_the_summary_is_dropped(client, scripted_llm):
-    """10/2 採点: 見立てが 3 人を 4 人と言っても検査を通っていた。要約に無い人数を言う文は落とす"""
+def test_head_counts_are_filled_by_the_server_and_self_written_numbers_are_dropped(
+    client, scripted_llm
+):
+    """10/2 採点: 見立てが 3 人を 4 人と言っても検査を通っていた。人数はモデルに書かせず、
+    〔キー〕を要約の数で埋める。自分で書いた数字や、要約に無いキーの行は落とす"""
     scripted_llm.script = [
         answer(
             lines=[
                 "音の高さで 4 人が保留",
-                "音の高さで 2 人が保留、理由は雑音",
-                "1 人は判定まで進んだ",
+                "〔音の高さ・保留〕が保留、理由は雑音",
+                "〔振り子・保留〕が保留",
             ]
         )
     ]
 
     data = ask(client).json()
 
-    assert data["lines"] == ["音の高さで 2 人が保留、理由は雑音", "1 人は判定まで進んだ"]
+    assert data["lines"] == ["2 人が保留、理由は雑音"]
     assert data["policy_fixed"] is True
 
 
@@ -234,4 +244,5 @@ def test_the_snapshot_gives_counts_per_theme_and_hides_unknown_event_kinds(
 
     snapshot, timeline = tool_results(scripted_llm)
     assert snapshot["by_theme"]["音の高さ"] == {"保留": 3, "判定済み": 1}
+    assert snapshot["count_keys"]["音の高さ・保留"] == 3
     assert timeline["events"] == [{"t": "10:09", "kind": "その他"}]

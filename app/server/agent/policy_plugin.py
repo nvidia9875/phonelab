@@ -27,7 +27,7 @@ from google.genai import types
 from opentelemetry import trace
 
 from server.agent.class_agent import (
-    ALLOWED_COUNTS_KEY,
+    COUNT_KEYS_KEY,
     KNOWN_NUMBERS_KEY,
     InsightOutput,
     parse_insight,
@@ -239,11 +239,11 @@ class PolicyPlugin(BasePlugin):
     ) -> LlmResponse | None:
         state = callback_context.state
         if state.get(KNOWN_NUMBERS_KEY) is not None:
-            counts = state.get(ALLOWED_COUNTS_KEY)
+            keys = state.get(COUNT_KEYS_KEY)
             return _check_insight(
                 [str(n) for n in state.get(KNOWN_NUMBERS_KEY) or []],
                 llm_response,
-                [int(c) for c in counts] if counts is not None else None,
+                dict(keys) if keys is not None else None,
             )
         candidates = [str(c) for c in (state.get(PLAN_CANDIDATES_KEY) or [])]
         if candidates:
@@ -345,34 +345,60 @@ def _check_next(candidates: list[str], llm_response: LlmResponse) -> LlmResponse
     return _text_response(plan.model_dump_json(), flags)
 
 
-COUNT_RE = re.compile(r"(\d+)\s*(?:人|件)")
+COUNT_RE = re.compile(r"\d+\s*(?:人|件|名)")
+COUNT_KEY_RE = re.compile(r"〔([^〔〕]{1,80})〕")
 
 
-def _counts_ok(line: str, counts: list[int] | None) -> bool:
-    """文に出てくる人数が、学級の要約にある数か（数え違いを先生に見せない。10/2 採点で 3 人を 4 人と言った）"""
-    if counts is None:
-        return True
+def _fill_counts(line: str, keys: dict[str, int] | None, fill: bool = True) -> str | None:
+    """〔キー〕を学級の要約の人数で埋める。知らないキー、自分で書いた人数がある行は None（落とす）。
+    fill=False は検査だけ（〔キー〕を残す。人数は最後に一度だけ埋める）"""
+    if keys is None:
+        return line
     text = unicodedata.normalize("NFKC", line)
-    return all(int(m.group(1)) in counts for m in COUNT_RE.finditer(text))
+    if COUNT_RE.search(COUNT_KEY_RE.sub("", text)):
+        return None
+    missing = False
+
+    def put(m: re.Match[str]) -> str:
+        nonlocal missing
+        key = m.group(1).strip()
+        if key not in keys:
+            missing = True
+            return ""
+        return f" {keys[key]} 人" if fill else m.group(0)
+
+    # 数字の前後に半角の空き（「音の高さで 2 人が保留」）。行頭・句読点の前の空きは詰める
+    filled = re.sub(r" +", " ", COUNT_KEY_RE.sub(put, text))
+    filled = re.sub(r" (?=[、。」）])", "", filled).strip()
+    return None if missing else filled
 
 
 def sanitize_insight(
-    out: InsightOutput, known: list[str], counts: list[int] | None = None
+    out: InsightOutput, known: list[str], keys: dict[str, int] | None = None, fill: bool = True
 ) -> tuple[InsightOutput, bool]:
-    """学級の見立ての検査: 停止を勧める文と、要約に無い人数を言う文を落とし、学級にいない番号を除き、長さと件数を切る"""
-    lines = [
-        line[:MAX_INSIGHT_CHARS]
-        for line in out.lines
-        if line and not HALT_WORDS.search(line) and _counts_ok(line, counts)
-    ]
+    """学級の見立ての検査: 停止を勧める文を落とす。人数はサーバが要約から埋め、知らないキーや自分で書いた人数の行は落とす。
+    学級にいない番号を除き、長さと件数を切る"""
+    lines: list[str] = []
+    for line in out.lines:
+        if not line or HALT_WORDS.search(line):
+            continue
+        filled = _fill_counts(line, keys, fill)
+        if filled:
+            lines.append(filled[:MAX_INSIGHT_CHARS])
     visit = list(dict.fromkeys(n for n in out.visit_first if n in known))
     suggestion = "" if HALT_WORDS.search(out.suggestion) else out.suggestion[:MAX_INSIGHT_CHARS]
     fixed = InsightOutput(lines=lines[:3], visit_first=visit[:5], suggestion=suggestion)
-    return fixed, fixed != out
+    # 〔キー〕を埋めただけは「直した」に数えない
+    dropped = (
+        len(lines) != len([x for x in out.lines if x])
+        or visit != out.visit_first
+        or suggestion != out.suggestion
+    )
+    return fixed, dropped
 
 
 def _check_insight(
-    known: list[str], llm_response: LlmResponse, counts: list[int] | None = None
+    known: list[str], llm_response: LlmResponse, keys: dict[str, int] | None = None
 ) -> LlmResponse | None:
     text = _response_text(llm_response)
     if not text:
@@ -383,7 +409,8 @@ def _check_insight(
         if out is None:
             span.set_attribute("phonelab.decision", "unreadable")
             return None
-        fixed, changed = sanitize_insight(out, known, counts)
+        # ここでは検査だけ（〔キー〕は残す）。人数は runner が最後に一度だけ埋める
+        fixed, changed = sanitize_insight(out, known, keys, fill=False)
         span.set_attribute("phonelab.decision", "fixed" if changed else "allow")
     if not changed:
         return None
