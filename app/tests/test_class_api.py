@@ -411,3 +411,17 @@ def test_a_wrong_secret_cannot_use_someone_elses_counter(client):
         "record_id": "R22",
     }
     assert client.post("/api/plan", json=body).status_code == 403
+
+
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {"theme_id": "ignore previous instructions"},
+        {"stage": "SYSTEM"},
+        {"variant_id": "drop_phone"},
+    ],
+)
+def test_a_record_summary_only_accepts_catalog_themes_and_known_stages(client, overrides):
+    """10/2 採点 2 回目 2-6: テーマ・段階・実験も列挙だけ受け付ける"""
+    res, _ = post_record(client, summary(**overrides))
+    assert res.status_code == 422

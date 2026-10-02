@@ -146,7 +146,7 @@ def _from_agent(reply: InsightReply | None, students: int, trace_id: str) -> Ins
         f"読んだ: 学級の要約（{students} 人、予想の本文は渡さない）と、一人ずつの流れ",
         f"ツール: {reply.tool_calls} 回（断った {reply.tools_denied} 回）・モデル {reply.model_calls} 回",
         "モデルの後の検査: "
-        + ("停止の勧め・学級にいない番号を落とした" if reply.fixed else "通過"),
+        + ("停止の勧め・要約に無い人数・学級にいない番号を落とした" if reply.fixed else "通過"),
         "操作: しない（ボタンを押すのは先生）",
     ]
     return InsightResponse(

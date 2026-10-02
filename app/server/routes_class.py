@@ -10,8 +10,9 @@ from functools import lru_cache
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
+from server.agent.catalog import CATALOG
 from server.agent.planner import HoldCode
 from server.classroom import (
     SENSORS,
@@ -98,14 +99,18 @@ class EventIn(BaseModel):
     body: str = Field(max_length=300)
 
 
+Stage = Literal["predict", "plan", "setup_A", "measure_A", "setup_B", "measure_B", "result"]
+
+
 class RecordSummary(BaseModel):
-    """生徒の端末が送る記録の要約。波形・音声などの生データは含まない（D2）"""
+    """生徒の端末が送る記録の要約。波形・音声などの生データは含まない（D2）。
+    テーマ・実験・段階はカタログと列挙だけ受け付ける（任意の文字列を学級の見立てに届けない。10/2 採点 2-6）"""
 
     record_id: str = Field(pattern=r"^[A-Za-z0-9-]{1,12}$")
     theme_id: str = Field(max_length=40)
     variant_id: str | None = Field(default=None, max_length=60)
     status: Literal["open", "held", "judged", "signed", "stopped"]
-    stage: str = Field(max_length=20)
+    stage: Stage
     prediction: str = Field(default="", max_length=500)
     claim: ClaimIn | None = None
     hold_codes: list[HoldCode] = Field(default_factory=list, max_length=10)
@@ -117,6 +122,22 @@ class RecordSummary(BaseModel):
     chat_turns: int = Field(default=0, ge=0, le=50)
     events: list[EventIn] = Field(default_factory=list, max_length=MAX_EVENTS)
     updated_at: str = Field(max_length=40)
+
+    @field_validator("theme_id")
+    @classmethod
+    def known_theme(cls, value: str) -> str:
+        if value not in CATALOG:
+            raise ValueError("カタログにないテーマです")
+        return value
+
+    @field_validator("variant_id")
+    @classmethod
+    def known_variant(cls, value: str | None) -> str | None:
+        if value is not None and not any(
+            v.id == value for t in CATALOG.values() for v in t.variants
+        ):
+            raise ValueError("カタログにない実験です")
+        return value
 
 
 class RecordPost(BaseModel):

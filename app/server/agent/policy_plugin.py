@@ -14,6 +14,7 @@ Planner（実験を選ぶ）とラボ先生（ふり返りの会話）で、数�
 from __future__ import annotations
 
 import re
+import unicodedata
 from typing import Any
 
 from google.adk.agents.callback_context import CallbackContext
@@ -25,7 +26,12 @@ from google.adk.tools import BaseTool, ToolContext
 from google.genai import types
 from opentelemetry import trace
 
-from server.agent.class_agent import KNOWN_NUMBERS_KEY, InsightOutput, parse_insight
+from server.agent.class_agent import (
+    ALLOWED_COUNTS_KEY,
+    KNOWN_NUMBERS_KEY,
+    InsightOutput,
+    parse_insight,
+)
 from server.agent.model_armor import ArmorClient
 from server.agent.next_step import parse_next
 from server.agent.planner import parse_plan, parse_replan
@@ -233,8 +239,11 @@ class PolicyPlugin(BasePlugin):
     ) -> LlmResponse | None:
         state = callback_context.state
         if state.get(KNOWN_NUMBERS_KEY) is not None:
+            counts = state.get(ALLOWED_COUNTS_KEY)
             return _check_insight(
-                [str(n) for n in state.get(KNOWN_NUMBERS_KEY) or []], llm_response
+                [str(n) for n in state.get(KNOWN_NUMBERS_KEY) or []],
+                llm_response,
+                [int(c) for c in counts] if counts is not None else None,
             )
         candidates = [str(c) for c in (state.get(PLAN_CANDIDATES_KEY) or [])]
         if candidates:
@@ -336,16 +345,35 @@ def _check_next(candidates: list[str], llm_response: LlmResponse) -> LlmResponse
     return _text_response(plan.model_dump_json(), flags)
 
 
-def sanitize_insight(out: InsightOutput, known: list[str]) -> tuple[InsightOutput, bool]:
-    """学級の見立ての検査: 停止を勧める文を落とし、学級にいない番号を除き、長さと件数を切る"""
-    lines = [line[:MAX_INSIGHT_CHARS] for line in out.lines if line and not HALT_WORDS.search(line)]
+COUNT_RE = re.compile(r"(\d+)\s*(?:人|件)")
+
+
+def _counts_ok(line: str, counts: list[int] | None) -> bool:
+    """文に出てくる人数が、学級の要約にある数か（数え違いを先生に見せない。10/2 採点で 3 人を 4 人と言った）"""
+    if counts is None:
+        return True
+    text = unicodedata.normalize("NFKC", line)
+    return all(int(m.group(1)) in counts for m in COUNT_RE.finditer(text))
+
+
+def sanitize_insight(
+    out: InsightOutput, known: list[str], counts: list[int] | None = None
+) -> tuple[InsightOutput, bool]:
+    """学級の見立ての検査: 停止を勧める文と、要約に無い人数を言う文を落とし、学級にいない番号を除き、長さと件数を切る"""
+    lines = [
+        line[:MAX_INSIGHT_CHARS]
+        for line in out.lines
+        if line and not HALT_WORDS.search(line) and _counts_ok(line, counts)
+    ]
     visit = list(dict.fromkeys(n for n in out.visit_first if n in known))
     suggestion = "" if HALT_WORDS.search(out.suggestion) else out.suggestion[:MAX_INSIGHT_CHARS]
     fixed = InsightOutput(lines=lines[:3], visit_first=visit[:5], suggestion=suggestion)
     return fixed, fixed != out
 
 
-def _check_insight(known: list[str], llm_response: LlmResponse) -> LlmResponse | None:
+def _check_insight(
+    known: list[str], llm_response: LlmResponse, counts: list[int] | None = None
+) -> LlmResponse | None:
     text = _response_text(llm_response)
     if not text:
         return None  # ツールを呼ぶ途中の応答
@@ -355,7 +383,7 @@ def _check_insight(known: list[str], llm_response: LlmResponse) -> LlmResponse |
         if out is None:
             span.set_attribute("phonelab.decision", "unreadable")
             return None
-        fixed, changed = sanitize_insight(out, known)
+        fixed, changed = sanitize_insight(out, known, counts)
         span.set_attribute("phonelab.decision", "fixed" if changed else "allow")
     if not changed:
         return None
