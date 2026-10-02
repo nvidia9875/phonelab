@@ -113,9 +113,14 @@ export interface RecordSummary {
   claim: { variable: string; direction: "faster" | "slower" | "same" | "unknown" } | null;
   hold_codes: string[];
   retries: { A?: number; B?: number };
-  result: { observed: "faster" | "slower" | "same" | "unknown"; consistent: boolean | null; statement: string } | null;
+  /** a・b は採用値、tolerance は判定に使った許容誤差（単位はテーマの量） */
+  result: { observed: "faster" | "slower" | "same" | "unknown"; consistent: boolean | null; statement: string; a?: number; b?: number; tolerance?: number } | null;
   plan_source: string | null;
   trace_id: string | null;
+  /** この記録でエージェントを呼んだトレース（計画・再計画・次の一手）。先生・開発者が判断の経路を追える */
+  trace_ids?: string[];
+  /** 端末で計算した SHA-256（全桁） */
+  hash?: string | null;
   rejection_title: string | null;
   chat_turns: number;
   events: { t: string; k: string; body: string }[];

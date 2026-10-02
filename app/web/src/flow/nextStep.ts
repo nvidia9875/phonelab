@@ -7,7 +7,7 @@
 import { NextError, requestNext } from "../agent/next";
 import { QUANTITY } from "../catalog/quantity";
 import { variantsOf, type Theme } from "../catalog/themes";
-import { addEvent, recordById, updateRecord, type NextSuggestion, type StudyRecord } from "../store/records";
+import { addEvent, withTrace, recordById, updateRecord, type NextSuggestion, type StudyRecord } from "../store/records";
 import { doneVariantIds, markHalted, trailText } from "./useFlow";
 
 const MIN_EXPLAIN_CHARS = 8;
@@ -90,7 +90,7 @@ export async function askNext(rec: StudyRecord, theme: Theme): Promise<NextSugge
   updateRecord(rec.id, (r) => {
     const label = (suggestion.source === "agent" ? "ラボ先生（Gemini）が結果を読んで選んだ" : "カタログの順") + (again ? "。理由や判定が変わったので聞き直した" : "");
     const body = suggestion.action === "reflect" ? `先にふり返り: ${suggestion.why}（${label}）` : `${suggestion.question}（${label}）`;
-    const n = addEvent({ ...r, nextSuggestion: suggestion, nextCalls: calls }, "次の一手", body.slice(0, 300), "orange");
+    const n = addEvent(withTrace({ ...r, nextSuggestion: suggestion, nextCalls: calls }, suggestion.traceId), "次の一手", body.slice(0, 300), "orange");
     const trail = trailText(suggestion.trail);
     return trail ? addEvent(n, "判断", trail) : n;
   });

@@ -125,7 +125,9 @@ export interface StudyRecord {
   /** 次の一手を聞いた回数（サーバの上限 3 回 / 記録） */
   nextCalls?: number;
   events: RecordEvent[];
-  signature: { signer: string; hash: string; server: boolean } | null;
+  signature: { signer: string; hash: string; server: boolean; full?: string } | null;
+  /** エージェントを呼んだトレース（計画・再計画・次の一手）。古い記録には無い */
+  traceIds?: string[];
   /** 古い記録には無い（undefined は null として扱う） */
   chat?: ChatLog | null;
   createdAt: string;
@@ -305,6 +307,13 @@ export function updateRecord(id: string, patch: (r: StudyRecord) => StudyRecord)
   });
   emit({ ...state, records });
   return out;
+}
+
+/** エージェントのトレース id を記録に足す（ローカル実行の 0 埋めは足さない。新しい 6 件まで） */
+export function withTrace(r: StudyRecord, traceId: string | null | undefined): StudyRecord {
+  if (!traceId || /^0+$/.test(traceId)) return r;
+  const ids = [...(r.traceIds ?? []).filter((x) => x !== traceId), traceId].slice(-6);
+  return { ...r, traceIds: ids };
 }
 
 export function addEvent(r: StudyRecord, k: string, body: string, tone?: "orange" | "teal"): StudyRecord {

@@ -233,12 +233,26 @@ export function Teacher({ classCode, cls, halted, onHalt, onPolicy, onResetStude
                     <p className={it.k === "却下" || it.k.includes("保留") ? "ttrace__strong" : undefined}>{it.k}: {it.body}</p>
                   </div>
                 ))}
-                {selectedRow.current.trace_id && (
-                  <p className="ttrace__row" style={{ opacity: 0.8 }}>
+                {selectedRow.current.result && selectedRow.current.result.a !== undefined && (
+                  <p className="ttrace__row ttrace__row--agent">
+                    <span className="ttrace__t">値</span>
+                    <span>
+                      {selectedRow.current.result.a?.toPrecision(4)} → {selectedRow.current.result.b?.toPrecision(4)}（許容 {selectedRow.current.result.tolerance?.toPrecision(3)}）
+                    </span>
+                  </p>
+                )}
+                {(selectedRow.current.trace_ids?.length ? selectedRow.current.trace_ids : selectedRow.current.trace_id ? [selectedRow.current.trace_id] : []).map((id) => (
+                  <p className="ttrace__row" style={{ opacity: 0.8 }} key={id}>
                     <span className="ttrace__t">trace</span>
-                    <a className="ttrace__link" href={traceUrl(selectedRow.current.trace_id)} target="_blank" rel="noreferrer">
-                      {selectedRow.current.trace_id.slice(0, 16)}… を Cloud Trace で開く（開発者向け）
+                    <a className="ttrace__link" href={traceUrl(id)} target="_blank" rel="noreferrer">
+                      {id.slice(0, 16)}… を Cloud Trace で開く（開発者向け）
                     </a>
+                  </p>
+                ))}
+                {selectedRow.current.hash && (
+                  <p className="ttrace__row ttrace__row--agent">
+                    <span className="ttrace__t">hash</span>
+                    <span style={{ wordBreak: "break-all", fontFamily: "var(--font-mono)" }}>{selectedRow.current.hash}</span>
                   </p>
                 )}
                 <button type="button" className="tbtn tbtn--outline tbtn--sm" disabled={busy} onClick={() => void run(() => onResetStudent(code, pin, selectedRow.number), `${selectedRow.number} の合言葉を消しました。次の入場で新しい合言葉が出ます`)}>

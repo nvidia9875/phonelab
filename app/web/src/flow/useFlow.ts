@@ -11,7 +11,7 @@ import { QUANTITY, formatQuantity, type Unit } from "../catalog/quantity";
 import { SENSOR_LABEL, repeatsOf, themeById, variantById, variantsOf, type Theme } from "../catalog/themes";
 import type { LocalCheck } from "../measure/checks";
 import { clocksSummary, measuredValue, type Features } from "../measure/features";
-import { activeRecordForTheme, addEvent, getState, setClassState, setHalted, createRecord, currentClassCode, currentNumber, currentSecret, recordById, recordsForTheme, updateRecord, type ChatLog, type Claim, type CondKey, type Direction, type HoldAdvice, type PlanInfo, type Rejection, type StudyRecord } from "../store/records";
+import { activeRecordForTheme, addEvent, withTrace, getState, setClassState, setHalted, createRecord, currentClassCode, currentNumber, currentSecret, recordById, recordsForTheme, updateRecord, type ChatLog, type Claim, type CondKey, type Direction, type HoldAdvice, type PlanInfo, type Rejection, type StudyRecord } from "../store/records";
 
 export const MAX_RETRY = 3;
 const EMPTY_TRIES: Record<CondKey, number> = { A: 0, B: 0 };
@@ -141,7 +141,7 @@ function applyDecision(rec: StudyRecord, text: string, d: Decision, plannerCalls
     n = addEvent(n, "計画", `${title}。${PLAN_SOURCE_LABEL[d.source]}${d.traceId ? `（trace ${d.traceId.slice(0, 8)}）` : ""}`);
     const trail = trailText(d.trail);
     if (trail) n = addEvent(n, "判断", trail);
-    return n;
+    return withTrace(n, d.traceId);
   });
   return "plan";
 }
@@ -216,7 +216,7 @@ export async function askHoldAdvice(rec: StudyRecord, theme: Theme): Promise<Hol
     const advice: HoldAdvice = { measurementIndex: index, action: reply.action, experimentId: reply.experiment_id, advice: reply.advice, source: reply.source, traceId, trail: reply.trail };
     updateRecord(rec.id, (r) => {
       const label = reply.source === "agent" ? "ラボ先生（Gemini）が保留の理由を読んで提案" : "定型の提案";
-      const n = addEvent({ ...r, holdAdvice: advice, replanCalls: reply.replan_calls }, "再計画", `${reply.action === "switch" ? "別の実験へ" : "同じ実験で直す"}: ${reply.advice}（${label}）`);
+      const n = addEvent(withTrace({ ...r, holdAdvice: advice, replanCalls: reply.replan_calls }, traceId), "再計画", `${reply.action === "switch" ? "別の実験へ" : "同じ実験で直す"}: ${reply.advice}（${label}）`);
       const trail = trailText(reply.trail);
       return trail ? addEvent(n, "判断", trail) : n;
     });
@@ -396,7 +396,7 @@ export async function sealRecord(rec: StudyRecord): Promise<void> {
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(payload));
   const hex = [...new Uint8Array(digest)].map((x) => x.toString(16).padStart(2, "0")).join("");
   updateRecord(rec.id, (r) => {
-    let n: StudyRecord = { ...r, status: "signed", signature: { signer: "端末（サーバ署名は未）", hash: `${hex.slice(0, 4)}…${hex.slice(-4)}`, server: false } };
+    let n: StudyRecord = { ...r, status: "signed", signature: { signer: "端末（サーバ署名は未）", hash: `${hex.slice(0, 4)}…${hex.slice(-4)}`, server: false, full: hex } };
     if (r.nextPrediction) {
       const theme = themeById(r.themeId);
       const unit = (theme && variantById(theme, r.nextPrediction.variantId ?? r.variantId)?.unit) ?? "s";

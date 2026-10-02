@@ -496,3 +496,30 @@ def test_self_correction_retries_also_need_a_slot(client, fake_llm):
         client.post("/api/plan", json=body)
 
     assert len(fake_llm.requests) == 5
+
+
+def test_a_summary_carries_every_agent_trace_values_and_the_full_hash(client):
+    """10/2 採点 2-5: 計画のトレースだけでなく、再計画・次の一手のトレース、採用値、ハッシュ全桁"""
+    rec = summary(
+        trace_ids=["a" * 32, "b" * 32],
+        hash="c" * 64,
+        status="judged",
+        result={
+            "observed": "same",
+            "consistent": False,
+            "statement": "変わらなかった",
+            "a": 220.0,
+            "b": 221.0,
+            "tolerance": 6.6,
+        },
+    )
+    res, _ = post_record(client, rec)
+    assert res.status_code == 200
+    row = next(
+        s
+        for s in client.post("/api/class/DEMO-2026/dashboard", json={"pin": PIN}).json()["students"]
+        if s["number"] == "S-04"
+    )
+    assert row["current"]["trace_ids"] == ["a" * 32, "b" * 32]
+    assert row["current"]["hash"] == "c" * 64
+    assert row["current"]["result"]["tolerance"] == 6.6

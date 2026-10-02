@@ -98,6 +98,10 @@ class ResultIn(BaseModel):
     observed: Literal["faster", "slower", "same", "unknown"]
     consistent: bool | None
     statement: str = Field(max_length=200)
+    # 採用値と許容誤差（特徴量の要約。波形などの生データではない）
+    a: float | None = None
+    b: float | None = None
+    tolerance: float | None = None
 
 
 class EventIn(BaseModel):
@@ -125,6 +129,11 @@ class RecordSummary(BaseModel):
     result: ResultIn | None = None
     plan_source: str | None = Field(default=None, max_length=10)
     trace_id: str | None = Field(default=None, max_length=32)
+    # この記録でエージェントを呼んだトレース（計画・再計画・次の一手）と、端末の SHA-256（全桁）
+    trace_ids: list[Annotated[str, Field(pattern=r"^[0-9a-f]{32}$")]] = Field(
+        default_factory=list, max_length=6
+    )
+    hash: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
     rejection_title: str | None = Field(default=None, max_length=120)
     chat_turns: int = Field(default=0, ge=0, le=50)
     events: list[EventIn] = Field(default_factory=list, max_length=MAX_EVENTS)
