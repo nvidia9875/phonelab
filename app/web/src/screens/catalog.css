@@ -90,3 +90,37 @@
 .gear { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 50%; border: 2px solid var(--ink); background: transparent; color: var(--ink); cursor: pointer; }
 .head-right { display: flex; align-items: center; gap: 8px; }
 .test-band { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 700; color: var(--orange-deep); background: color-mix(in oklab, var(--orange) 12%, var(--paper)); border: 1.5px dashed var(--orange); border-radius: var(--r-note); padding: 8px 12px; }
+
+/* これから増えるテーマ（選べないものは畳んで下へ） */
+.later { margin-top: 4px; }
+.later__summary { font-size: 13px; font-weight: 700; color: var(--muted); cursor: pointer; min-height: 40px; display: flex; align-items: center; }
+.later__summary:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; border-radius: 6px; }
+.later .themes { margin-top: 8px; }
+
+/* 生徒の情報: いつも見える入力欄の名前、合言葉の大きな表示、畳んだ詳細、控えめな消去 */
+.field-label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 700; color: var(--muted); }
+.secret-big { font-family: var(--font-mono); font-size: 40px; font-weight: 700; letter-spacing: 0.18em; color: var(--ink); text-align: center; padding: 12px 0; }
+.me-more { display: flex; flex-direction: column; gap: 12px; }
+.me-more__summary { font-size: 13px; font-weight: 700; color: var(--muted); cursor: pointer; min-height: 40px; display: flex; align-items: center; }
+.me-more[open] > .card { margin-top: 12px; }
+.link-danger { align-self: flex-start; background: none; border: 0; padding: 8px 0; font: inherit; font-size: 12px; color: var(--muted); text-decoration: underline; cursor: pointer; }
+.link-danger:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+.clear-confirm { display: flex; flex-direction: column; gap: 8px; }
+
+/* ラボ先生の吹き出し（問い返し） */
+.qbubble { position: relative; background: var(--card); border: 2px solid var(--ink); border-radius: var(--r-card); padding: 10px 14px; margin-bottom: 4px; animation: bubble-in var(--dur-normal) var(--ease-out); }
+.qbubble::after { content: ""; position: absolute; left: 24px; bottom: -9px; width: 14px; height: 14px; background: var(--card); border-right: 2px solid var(--ink); border-bottom: 2px solid var(--ink); transform: rotate(45deg); }
+.qbubble__who { font-size: 11px; font-weight: 700; color: var(--muted); }
+.qbubble__text { font-size: 15px; font-weight: 700; line-height: 1.5; color: var(--ink); }
+@keyframes bubble-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .qbubble { animation: none; } }
+
+/* 計画: このテーマのほかの実験 */
+.alt { display: flex; flex-direction: column; gap: 2px; text-align: left; width: 100%; background: transparent; border: 0; border-top: 1px solid var(--sand); padding: 10px 0; font: inherit; color: inherit; cursor: pointer; min-height: 44px; }
+.alt:hover { background: color-mix(in oklab, var(--teal) 8%, transparent); }
+.alt:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+.alt__title { font-size: 14px; font-weight: 700; }
+.alt__sub { font-size: 12px; color: var(--muted); }
+
+.record-more { display: flex; flex-direction: column; gap: 10px; }
+.record-more__summary { font-size: 13px; font-weight: 700; color: var(--muted); cursor: pointer; min-height: 40px; display: flex; align-items: center; }

@@ -1,3 +1,4 @@
+import type { CheckCode } from "../measure/checks";
 /**
  * 先生の 1 画面の計算（docs/personas.md §3、ux-flow §11）: 予想の向きの分布、いま見に行く子、状態の言葉。
  * 入力はサーバの記録の要約だけ。名前は無い。
@@ -19,7 +20,7 @@ export function stateOf(r: RecordSummary | null): StateLabel {
   if (r.status === "held") return { text: "保留", tone: "navy" };
   if (r.rejection_title && r.stage === "plan") return { text: "却下 → 代替", tone: "navy" };
   if (r.status === "signed") return { text: "記録済み", tone: "outline" };
-  if (r.status === "judged" || r.stage === "result") return { text: "次の予測", tone: "outline" };
+  if (r.status === "judged" || r.stage === "result") return { text: "判定まで済み", tone: "outline" };
   switch (r.stage) {
     case "predict": return { text: r.prediction ? "予想の続き" : "予想中", tone: "outline" };
     case "plan": return { text: "承認待ち", tone: "outline" };
@@ -29,7 +30,8 @@ export function stateOf(r: RecordSummary | null): StateLabel {
   }
 }
 
-const CHECK_WORDS: Record<string, string> = {
+/** 検査コードの言葉。CheckCode を全部持たないと型検査で落ちる（足し忘れで英字のコードが先生に出た。10/2 採点） */
+const CHECK_WORDS: Record<CheckCode, string> = {
   low_snr: "雑音と区別できない",
   low_voiced: "音が短い",
   clipping: "音割れ",
@@ -42,16 +44,33 @@ const CHECK_WORDS: Record<string, string> = {
   unstable: "周期が不安定",
   weak_autocorr: "周期が読めない",
   no_signal: "信号なし",
+  too_uncertain: "ばらつきで決められない",
 };
 
 /** 検査の列。保留の理由か、通ったなら「二系統一致」 */
 export function checkTextOf(r: RecordSummary | null): { text: string; strong: boolean } {
   if (!r) return { text: "—", strong: false };
-  if (r.hold_codes.length) return { text: r.hold_codes.map((c) => CHECK_WORDS[c] ?? c).join("・"), strong: true };
+  if (r.hold_codes.length) return { text: r.hold_codes.map((c) => (CHECK_WORDS as Record<string, string>)[c] ?? "保留").join("・"), strong: true };
   if (r.rejection_title) return { text: "代替実験を提示", strong: false };
   if (r.result) return { text: "二系統一致", strong: false };
   if (r.stage === "predict" || r.stage === "plan") return { text: "センサー未使用", strong: false };
   return { text: "測定中", strong: false };
+}
+
+/** 記録のトレースを段の名前つきで。古い形（trace_ids・trace_id）は段が分からないので「エージェント」 */
+export function tracesOfRow(r: RecordSummary): { stage: string; id: string }[] {
+  if (r.traces?.length) return r.traces;
+  const ids = r.trace_ids?.length ? r.trace_ids : r.trace_id ? [r.trace_id] : [];
+  return ids.map((id) => ({ stage: "エージェント", id }));
+}
+
+/** 測定ごとの 1 行: 「A 1.210 / 1.190 通過」「B — / 2.400 飽和」 */
+export function measurementLinesOf(r: RecordSummary): { key: string; label: string; text: string; pass: boolean }[] {
+  return (r.measurements ?? []).map((m, i) => {
+    const values = m.values.map((v) => (v === null ? "—" : v.toPrecision(4))).join(" / ");
+    const verdict = m.pass ? "通過" : m.failed.map((c) => (CHECK_WORDS as Record<string, string>)[c] ?? c).join("・") || "保留";
+    return { key: `${m.at}-${i}`, label: `測定 ${m.condition}`, text: `${values}　${verdict}`, pass: m.pass };
+  });
 }
 
 /** 「いまの予想」の列。短く */

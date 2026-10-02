@@ -109,12 +109,18 @@ class StudentRow:
 class ClassStore(Protocol):
     async def get(self, code: str) -> ClassRecord | None: ...
     async def put(self, record: ClassRecord) -> None: ...
+    async def update_policy(self, code: str, **fields: object) -> ClassPolicy | None: ...
     async def touch_student(self, code: str, number: str) -> None: ...
     async def get_student_auth(self, code: str, number: str) -> StudentAuth | None: ...
     async def set_student_auth(self, code: str, number: str, auth: StudentAuth | None) -> None: ...
     async def put_record(self, code: str, number: str, summary: Summary) -> None: ...
     async def get_current(self, code: str, number: str) -> Summary | None: ...
     async def list_students(self, code: str) -> list[StudentRow]: ...
+    async def get_counter(self, code: str, number: str, key: str) -> int: ...
+    async def add_counter(self, code: str, number: str, key: str, n: int) -> None: ...
+    async def reserve_counter(
+        self, code: str, number: str, key: str, floor: int, limit: int
+    ) -> int | None: ...
 
 
 class MemoryClassStore:
@@ -126,6 +132,7 @@ class MemoryClassStore:
         self._current: dict[str, dict[str, Summary]] = {}
         self._history: dict[str, dict[str, dict[str, Summary]]] = {}
         self._auth: dict[str, dict[str, StudentAuth]] = {}
+        self._counters: dict[tuple[str, str, str], int] = {}
 
     def seed(self, record: ClassRecord) -> None:
         self._classes[record.policy.class_code] = record
@@ -135,6 +142,14 @@ class MemoryClassStore:
 
     async def put(self, record: ClassRecord) -> None:
         self._classes[record.policy.class_code] = record
+
+    async def update_policy(self, code: str, **fields: object) -> ClassPolicy | None:
+        record = self._classes.get(normalize_code(code))
+        if record is None:
+            return None
+        policy = updated(record.policy, **fields)
+        self._classes[policy.class_code] = replace(record, policy=policy)
+        return policy
 
     async def touch_student(self, code: str, number: str) -> None:
         self.students.setdefault(normalize_code(code), {})[number] = now_iso()
@@ -160,6 +175,23 @@ class MemoryClassStore:
 
     async def get_current(self, code: str, number: str) -> Summary | None:
         return self._current.get(normalize_code(code), {}).get(number)
+
+    async def get_counter(self, code: str, number: str, key: str) -> int:
+        return self._counters.get((normalize_code(code), number, key), 0)
+
+    async def add_counter(self, code: str, number: str, key: str, n: int) -> None:
+        k = (normalize_code(code), number, key)
+        self._counters[k] = self._counters.get(k, 0) + n
+
+    async def reserve_counter(
+        self, code: str, number: str, key: str, floor: int, limit: int
+    ) -> int | None:
+        k = (normalize_code(code), number, key)
+        current = max(self._counters.get(k, 0), floor)
+        if current >= limit:
+            return None
+        self._counters[k] = current + 1
+        return current
 
     async def list_students(self, code: str) -> list[StudentRow]:
         code = normalize_code(code)
@@ -210,6 +242,26 @@ class FirestoreClassStore:
         data["salt"] = record.salt
         await self._doc(record.policy.class_code).set(data)
 
+    async def update_policy(self, code: str, **fields: object) -> ClassPolicy | None:
+        """渡した項目だけを書き換える（文書全体を読んで書き戻すと、同時に押した停止と許可の変更が互いを消し得た。
+        10/2 採点 2-4）。停止は halted と updated_at の 2 項目だけ"""
+        data = {
+            k: list(v) if isinstance(v, tuple) else v
+            for k, v in fields.items()
+            if k != "class_code"
+        }
+        data["updated_at"] = now_iso()
+        try:
+            await self._doc(code).update(data)
+        except Exception as exc:  # 学級が無い（NotFound）
+            from google.api_core.exceptions import NotFound
+
+            if isinstance(exc, NotFound):
+                return None
+            raise
+        record = await self.get(code)
+        return record.policy if record else None
+
     async def touch_student(self, code: str, number: str) -> None:
         await (
             self._doc(code)
@@ -219,14 +271,25 @@ class FirestoreClassStore:
         )
 
     async def put_record(self, code: str, number: str, summary: Summary) -> None:
+        """「いま」と履歴の更新を、読んで比べて書くまでトランザクションで（同時の送信で古い要約が勝たない。10/2 採点 3-2）"""
+        from google.cloud import firestore
+
         student = self._doc(code).collection("students").document(number)
-        snap = await student.get()
-        current = (snap.to_dict() or {}).get("current") if snap.exists else None
-        fields: dict[str, object] = {"last_seen_at": now_iso()}
-        if newer_or_same(summary, current):
-            fields["current"] = summary
-        await student.set(fields, merge=True)
-        await student.collection("records").document(str(summary["record_id"])).set(summary)
+        history = student.collection("records").document(str(summary["record_id"]))
+
+        @firestore.async_transactional
+        async def write(tx) -> None:
+            snap = await student.get(transaction=tx)
+            old = await history.get(transaction=tx)
+            current = (snap.to_dict() or {}).get("current") if snap.exists else None
+            fields: dict[str, object] = {"last_seen_at": now_iso()}
+            if newer_or_same(summary, current):
+                fields["current"] = summary
+            tx.set(student, fields, merge=True)
+            if newer_or_same(summary, old.to_dict() if old.exists else None):
+                tx.set(history, summary)
+
+        await write(self._client.transaction())
 
     async def get_student_auth(self, code: str, number: str) -> StudentAuth | None:
         snap = await self._doc(code).collection("students").document(number).get()
@@ -249,6 +312,46 @@ class FirestoreClassStore:
         snap = await self._doc(code).collection("students").document(number).get()
         data = snap.to_dict() if snap.exists else None
         return data.get("current") if data else None
+
+    def _counter(self, code: str, number: str, key: str):
+        return (
+            self._doc(code)
+            .collection("students")
+            .document(number)
+            .collection("counters")
+            .document(key)
+        )
+
+    async def get_counter(self, code: str, number: str, key: str) -> int:
+        snap = await self._counter(code, number, key).get()
+        return int((snap.to_dict() or {}).get("n", 0)) if snap.exists else 0
+
+    async def add_counter(self, code: str, number: str, key: str, n: int) -> None:
+        from google.cloud import firestore
+
+        await self._counter(code, number, key).set(
+            {"n": firestore.Increment(n), "updated_at": now_iso()}, merge=True
+        )
+
+    async def reserve_counter(
+        self, code: str, number: str, key: str, floor: int, limit: int
+    ) -> int | None:
+        """枠を 1 つ、読んで確かめて書くまでをトランザクションで（同時の要求が同じ残りの枠を使わない）。
+        戻り値はこの呼び出しの前の数。上限なら None"""
+        from google.cloud import firestore
+
+        ref = self._counter(code, number, key)
+
+        @firestore.async_transactional
+        async def take(tx) -> int | None:
+            snap = await ref.get(transaction=tx)
+            current = max(int((snap.to_dict() or {}).get("n", 0)) if snap.exists else 0, floor)
+            if current >= limit:
+                return None
+            tx.set(ref, {"n": current + 1, "updated_at": now_iso()}, merge=True)
+            return current
+
+        return await take(self._client.transaction())
 
     async def list_students(self, code: str) -> list[StudentRow]:
         rows: list[StudentRow] = []

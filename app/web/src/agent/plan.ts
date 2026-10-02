@@ -18,6 +18,9 @@ export interface PlanRequest {
   /** 学級コード。停止中ならサーバが 409 で断る */
   class_code: string | null;
   number: string | null;
+  /** 学級の生徒の合言葉と記録 id。回数はサーバが数える */
+  secret?: string | null;
+  record_id?: string | null;
 }
 
 export interface PlanReply {
@@ -30,6 +33,11 @@ export interface PlanReply {
   planner_calls: number;
   skipped: boolean;
   policy_fixed: boolean;
+  /** 1 回目が検査に落ちて作り直させたときの理由（古いサーバには無い） */
+  fix_reasons?: string[];
+  self_corrected?: boolean;
+  /** 判断の跡: 何を読み、何を選び、統制層が何を直したか。本文は入らない */
+  trail?: string[];
   source: PlanSource;
   trace_id: string;
 }
@@ -39,7 +47,12 @@ export const PLAN_TIMEOUT_MS = 13_000;
 const MAX_TEXT = 500;
 const MAX_DONE_IDS = 10;
 
-export class PlanError extends Error {}
+/** status: サーバが返した HTTP の番号（つながらなかったときは無い）。409 は先生の停止、429 は回数の上限 */
+export class PlanError extends Error {
+  constructor(message: string, readonly status?: number) {
+    super(message);
+  }
+}
 
 function isPlanReply(value: unknown): value is PlanReply {
   if (typeof value !== "object" || value === null) return false;
@@ -64,7 +77,7 @@ export async function requestPlan(req: PlanRequest, timeoutMs = PLAN_TIMEOUT_MS)
   } finally {
     clearTimeout(timer);
   }
-  if (!res.ok) throw new PlanError(`ラボ先生が答えられませんでした（${res.status}）`);
+  if (!res.ok) throw new PlanError(`ラボ先生が答えられませんでした（${res.status}）`, res.status);
   const data: unknown = await res.json();
   if (!isPlanReply(data)) throw new PlanError("ラボ先生の返事を読み取れませんでした");
   return data;

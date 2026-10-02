@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Button, Card, CardBody, CardTitle, Check, Checks, Eyebrow, Foot, FootNote, Screen, Wave } from "../components/ui";
+import { Button, Card, CardBody, CardTitle, Check, Checks, Eyebrow, Foot, FootNote, Screen, Trail, Wave } from "../components/ui";
 import type { CheckCode, LocalCheck } from "../measure/checks";
 import type { HoldAdvice } from "../store/records";
 
@@ -24,22 +24,23 @@ export interface HoldProps {
 /** 保留のあとの提案（Planner ではなく検査コードごとのテンプレート。docs/verifier.md 4 章） */
 const PROPOSAL: Record<CheckCode, string> = {
   gap: "画面を開いたまま、同じ条件でもう一度。通知や画面の切り替えで読み取りが途切れた可能性があります。",
-  saturation: "振りが強すぎました。押さずにそっと放すか、振れ幅を小さくして、同じ条件でもう一度。",
+  saturation: "振りが強すぎました。端末が袋の中で動かないように包み直し、押さずにそっと放して、同じ高さからもう一度。何度も続くときは別の実験へ。",
   no_signal: "振り子が止まっていました。振ってから「測る」を押してください。",
   no_release: "振り子が動き出していませんでした。袋の底をものさしで高さに合わせ、「測る」を押してから押さずに放してください。",
   two_clocks_disagree: "二つの独立した測り方が合いませんでした。振り子なら袋の中で端末が回っていないか、音ならほかの音が入っていないかを確かめて、もう一度。",
   unstable: "前半と後半で値が変わりました。途中で触ったか、糸が絡んだかもしれません。もう一度。",
-  weak_autocorr: "周期がはっきり出ませんでした。もう少し大きく、でも 30° 以内で振って、もう一度。",
+  weak_autocorr: "周期がはっきり出ませんでした。糸が絡んでいないか、袋が回っていないかを確かめて、同じ条件でもう一度。",
   low_rate: "この端末のサンプリングが遅く、値を決められません。別の端末で試すか、別の実験へ。",
   out_of_range: "この実験の値として考えにくい値でした。糸の長さや高さなど、準備の手順を確かめて、もう一度。",
   low_voiced: "音のあるところが短すぎました。「測る」を押して少し待ってから、はっきり何回か鳴らしてください。",
   low_snr: "音が小さく、まわりの雑音と区別できませんでした。端末を音の近くに置いて、もう一度。",
   clipping: "音が大きすぎて割れました。端末を少し離して、同じ強さでもう一度。",
+  too_uncertain: "差が測定のばらつきに埋もれて、決められませんでした。条件をそろえて、もう一度測りましょう。",
 };
 
 /** 画面 4: 保留。理由と再測定の提案。上限に達したら別の実験へ */
 const SOURCE_NOTE: Record<HoldAdvice["source"], string> = {
-  agent: "ラボ先生（Gemini）が、保留の理由を読んで提案しました。結果は言っていません",
+  agent: "ラボ先生（AI）が、保留の理由を読んで提案しました。結果は言っていません",
   catalog: "ラボ先生に聞ける回数の上限のため、定型の提案です",
   policy: "Policy の判断です",
   stub: "いまはラボ先生につながらないので、定型の提案です",
@@ -103,6 +104,7 @@ export function Hold({ checks, conditionLabel, retry, maxRetry, advice, onLoadAd
         <Eyebrow>ラボ先生の提案</Eyebrow>
         <p style={{ fontSize: 14, lineHeight: 1.6 }}>{text}</p>
         {canRetry && !loading && <p className="card__hint">{current ? SOURCE_NOTE[current.source] : SOURCE_NOTE.stub}</p>}
+        {!loading && current?.trail && <Trail steps={current.trail} traceId={current.traceId} />}
       </Card>
 
       <Foot>

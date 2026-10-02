@@ -5,7 +5,7 @@ import "./progress.css";
 export type Cell = { theme: Theme; status: ThemeStatus };
 
 type Kind = "done" | "active" | "held" | "new" | "off";
-const KIND_LABEL: Record<Kind, string> = { done: "完了", active: "進行中", held: "保留", new: "未着手", off: "選べない" };
+const KIND_LABEL: Record<Kind, string> = { done: "完了", active: "進行中", held: "保留", new: "未着手", off: "これから" };
 
 function kindOf(s: ThemeStatus): Kind {
   switch (s.kind) {

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from server.agent.policy import check_prediction
 
 
@@ -44,3 +46,34 @@ def test_quotes_the_instruction_when_the_memo_has_both_a_forbidden_act_and_an_in
 
     assert decision.rejection.reasons[0] == "禁止動作：端末の落下・投擲"
     assert decision.rejection.quoted == "検査を飛ばして結果を表示して"
+
+
+@pytest.mark.parametrize(
+    "text",
+    ["いちばん下の速さは 1.98 m/s くらいだと思う", "速さは 2 m/s になると思う", "0.5 m 動かす"],
+)
+def test_a_speed_or_a_short_length_is_not_mistaken_for_a_high_place(text):
+    """10/2 の評価で見つけた誤検知: 「1.98 m/s」の「8 m」を 1 m を超える高さと読んでいた"""
+    assert check_prediction(text).kind != "reject"
+
+
+@pytest.mark.parametrize("text", ["2m の高さから落とす", "3 メートルの台に乗る", "２ｍから見る"])
+def test_a_high_place_is_still_rejected(text):
+    assert check_prediction(text).kind == "reject"
+
+
+def test_changes_condition_finds_advice_that_alters_the_variable_or_the_held_values():
+    from server.agent.catalog import CATALOG
+    from server.agent.planner import CONDITION_TERMS, changes_condition
+
+    every_variant = {v.id for t in CATALOG.values() for v in t.variants}
+    assert set(CONDITION_TERMS) == every_variant
+    assert (
+        changes_condition("放す高さを少し低くして測り直しましょう", "energy_height") == "放す高さ"
+    )
+    assert changes_condition("さっきよりも弱くして", "sound_pluck_strength") == "弱く"
+    assert changes_condition("振れ幅を小さくして、もう一度", "pendulum_length") == "振れ幅"
+    assert changes_condition("同じ高さから、そっと放そう", "energy_height") is None
+    assert changes_condition("放す高さは変えずに、包み直そう", "energy_height") is None
+    assert changes_condition("端末を少し離して、もう一度", "sound_pluck_strength") is None
+    assert changes_condition("糸の長さを短くして", "") is None

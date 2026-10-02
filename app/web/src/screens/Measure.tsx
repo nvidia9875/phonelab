@@ -103,7 +103,7 @@ export function Measure({ view, onStop, onContinue, onDemo, onRemeasure }: Measu
       )}
 
       <Card variant="line">
-        <Eyebrow>機械の検査（ラボ先生は見ていない）</Eyebrow>
+        <Eyebrow>機械のチェック（ラボ先生は見ていない）</Eyebrow>
         <Checks>
           {done ? (
             view.checks.map((c, i) => (

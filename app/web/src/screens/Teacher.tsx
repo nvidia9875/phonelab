@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { Icon } from "../components/ui";
 import type { Sensor } from "../catalog/themes";
-import { ClassError, fetchDashboard, type DashboardInfo, type StudentRow } from "../agent/classroom";
+import { ClassError, fetchDashboard, traceUrl, type DashboardInfo, type InsightInfo, type StudentRow } from "../agent/classroom";
+import { InsightPanel } from "./InsightPanel";
 import type { ClassState } from "../store/records";
-import { attentionOf, checkTextOf, claimTextOf, distributionOf, isOnline, stateOf } from "./dashboard";
+import { attentionOf, checkTextOf, claimTextOf, distributionOf, isOnline, measurementLinesOf, stateOf, tracesOfRow } from "./dashboard";
 import "./teacher.css";
 
 export interface TeacherProps {
@@ -17,6 +18,7 @@ export interface TeacherProps {
   onResetStudent: (classCode: string, pin: string, number: string) => Promise<void>;
   /** テスト用。省略時はサーバから取る */
   load?: (classCode: string, pin: string) => Promise<DashboardInfo>;
+  loadInsight?: (classCode: string, pin: string) => Promise<InsightInfo>;
 }
 
 const TOGGLE_SENSORS: { sensor: Sensor; label: string }[] = [
@@ -36,7 +38,7 @@ function errorText(e: unknown): string {
  * 教員画面（docs/personas.md §3）: 上に予想の向きの分布、下に保留・却下の子、右上に全端末停止。
  * 生徒の名前は無い。番号だけ。学級コードと教師 PIN で開く。
  */
-export function Teacher({ classCode, cls, halted, onHalt, onPolicy, onResetStudent, load = fetchDashboard }: TeacherProps) {
+export function Teacher({ classCode, cls, halted, onHalt, onPolicy, onResetStudent, load = fetchDashboard, loadInsight }: TeacherProps) {
   const [code, setCode] = useState(classCode);
   const [pin, setPin] = useState("");
   const [busy, setBusy] = useState(false);
@@ -49,6 +51,8 @@ export function Teacher({ classCode, cls, halted, onHalt, onPolicy, onResetStude
   const enabled = new Set(dash?.teacher_enabled ?? cls?.teacherEnabled ?? []);
   const live = !!cls && cls.classCode === code.trim().toUpperCase();
   const unlocked = pin.length > 0 && code.trim().length >= 3;
+  // PIN が通って学級の様子が取れるまで、停止と許可は押せない見た目に（PIN 前に押すと止めたつもりになった。10/2 の通し操作）
+  const ready = unlocked && !!dash;
 
   // PIN が入っている間、5 秒ごとに学級の様子を取る
   useEffect(() => {
@@ -128,7 +132,8 @@ export function Teacher({ classCode, cls, halted, onHalt, onPolicy, onResetStude
           <button
             type="button"
             className={`tbtn ${isHalted ? "tbtn--outline" : "tbtn--halt"}`}
-            disabled={busy}
+            disabled={busy || !ready}
+            title={ready ? undefined : "学級コードと教師 PIN を入れると押せます"}
             aria-pressed={isHalted}
             onClick={() => void run(() => onHalt(live || unlocked ? code : null, pin, !isHalted), isHalted ? "停止を解除しました" : "全端末の測定を止めました")}
           >
@@ -137,7 +142,8 @@ export function Teacher({ classCode, cls, halted, onHalt, onPolicy, onResetStude
         </div>
       </header>
       {message && <p className="tmessage" role="status">{message}</p>}
-      {!unlocked && <p className="tmessage">学級コードと教師 PIN を入れると、生徒の進み方が出ます（5 秒ごとに更新）。名前は出ません、番号だけです。</p>}
+      {!unlocked && <p className="tmessage">学級コードと教師 PIN を入れると、生徒の進み方が出て、停止や許可のボタンが押せるようになります（5 秒ごとに更新）。名前は出ません、番号だけです。</p>}
+      {dash && <p className="tupdated">{new Date(dash.fetched_at).toLocaleTimeString("ja-JP")} 時点（5 秒ごとに更新）</p>}
       {dashError && <p className="tmessage" role="alert">{dashError}</p>}
 
       <div className="teacher__grid">
@@ -180,19 +186,20 @@ export function Teacher({ classCode, cls, halted, onHalt, onPolicy, onResetStude
           <div className="tstats">
             <p><strong>{online}</strong> 人が接続（10 分以内）</p>
             <p><strong>{held}</strong> 件 保留中</p>
-            <p><strong>{rejected}</strong> 件 Policy の却下</p>
+            <p><strong>{rejected}</strong> 件 安全のため止めた</p>
             <p><strong>{signed}</strong> 件 記録済み</p>
           </div>
         </section>
 
         <div className="teacher__side">
+          <InsightPanel classCode={code} pin={pin} unlocked={unlocked} onSelect={setSelected} load={loadInsight} />
           <section className="tpanel">
             <h2>この学級の許可</h2>
             <div className="perm-grid">
               {TOGGLE_SENSORS.map((p) => (
                 <div className="perm" key={p.sensor}>
                   <p>{p.label}</p>
-                  <button type="button" role="switch" aria-checked={allowed.has(p.sensor)} disabled={busy || !unlocked} className={`toggle${allowed.has(p.sensor) ? " toggle--on" : ""}`} aria-label={p.label} onClick={() => toggleSensor(p.sensor)}>
+                  <button type="button" role="switch" aria-checked={allowed.has(p.sensor)} disabled={busy || !ready} className={`toggle${allowed.has(p.sensor) ? " toggle--on" : ""}`} aria-label={p.label} onClick={() => toggleSensor(p.sensor)}>
                     <span className="toggle__knob" />
                   </button>
                 </div>
@@ -206,7 +213,7 @@ export function Teacher({ classCode, cls, halted, onHalt, onPolicy, onResetStude
               {HOME_THEMES.map((h) => (
                 <div className="perm" key={h.id}>
                   <p>{h.label}</p>
-                  <button type="button" role="switch" aria-checked={enabled.has(h.id)} disabled={busy || !unlocked} className={`toggle${enabled.has(h.id) ? " toggle--on" : ""}`} aria-label={h.label} onClick={() => toggleHome(h.id)}>
+                  <button type="button" role="switch" aria-checked={enabled.has(h.id)} disabled={busy || !ready} className={`toggle${enabled.has(h.id) ? " toggle--on" : ""}`} aria-label={h.label} onClick={() => toggleHome(h.id)}>
                     <span className="toggle__knob" />
                   </button>
                 </div>
@@ -225,15 +232,37 @@ export function Teacher({ classCode, cls, halted, onHalt, onPolicy, onResetStude
             {selectedRow?.current ? (
               <div className="ttrace">
                 {selectedRow.current.events.map((it, i) => (
-                  <div className="ttrace__row" key={i}>
+                  <div className={`ttrace__row${it.k === "判断" ? " ttrace__row--agent" : ""}`} key={i}>
                     <p className="ttrace__t">{it.t}</p>
                     <p className={it.k === "却下" || it.k.includes("保留") ? "ttrace__strong" : undefined}>{it.k}: {it.body}</p>
                   </div>
                 ))}
-                {selectedRow.current.trace_id && (
-                  <p className="ttrace__row" style={{ opacity: 0.7 }}>
-                    <span className="ttrace__t">trace</span>
-                    <span>{selectedRow.current.trace_id.slice(0, 16)}…（Cloud Trace）</span>
+                {selectedRow.current.result && selectedRow.current.result.a !== undefined && (
+                  <p className="ttrace__row ttrace__row--agent">
+                    <span className="ttrace__t">値</span>
+                    <span>
+                      {selectedRow.current.result.a?.toPrecision(4)} → {selectedRow.current.result.b?.toPrecision(4)}（許容 {selectedRow.current.result.tolerance?.toPrecision(3)}）
+                    </span>
+                  </p>
+                )}
+                {measurementLinesOf(selectedRow.current).map((m) => (
+                  <p className={`ttrace__row${m.pass ? "" : " ttrace__strong"}`} key={m.key}>
+                    <span className="ttrace__t">{m.label}</span>
+                    <span>{m.text}</span>
+                  </p>
+                ))}
+                {tracesOfRow(selectedRow.current).map((t) => (
+                  <p className="ttrace__row" style={{ opacity: 0.8 }} key={t.id}>
+                    <span className="ttrace__t">{t.stage}</span>
+                    <a className="ttrace__link" href={traceUrl(t.id)} target="_blank" rel="noreferrer">
+                      trace {t.id.slice(0, 16)}… を Cloud Trace で開く（開発者向け）
+                    </a>
+                  </p>
+                ))}
+                {selectedRow.current.hash && (
+                  <p className="ttrace__row ttrace__row--agent">
+                    <span className="ttrace__t">hash</span>
+                    <span style={{ wordBreak: "break-all", fontFamily: "var(--font-mono)" }}>{selectedRow.current.hash}</span>
                   </p>
                 )}
                 <button type="button" className="tbtn tbtn--outline tbtn--sm" disabled={busy} onClick={() => void run(() => onResetStudent(code, pin, selectedRow.number), `${selectedRow.number} の合言葉を消しました。次の入場で新しい合言葉が出ます`)}>

@@ -153,3 +153,16 @@
 
 /* ---------- Reasons ---------- */
 .reasons { display: flex; flex-direction: column; gap: 6px; font-size: 13px; line-height: 1.6; color: var(--gray); }
+
+/* ---------- 判断の跡 ---------- */
+.trail { border-top: 1px dashed var(--line); padding-top: 8px; }
+.trail__summary { font-size: 12px; font-weight: 700; color: var(--ink-2); cursor: pointer; list-style: none; display: flex; align-items: center; gap: 8px; min-height: 32px; }
+.trail__summary::-webkit-details-marker { display: none; }
+.trail__summary::before { content: "▸"; color: var(--muted-2); transition: transform var(--dur-fast) var(--ease-out); }
+.trail[open] .trail__summary::before { transform: rotate(90deg); }
+.trail__summary:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; border-radius: 6px; }
+.trail__badge { font-size: 11px; font-weight: 700; color: var(--card); background: var(--ink); border-radius: var(--r-pill); padding: 2px 8px; }
+.trail__steps { margin: 6px 0 0; padding-left: 20px; display: flex; flex-direction: column; gap: 4px; }
+.trail__step { font-size: 12px; color: var(--muted); line-height: 1.5; }
+.trail__step::marker { color: var(--muted-2); font-family: var(--font-mono); }
+.trail__trace { margin: 6px 0 0; font-size: 11px; color: var(--muted-2); font-family: var(--font-mono); word-break: break-all; }

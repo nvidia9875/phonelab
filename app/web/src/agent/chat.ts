@@ -46,7 +46,7 @@ export interface ChatReply {
 export class ChatError extends Error {}
 
 export function chatSituation(rec: StudyRecord): ChatSituation {
-  if (!rec.result) return "hold";
+  if (!rec.result || rec.result.undecided) return "hold";
   if (rec.result.consistent === null) return "unjudged";
   return rec.result.consistent ? "match" : "mismatch";
 }

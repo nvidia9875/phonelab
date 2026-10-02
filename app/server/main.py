@@ -25,13 +25,22 @@ from pydantic import BaseModel, Field, field_validator
 
 from server.agent.answers import MODEL_ANSWERS, phrases_for
 from server.agent.catalog import CATALOG, candidates_for, short_changes
+from server.agent.model_armor import armor_from_env
+from server.agent.models import gemini
 from server.agent.planner import (
+    HoldCode,
     PlanContext,
     ReplanContext,
     build_plan_prompt,
     build_replan_prompt,
     planner_model,
     template_advice,
+)
+from server.agent.planner_tools import (
+    CLASS_RULES_KEY,
+    PLAN_CATALOG_KEY,
+    catalog_for_tools,
+    planner_tools_enabled,
 )
 from server.agent.policy import PredictionCheck, check_prediction
 from server.agent.policy_plugin import PLANNER_CALLS_PER_EXPERIMENT, REPLAN_CALLS_PER_RECORD
@@ -44,11 +53,34 @@ from server.agent.runner import (
     run_replan,
     run_tutor,
 )
+from server.agent.trail import (
+    check_lines,
+    chose_line,
+    experiment_words,
+    policy_before_line,
+    read_line,
+    trail,
+    variable_words,
+)
 from server.agent.tutor import ChatTurn, TutorContext, build_tutor_prompt, chat_model
 from server.classroom import ClassStore, normalize_code, seed_demo
+from server.guards import (
+    HALTED_DETAIL,
+    MAX_CLASS_CODE_CHARS,
+    RetryGate,
+    call_count,
+    check_limits,
+    class_denies_theme,
+    class_is_halted,
+    class_rules,
+    get_student_limiter,
+)
 from server.ratelimit import SlidingWindowLimiter
 from server.routes_class import get_class_store, records_router, verify_student
 from server.routes_class import router as class_router
+from server.routes_insight import router as insight_router
+from server.routes_next import router as next_router
+from server.samples import seed_samples
 from server.telemetry import disable_content_capture, setup_cloud_tracing
 
 STATIC = Path(__file__).parent / "static"
@@ -67,6 +99,7 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     """起動時に審査員向けの学級 DEMO-2026 を作る（PHONELAB_DEMO_PIN があるとき）"""
     try:
         await seed_demo(get_class_store())
+        await seed_samples(get_class_store())
     except Exception:
         logger.exception("学級の初期化に失敗（学級の API は動かない可能性）")
     yield
@@ -75,48 +108,32 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 app = FastAPI(title="PhoneLab", version="0.0.1", lifespan=lifespan)
 app.include_router(class_router)
 app.include_router(records_router)
-
-MAX_CLASS_CODE_CHARS = 20
-HALTED_DETAIL = "先生が学級の測定を止めています。解除されるまで待ってください"
-
-
-async def class_denies_theme(store: ClassStore, code: str | None, theme) -> str | None:
-    """学級の許可を、画面だけでなく Planner の入口でも検査する（9/18 Codex I2）"""
-    if not code:
-        return None
-    record = await store.get(normalize_code(code))
-    if record is None:
-        return None
-    policy = record.policy
-    if any(sensor not in policy.allowed_sensors for sensor in theme.sensors):
-        return "この実験で使うセンサーは、学級で許可されていません。先生に聞くか、別の実験を選んでください"
-    if theme.home and theme.id not in policy.teacher_enabled:
-        return "この実験は、先生が有効化したときだけできます"
-    return None
+app.include_router(next_router)
+app.include_router(insight_router)
 
 
 async def judged_on_server(
-    store: ClassStore, code: str, number: str | None, secret: str | None, record_id: str | None
+    store: ClassStore,
+    code: str,
+    number: str | None,
+    secret: str | None,
+    record_id: str | None,
+    variant_id: str,
 ) -> bool:
-    """この記録は、この生徒のもので、判定が出ているか。要約が届いていなければ開かない（9/18 Codex I3）"""
+    """この記録は、この生徒のもので、聞いている実験そのもので、向きの決まった判定が出ているか。
+    要約が届いていなければ開かない（9/18 Codex I3）。別の実験の判定や、ばらつきで保留した判定では開かない（10/2 採点 2-6）"""
     if not number or not record_id:
         return False
     await verify_student(store, normalize_code(code), number.strip().upper(), secret)
     current = await store.get_current(normalize_code(code), number.strip().upper())
+    result = (current or {}).get("result") or {}
     return bool(
         current
         and str(current.get("record_id")) == record_id
+        and current.get("variant_id") == variant_id
         and current.get("status") in ("judged", "signed")
-        and current.get("result")
+        and result.get("observed") in ("faster", "slower", "same")
     )
-
-
-async def class_is_halted(store: ClassStore, code: str | None) -> bool:
-    """学級コード付きの呼び出しは、停止中なら Runner を動かさない（PolicyPlugin の before_run と二重に）"""
-    if not code:
-        return False
-    record = await store.get(normalize_code(code))
-    return record is not None and record.policy.halted
 
 
 @app.get("/api/status")
@@ -144,7 +161,9 @@ def require_spike_agent_enabled() -> None:
 
 @lru_cache(maxsize=1)
 def get_planner_runner() -> Runner:
-    return build_runner(planner_model())
+    return build_runner(
+        gemini(planner_model()), with_tools=planner_tools_enabled(), armor=armor_from_env()
+    )
 
 
 @app.post("/api/spike/agent", dependencies=[Depends(require_spike_agent_enabled)])
@@ -170,38 +189,6 @@ async def spike_agent(
     )
 
 
-def client_key(request: Request) -> str:
-    """Cloud Run（run.app）は利用者の IP を X-Forwarded-For の末尾に足す。先頭は利用者が書けるので使わない"""
-    forwarded = request.headers.get("x-forwarded-for", "").split(",")[-1].strip()
-    return forwarded or (request.client.host if request.client else "unknown")
-
-
-def student_key(class_code: str | None, number: str | None) -> str | None:
-    if class_code and number:
-        return f"{normalize_code(class_code)}|{number.strip().upper()}"
-    return None
-
-
-@lru_cache(maxsize=1)
-def get_student_limiter() -> SlidingWindowLimiter:
-    return SlidingWindowLimiter(limit=PER_STUDENT_REQUESTS_PER_WINDOW, window_s=CHAT_WINDOW_S)
-
-
-def check_limits(
-    request: Request,
-    ip_limiter: SlidingWindowLimiter,
-    student_limiter: SlidingWindowLimiter,
-    class_code: str | None,
-    number: str | None,
-    detail: str,
-) -> None:
-    key = student_key(class_code, number)
-    if key and not student_limiter.allow(key):
-        raise HTTPException(status_code=429, detail=detail)
-    if not ip_limiter.allow(client_key(request)):
-        raise HTTPException(status_code=429, detail=detail)
-
-
 # ---- Planner: 予想を読んで実験を一つ選ぶ（docs/architecture.md 2.2、docs/policy.md 3.2〜3.4） ----
 
 PLAN_REQUESTS_PER_WINDOW = 240
@@ -225,6 +212,9 @@ class PlanRequest(BaseModel):
     planner_calls: int = Field(default=0, ge=0, le=PLANNER_CALLS_PER_EXPERIMENT)
     class_code: str | None = Field(default=None, max_length=MAX_CLASS_CODE_CHARS)
     number: str | None = Field(default=None, max_length=8)
+    # 学級の生徒は合言葉と記録 id を付ける。回数はサーバが数える
+    secret: str | None = Field(default=None, max_length=6)
+    record_id: str | None = Field(default=None, max_length=12)
 
     @field_validator("theme_id")
     @classmethod
@@ -257,6 +247,11 @@ class PlanResponse(BaseModel):
     skipped: bool = False
     # Policy が Planner の出力を直した（候補外の id、理由に混じった結果、読めない出力）
     policy_fixed: bool = False
+    # 1 回目が検査に落ち、理由を伝えて作り直してもらったら、その理由と結果
+    fix_reasons: list[str] = Field(default_factory=list)
+    self_corrected: bool = False
+    # 判断の跡（何を読み、何を選び、統制層が何を直したか）。本文は入れない
+    trail: list[str] = Field(default_factory=list)
     source: PlanSource
     trace_id: str
 
@@ -287,6 +282,16 @@ async def plan(
     halted = await class_is_halted(store, body.class_code)
     if halted:
         raise HTTPException(status_code=409, detail=HALTED_DETAIL)
+    count = await call_count(
+        store,
+        kind="plan",
+        claimed=body.planner_calls,
+        class_code=body.class_code,
+        number=body.number,
+        secret=body.secret,
+        record_id=body.record_id,
+    )
+    planner_calls = count.start
 
     candidates = candidates_for(body.theme_id, body.done_variant_ids)
     first = candidates[0]
@@ -297,19 +302,21 @@ async def plan(
     with _tracer.start_as_current_span("phonelab.plan") as span:
         span.set_attribute("phonelab.theme", body.theme_id)
         span.set_attribute("phonelab.text_len", len(body.text))
-        span.set_attribute("phonelab.planner_calls", body.planner_calls)
+        span.set_attribute("phonelab.planner_calls", planner_calls)
         trace_id = format(span.get_span_context().trace_id, "032x")
 
         check = check_prediction(body.text)
         if denied:
             check = PredictionCheck(kind="hint", message=denied)
         span.set_attribute("phonelab.policy", "class_policy" if denied else check.kind)
+        read = read_line(f"予想（{len(body.text)} 字）と、選べる実験 {len(candidates)} 件")
         if check.kind == "hint":
             return PlanResponse(
                 kind="hint",
                 question_back=check.message,
-                planner_calls=body.planner_calls,
+                planner_calls=planner_calls,
                 source="policy",
+                trail=trail(read, policy_before_line("class_policy" if denied else "hint")),
                 trace_id=trace_id,
             )
         if check.kind == "reject" and check.rejection:
@@ -323,11 +330,13 @@ async def plan(
                     quoted=rejection.quoted,
                     alternative_variant_id=first.id,
                 ),
-                planner_calls=body.planner_calls,
+                planner_calls=planner_calls,
                 source="policy",
+                trail=trail(read, policy_before_line("reject")),
                 trace_id=trace_id,
             )
 
+        with_tools = planner_tools_enabled()
         prompt = build_plan_prompt(
             PlanContext(
                 school=body.school,
@@ -335,16 +344,32 @@ async def plan(
                 text=body.text,
                 candidates=candidates,
                 previous_question_back=body.previous_question_back,
-            )
+            ),
+            with_tools=with_tools,
         )
+        tool_state = (
+            {
+                PLAN_CATALOG_KEY: catalog_for_tools(theme, candidates),
+                CLASS_RULES_KEY: await class_rules(store, body.class_code),
+            }
+            if with_tools
+            else None
+        )
+        count = await count.reserve(store, PLANNER_CALLS_PER_EXPERIMENT)
+        planner_calls = count.start
+        gate = RetryGate(count, store, PLANNER_CALLS_PER_EXPERIMENT)
         try:
             reply = await asyncio.wait_for(
                 run_planner(
                     runner,
                     text=prompt,
-                    planner_calls=body.planner_calls,
+                    planner_calls=planner_calls,
                     candidates=[c.id for c in candidates],
                     class_halted=halted,
+                    tool_state=tool_state,
+                    armor_text=body.text,
+                    student_text=body.text,
+                    before_retry=gate,
                 ),
                 timeout=PLAN_TIMEOUT_S,
             )
@@ -357,7 +382,33 @@ async def plan(
         span.set_attribute("phonelab.skipped", reply.skipped)
         span.set_attribute("phonelab.plan_readable", reply.plan is not None)
         span.set_attribute("phonelab.policy_fixed", reply.off_catalog or reply.why_replaced)
+        span.set_attribute("phonelab.self_corrected", reply.self_corrected)
+    await gate.settle(reply.planner_calls - planner_calls)
 
+    checked = check_lines(reply.fix_reasons, reply.retried, reply.self_corrected)
+    fixes = {"fix_reasons": list(reply.fix_reasons), "self_corrected": reply.self_corrected}
+    if reply.armor_blocked:
+        return PlanResponse(
+            kind="rejected",
+            variant_id=first.id,
+            rejection=RejectionOut(
+                title="Model Armor が、ラボ先生への指示か授業に合わない言葉を検知",
+                reasons=[
+                    "予想の中の指示は、実験の命令としては読みません",
+                    "この文はラボ先生（Gemini）に渡していません",
+                    "自分の言葉で予想を書き直すか、代わりの実験から始められます",
+                ],
+                quoted="",
+                alternative_variant_id=first.id,
+            ),
+            planner_calls=reply.planner_calls,
+            source="policy",
+            trail=trail(
+                read,
+                "AI に渡す前のチェック（Model Armor）: 命令や授業に合わない言葉 → 止めた（AI は呼ばない）",
+            ),
+            trace_id=trace_id,
+        )
     if reply.skipped:
         return PlanResponse(
             kind="plan",
@@ -366,6 +417,7 @@ async def plan(
             planner_calls=reply.planner_calls,
             skipped=True,
             source="catalog",
+            trail=trail(read, policy_before_line("limit"), chose_line(experiment_words(first.id))),
             trace_id=trace_id,
         )
     if reply.plan is None:
@@ -376,7 +428,14 @@ async def plan(
             planner_calls=reply.planner_calls,
             policy_fixed=True,
             source="catalog",
+            trail=trail(
+                read,
+                policy_before_line("allow"),
+                checked,
+                chose_line(f"{experiment_words(first.id)}（カタログの順）"),
+            ),
             trace_id=trace_id,
+            **fixes,
         )
     out = reply.plan
     if out.question_back and not body.previous_question_back:
@@ -385,7 +444,11 @@ async def plan(
             question_back=out.question_back[:MAX_QUESTION_BACK_CHARS],
             planner_calls=reply.planner_calls,
             source="agent",
+            trail=trail(
+                read, policy_before_line("allow"), chose_line("理由を一つ問い返す"), checked
+            ),
             trace_id=trace_id,
+            **fixes,
         )
     return PlanResponse(
         kind="plan",
@@ -398,7 +461,17 @@ async def plan(
         planner_calls=reply.planner_calls,
         policy_fixed=reply.off_catalog or reply.why_replaced,
         source="agent",
+        trail=trail(
+            read,
+            policy_before_line("allow"),
+            chose_line(
+                f"{experiment_words(out.experiment_id)}"
+                f"（予想は「{variable_words(body.theme_id, out.claim_variable)}」を変える話と読んだ）"
+            ),
+            checked,
+        ),
         trace_id=trace_id,
+        **fixes,
     )
 
 
@@ -413,9 +486,7 @@ class ReplanRequest(BaseModel):
     theme_id: str
     variant_id: str
     condition: Literal["A", "B"]
-    hold_codes: list[Annotated[str, Field(max_length=30)]] = Field(
-        default_factory=list, max_length=MAX_HOLD_CODES
-    )
+    hold_codes: list[HoldCode] = Field(default_factory=list, max_length=MAX_HOLD_CODES)
     retries: int = Field(default=0, ge=0, le=10)
     prediction: str = Field(default="", max_length=MAX_PREDICTION_CHARS)
     done_variant_ids: list[Annotated[str, Field(max_length=60)]] = Field(
@@ -424,6 +495,8 @@ class ReplanRequest(BaseModel):
     replan_calls: int = Field(default=0, ge=0, le=REPLAN_CALLS_PER_RECORD)
     class_code: str | None = Field(default=None, max_length=MAX_CLASS_CODE_CHARS)
     number: str | None = Field(default=None, max_length=8)
+    secret: str | None = Field(default=None, max_length=6)
+    record_id: str | None = Field(default=None, max_length=12)
 
     @field_validator("theme_id")
     @classmethod
@@ -446,13 +519,16 @@ class ReplanResponse(BaseModel):
     advice: str
     source: PlanSource
     policy_fixed: bool = False
+    fix_reasons: list[str] = Field(default_factory=list)
+    self_corrected: bool = False
+    trail: list[str] = Field(default_factory=list)
     replan_calls: int
     trace_id: str
 
 
 @lru_cache(maxsize=1)
 def get_replan_runner() -> Runner:
-    return build_replan_runner(planner_model())
+    return build_replan_runner(gemini(planner_model()))
 
 
 @app.post("/api/replan")
@@ -471,6 +547,15 @@ async def replan(
     halted = await class_is_halted(store, body.class_code)
     if halted:
         raise HTTPException(status_code=409, detail=HALTED_DETAIL)
+    count = await call_count(
+        store,
+        kind="replan",
+        claimed=body.replan_calls,
+        class_code=body.class_code,
+        number=body.number,
+        secret=body.secret,
+        record_id=body.record_id,
+    )
     others = tuple(
         v for v in candidates_for(body.theme_id, body.done_variant_ids) if v.id != body.variant_id
     )
@@ -490,14 +575,18 @@ async def replan(
         span.set_attribute("phonelab.hold_codes", ",".join(body.hold_codes))
         span.set_attribute("phonelab.retries", body.retries)
         trace_id = format(span.get_span_context().trace_id, "032x")
+        count = await count.reserve(store, REPLAN_CALLS_PER_RECORD)
+        gate = RetryGate(count, store, REPLAN_CALLS_PER_RECORD)
         try:
             reply = await asyncio.wait_for(
                 run_replan(
                     runner,
                     prompt=prompt,
-                    replan_calls=body.replan_calls,
+                    replan_calls=count.start,
                     candidates=[v.id for v in others],
+                    variant_id=body.variant_id,
                     class_halted=halted,
+                    before_retry=gate,
                 ),
                 timeout=REPLAN_TIMEOUT_S,
             )
@@ -509,7 +598,13 @@ async def replan(
         span.set_attribute("phonelab.skipped", reply.skipped)
         span.set_attribute("phonelab.plan_readable", reply.plan is not None)
 
-    calls = body.replan_calls if reply.skipped else body.replan_calls + 1
+    await gate.settle(reply.calls_used)
+    calls = min(count.start + reply.calls_used, REPLAN_CALLS_PER_RECORD)
+    read = read_line(
+        f"保留の理由 {len(body.hold_codes)} 件・同じ条件の保留 {body.retries} 回・ほかの実験 {len(others)} 件"
+    )
+    fixes = {"fix_reasons": list(reply.fix_reasons), "self_corrected": reply.self_corrected}
+    checked = check_lines(reply.fix_reasons, reply.retried, reply.self_corrected)
     if reply.skipped or reply.plan is None:
         return ReplanResponse(
             action="retry",
@@ -517,17 +612,28 @@ async def replan(
             source="catalog",
             policy_fixed=reply.plan is None and not reply.skipped,
             replan_calls=calls,
+            trail=trail(
+                read,
+                policy_before_line("limit") if reply.skipped else checked,
+                chose_line("定型の測り直し"),
+            ),
             trace_id=trace_id,
+            **fixes,
         )
     out = reply.plan
+    chose = (
+        f"別の実験 {out.experiment_id} へ" if out.action == "switch" else "同じ実験で直して測り直す"
+    )
     return ReplanResponse(
         action=out.action,
         experiment_id=out.experiment_id if out.action == "switch" else None,
         advice=out.advice[:200] or template_advice(body.hold_codes),
         source="agent",
-        policy_fixed=reply.off_catalog or reply.advice_replaced,
+        policy_fixed=reply.off_catalog or reply.advice_replaced or reply.condition_changed,
         replan_calls=calls,
+        trail=trail(read, chose_line(chose), checked),
         trace_id=trace_id,
+        **fixes,
     )
 
 
@@ -541,11 +647,8 @@ MAX_CHAT_CHARS = 500
 MAX_CHAT_HISTORY = 20
 MAX_HOLD_REASONS = 6
 MIN_THINKING_CHARS = 8
-# 学校は 31 人が同じ外向き IP なので、IP だけの上限は学級 1 つ分（生徒 40 人 × 6 回）を超える値にし、
-# 学級コード＋番号が付いていればその単位でも数える
 CHAT_REQUESTS_PER_WINDOW = 240
 CHAT_WINDOW_S = 600
-PER_STUDENT_REQUESTS_PER_WINDOW = 30
 # 返事を待たせすぎない。9/16 に gemini-3.8-flash が 25〜50 秒かかった時間帯があった
 CHAT_TIMEOUT_S = 25
 
@@ -595,7 +698,7 @@ class ChatResponse(BaseModel):
 
 @lru_cache(maxsize=1)
 def get_tutor_runner() -> Runner:
-    return build_tutor_runner(chat_model())
+    return build_tutor_runner(gemini(chat_model()), armor=armor_from_env())
 
 
 @lru_cache(maxsize=1)
@@ -624,6 +727,15 @@ async def chat(
     halted = await class_is_halted(store, body.class_code)
     if halted:
         raise HTTPException(status_code=409, detail=HALTED_DETAIL)
+    count = await call_count(
+        store,
+        kind="chat",
+        claimed=body.turns_used,
+        class_code=body.class_code,
+        number=body.number,
+        secret=body.secret,
+        record_id=body.record_id,
+    )
 
     answer = MODEL_ANSWERS[body.variant_id]
     # 保留（有効な測定が無い）では渡さない。測る前に答えを知ってしまうから。docs/policy.md 3.8
@@ -635,7 +747,7 @@ async def chat(
     if body.class_code and revealed:
         # 学級に入っている端末は、端末の申告でなくサーバが持つ記録の要約で決める（9/18 Codex I3）
         revealed = await judged_on_server(
-            store, body.class_code, body.number, body.secret, body.record_id
+            store, body.class_code, body.number, body.secret, body.record_id, body.variant_id
         )
     context = TutorContext(
         school=body.school,
@@ -654,18 +766,20 @@ async def chat(
     with _tracer.start_as_current_span("phonelab.chat") as span:
         span.set_attribute("phonelab.situation", body.situation)
         span.set_attribute("phonelab.revealed", revealed)
-        span.set_attribute("phonelab.turns_used", body.turns_used)
+        span.set_attribute("phonelab.turns_used", count.start)
         span.set_attribute("phonelab.prompt_len", len(prompt))
         trace_id = format(span.get_span_context().trace_id, "032x")
+        count = await count.reserve(store, CHAT_TURNS_PER_RECORD)
         try:
             reply = await asyncio.wait_for(
                 run_tutor(
                     runner,
                     prompt=prompt,
-                    turns_used=body.turns_used,
+                    turns_used=count.start,
                     leak_phrases=phrases_for(answer, body.situation),
                     locked=not revealed,
                     class_halted=halted,
+                    armor_text=body.message,
                 ),
                 timeout=CHAT_TIMEOUT_S,
             )
@@ -681,14 +795,17 @@ async def chat(
                 status_code=502, detail="ラボ先生につながりませんでした。少し待ってから、もう一度"
             ) from exc
         span.set_attribute("phonelab.answer_leak", reply.leaked)
+        span.set_attribute("phonelab.armor_blocked", reply.armor_blocked)
         span.set_attribute("phonelab.skipped", reply.skipped)
 
-    turns_used = body.turns_used if reply.skipped else body.turns_used + 1
+    turns_used = count.start if reply.skipped else count.start + 1
+    await count.settle(store, turns_used - count.start)
     return ChatResponse(
         reply=reply.text,
         revealed=revealed and not reply.skipped,
         turns_used=turns_used,
-        limit_reached=reply.skipped or turns_used >= CHAT_TURNS_PER_RECORD,
+        limit_reached=(reply.skipped and not reply.armor_blocked)
+        or turns_used >= CHAT_TURNS_PER_RECORD,
         trace_id=trace_id,
     )
 

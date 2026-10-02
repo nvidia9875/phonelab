@@ -95,7 +95,8 @@ export interface PlanChoice {
 export function choosePlan(text: string, theme: Theme, done: string[]): PlanChoice {
   const claim = readClaim(text, theme);
   const variant = pickVariant(theme, claim, done);
-  const tooShort = text.trim().length < 6 || !/から|ので|ため|思う|はず|と|だ/.test(text);
+  // 理由は「なぜ」の説明（から・ので・ため・同じで・見たことがある）。「思う」「はず」は気持ちの言葉なので数えない（サーバの Planner と同じ線引き）
+  const tooShort = text.trim().length < 6 || !/から|ので|ため|同じ|見たこと|聞いたこと|なぜなら/.test(text);
   const questionBack = tooShort ? "どうしてそう思う？ 理由を一言足してから、実験を選びます" : null;
   const why =
     claim.variable !== "unknown" && claim.variable === variant.variable
@@ -104,27 +105,39 @@ export function choosePlan(text: string, theme: Theme, done: string[]): PlanChoi
   return { variant, why, questionBack };
 }
 
-/** 判定（テンプレート。LLM は関与しない）。unc は二本の時計の差を条件 A と B で足したもの */
+/**
+ * 判定（テンプレート。LLM は関与しない）。unc は二本の時計の差とくり返しのばらつき（条件 A と B の和）。
+ * ばらつきが許容誤差より大きく、差がそのばらつきの中にあるときは「変わらなかった」と言わずに保留する
+ * （差が無いのか、測り方が粗くて見分けられないのかを区別できないため。10/2 採点 1-3）
+ */
 export function judge(a: number, b: number, unc: number, claim: Claim | null, variant: Variant): Judgement {
   const q = QUANTITY[variant.unit];
   const delta = b - a;
   const tolerance = variant.toleranceKind === "rel" ? variant.tolerance * Math.abs(a) : variant.tolerance;
   const u = Math.max(tolerance, unc);
-  const observed: Direction = Math.abs(delta) <= u ? "same" : (q.largerIsFaster ? delta > 0 : delta < 0) ? "faster" : "slower";
   const what = variant.changes.split("（")[0];
+  const fmt = (v: number) => formatQuantity(v, variant.unit);
+  if (unc > tolerance && Math.abs(delta) <= unc) {
+    return {
+      a, b, delta, tolerance: u, observed: "unknown", consistent: null, undecided: true,
+      statement: `${what}を変えたときの${q.name}の差は、測定のばらつきに埋もれて決められなかった（保留）`,
+      detail: `差 ${fmt(Math.abs(delta))} は、測るたびのばらつき ${fmt(unc)} より小さいので、変わったとも変わらないとも言えません。条件をそろえて測り直そう`,
+    };
+  }
+  const observed: Direction = Math.abs(delta) <= u ? "same" : (q.largerIsFaster ? delta > 0 : delta < 0) ? "faster" : "slower";
   const statement = observed === "same" ? `${what}を変えても、${q.name}は変わらなかった` : `${what}を変えたら、${q.name}は${observed === "faster" ? q.faster : q.slower}`;
   // 予想が別の変数の話なら（「強くすると高くなる」に長さの実験）、向きが合っていても「成り立った」とは言わない（9/18 Codex F5）
   const consistent = claim && claim.direction !== "unknown" && claim.variable === variant.variable ? claim.direction === observed : null;
-  const fmt = (v: number) => formatQuantity(v, variant.unit);
   const claimWord = claim ? ({ faster: q.choiceFaster, slower: q.choiceSlower, same: "変わらない", unknown: "" } as const)[claim.direction] : "";
-  const inside = Math.abs(delta) <= u ? "内側" : "外側";
+  const small = Math.abs(delta) <= u;
+  const diff = small ? `差 ${fmt(Math.abs(delta))} は、ずれの目安 ${fmt(u)} より小さい` : `差 ${fmt(Math.abs(delta))} は、ずれの目安 ${fmt(u)} より大きい`;
   const detail =
     consistent === null
       ? claim && claim.variable !== "unknown" && claim.variable !== variant.variable
-        ? `差 ${fmt(Math.abs(delta))} は許容誤差 ${fmt(u)} の${inside}です。予想は「${what}」とは別のものを変える話だったので、この測定では判定していません`
-        : `差 ${fmt(Math.abs(delta))} は許容誤差 ${fmt(u)} の${inside}です。予想の向きが読み取れなかったので、判定はしていません`
+        ? `${diff}。予想は「${what}」とは別のものを変える話だったので、この測定では比べていません`
+        : `${diff}。予想の向きが読み取れなかったので、比べていません`
       : consistent
-        ? `あなたの予想「${claimWord}」は、この測定では成り立った。差 ${fmt(Math.abs(delta))} は許容誤差 ${fmt(u)} の${inside}です`
-        : `あなたの予想「${claimWord}」は、この測定では成り立たなかった。差 ${fmt(Math.abs(delta))} は許容誤差 ${fmt(u)} の${inside}です`;
+        ? `あなたの予想「${claimWord}」のとおりだった。${diff}`
+        : `あなたの予想「${claimWord}」とはちがう結果。なぜだろう？ ${diff}`;
   return { a, b, delta, tolerance: u, observed, consistent, statement, detail };
 }

@@ -13,7 +13,9 @@ export type CheckCode =
   | "no_release"
   | "low_snr"
   | "clipping"
-  | "low_voiced";
+  | "low_voiced"
+  /** 判定のとき: 差が測定のばらつきに埋もれた（測定ごとの検査ではない。10/2 採点 1-3） */
+  | "too_uncertain";
 
 export interface LocalCheck {
   code: CheckCode;

@@ -59,6 +59,16 @@ export function Predict({ theme, initialText, questionBack, hintMessage, onSubmi
       </Card>
 
       <Section label={theme.question}>
+        {/* 問い返しは入力欄の上に、ラボ先生の言葉として（下の薄い枠だと読まずに押せた。10/2 の通し操作） */}
+        <div ref={noteRef} style={{ display: "contents" }}>
+          {questionBack && (
+            <div className="qbubble" role="status">
+              <span className="qbubble__who">ラボ先生</span>
+              <p className="qbubble__text">{questionBack}</p>
+            </div>
+          )}
+          {hintMessage && <Note icon="shield-x">{hintMessage}</Note>}
+        </div>
         <Field
           ref={fieldRef}
           value={text}
@@ -67,15 +77,11 @@ export function Predict({ theme, initialText, questionBack, hintMessage, onSubmi
           rows={4}
           style={{ borderColor: "var(--orange)" }}
         />
-        <div ref={noteRef} style={{ display: "contents" }}>
-          {questionBack && <Note icon="bulb"><strong>ラボ先生からの問い返し</strong>　{questionBack}</Note>}
-          {hintMessage && <Note icon="shield-x">{hintMessage}</Note>}
-        </div>
       </Section>
 
       <Foot>
         <Button disabled={!canGo} onClick={() => void submit()}>{pending ? "ラボ先生が考えています…" : "ラボ先生に実験を考えてもらう"}</Button>
-        <FootNote>{pending ? "予想を読んで、カタログから実験を選んでいます。答えは渡していません。" : "まず「こう思う」を書こう。そこからラボ先生がいっしょに実験を考えます。センサーはまだ読みません。"}</FootNote>
+        <FootNote>{pending ? "あなたの予想を読んで、実験のリストから選んでいます。ラボ先生は答えを知りません。" : "まず「こう思う」と「なぜ」を書こう。そこからラボ先生がいっしょに実験を考えます。センサーはまだ読みません。"}</FootNote>
       </Foot>
     </Screen>
   );

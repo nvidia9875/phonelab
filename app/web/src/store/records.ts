@@ -32,6 +32,8 @@ export interface Judgement {
   tolerance: number;
   observed: Direction;
   consistent: boolean | null;
+  /** 差が測定のばらつきに埋もれて、変わったとも変わらないとも言えない（保留） */
+  undecided?: boolean;
   statement: string;
   detail: string;
 }
@@ -56,9 +58,13 @@ export interface RecordEvent {
 }
 /** 実験を誰が選んだか。agent = ラボ先生（Gemini）、policy = 決定論の Policy、catalog = カタログの順（上限・読めない出力）、stub = 端末内（オフライン） */
 export interface PlanInfo {
-  source: "agent" | "policy" | "catalog" | "stub";
+  source: "agent" | "policy" | "catalog" | "stub" | "student";
   why: string;
   traceId: string | null;
+  /** 判断の跡（古い記録には無い） */
+  trail?: string[];
+  /** 検査に落ちた 1 回目を、ラボ先生が自分で作り直した */
+  selfCorrected?: boolean;
 }
 /** 保留のあとのラボ先生の提案（保留ごとに 1 回。measurementIndex でどの保留の分かを持つ） */
 export interface HoldAdvice {
@@ -68,7 +74,28 @@ export interface HoldAdvice {
   advice: string;
   source: "agent" | "policy" | "catalog" | "stub";
   traceId: string | null;
+  trail?: string[];
 }
+/** 結果のあとの次の一手（POST /api/next）。next なら次の実験と問いかけ、reflect ならふり返りが先 */
+export interface NextSuggestion {
+  action: "next" | "reflect";
+  variantId: string | null;
+  question: string;
+  why: string;
+  source: "agent" | "catalog" | "stub";
+  traceId: string | null;
+  trail: string[];
+  /** 何を見て選んだか（理由を書いたか・判定）。変わったら聞き直す（古い記録には無い） */
+  basis?: string;
+}
+export type TraceStage = "計画" | "再計画" | "次の一手" | "会話";
+export interface TraceRef {
+  stage: TraceStage;
+  id: string;
+}
+/** 1 記録で持つトレースの数。計画 5・再計画 3・次の一手 3・会話 10 の上限を足した 21 より少し多く */
+export const MAX_TRACES = 24;
+
 export interface Rejection {
   title: string;
   reasons: string[];
@@ -77,6 +104,8 @@ export interface Rejection {
 }
 export interface StudyRecord {
   id: string;
+  /** 誰の記録か（学級コード|番号）。学級に入っていない端末で作ったものは null。古い記録には無い（null 扱い） */
+  owner?: string | null;
   themeId: string;
   variantId: string | null;
   status: RecordStatus;
@@ -99,8 +128,16 @@ export interface StudyRecord {
   result: Judgement | null;
   explain: string;
   nextPrediction: { variantId: string | null; direction: Direction } | null;
+  /** ラボ先生が選んだ次の一手（古い記録には無い） */
+  nextSuggestion?: NextSuggestion | null;
+  /** 次の一手を聞いた回数（サーバの上限 3 回 / 記録） */
+  nextCalls?: number;
   events: RecordEvent[];
-  signature: { signer: string; hash: string; server: boolean } | null;
+  signature: { signer: string; hash: string; server: boolean; full?: string } | null;
+  /** 段の名前のない古い形（10/2 まで）。読むだけ */
+  traceIds?: string[];
+  /** エージェントを呼んだトレースと、その段（計画・再計画・次の一手・会話）。新しい MAX_TRACES 件まで。古い記録には無い */
+  traces?: TraceRef[];
   /** 古い記録には無い（undefined は null として扱う） */
   chat?: ChatLog | null;
   createdAt: string;
@@ -158,11 +195,26 @@ function write(key: string, value: unknown): void {
   }
 }
 
+/** 端末を共有しても、記録は番号ごとに分ける（10/2 採点: 番号を変えると前の人の記録が新しい番号で送られ得た） */
+export function ownerKey(student: Student | null): string | null {
+  return student ? `${student.classCode.trim().toUpperCase()}|${student.number.trim().toUpperCase()}` : null;
+}
+export function isMine(r: StudyRecord, student: Student | null = state.student): boolean {
+  return (r.owner ?? null) === ownerKey(student);
+}
+
 let state: State = { records: read(KEY_RECORDS, []), student: read(KEY_STUDENT, null), halted: read(KEY_HALTED, false), settings: { ...DEFAULT_SETTINGS, ...read(KEY_SETTINGS, {}) }, classState: read(KEY_CLASS, null) };
 const listeners = new Set<() => void>();
+/** 画面に出すのは、いまの番号の記録だけ（全部は state.records に残る） */
+function visible(s: State): State {
+  return { ...s, records: s.records.filter((r) => (r.owner ?? null) === ownerKey(s.student)) };
+}
+let snapshot: State = visible(state);
 function emit(next: State): void {
   const prev = state;
   state = next;
+  if (next.records !== prev.records || next.student !== prev.student) snapshot = visible(next);
+  else snapshot = { ...next, records: snapshot.records };
   // 変わったものだけ書く（学級のポーリングのたびに全記録を書き直さない）
   if (next.records !== prev.records) write(KEY_RECORDS, next.records);
   if (next.student !== prev.student) write(KEY_STUDENT, next.student);
@@ -176,7 +228,7 @@ function subscribe(l: () => void): () => void {
   return () => listeners.delete(l);
 }
 export function useStore(): State {
-  return useSyncExternalStore(subscribe, () => state);
+  return useSyncExternalStore(subscribe, () => snapshot);
 }
 /** 画面の外（記録の同期など）から状態の変化を聞く */
 export function subscribeStore(listener: () => void): () => void {
@@ -231,6 +283,7 @@ export function createRecord(themeId: string): StudyRecord {
   const at = nowIso();
   const rec: StudyRecord = {
     id: newId(),
+    owner: ownerKey(state.student),
     themeId,
     variantId: null,
     status: "open",
@@ -266,6 +319,19 @@ export function updateRecord(id: string, patch: (r: StudyRecord) => StudyRecord)
   return out;
 }
 
+/** エージェントのトレース id を、どの段の呼び出しかと一緒に記録に足す（ローカル実行の 0 埋めは足さない） */
+export function withTrace(r: StudyRecord, traceId: string | null | undefined, stage: TraceStage): StudyRecord {
+  if (!traceId || /^0+$/.test(traceId)) return r;
+  const traces = [...tracesOf(r).filter((x) => x.id !== traceId), { stage, id: traceId }].slice(-MAX_TRACES);
+  return { ...r, traces };
+}
+
+/** 記録のトレース。古い形（段の名前なし）は「計画など」として読む */
+export function tracesOf(r: StudyRecord): TraceRef[] {
+  if (r.traces) return r.traces;
+  return (r.traceIds ?? []).map((id) => ({ stage: "計画" as const, id }));
+}
+
 export function addEvent(r: StudyRecord, k: string, body: string, tone?: "orange" | "teal"): StudyRecord {
   return { ...r, events: [...r.events, { t: hhmm(nowIso()), k, body, tone }] };
 }
@@ -273,12 +339,17 @@ export function addEvent(r: StudyRecord, k: string, body: string, tone?: "orange
 export function recordById(id: string): StudyRecord | undefined {
   return state.records.find((r) => r.id === id);
 }
-export function recordsForTheme(themeId: string, records = state.records): StudyRecord[] {
-  return records.filter((r) => r.themeId === themeId);
+/** 画面に出すときはこちら。いまの番号の記録だけ（共有端末で前の人の記録の URL を開いても見せない。10/2 採点 3-2） */
+export function myRecordById(id: string): StudyRecord | undefined {
+  const r = recordById(id);
+  return r && isMine(r) ? r : undefined;
+}
+export function recordsForTheme(themeId: string, records = snapshot.records): StudyRecord[] {
+  return records.filter((r) => r.themeId === themeId && isMine(r));
 }
 /** テーマの「続き」になる記録（open / held / judged で最新のもの） */
-export function activeRecordForTheme(themeId: string, records = state.records): StudyRecord | undefined {
-  return records.find((r) => r.themeId === themeId && (r.status === "open" || r.status === "held" || r.status === "judged"));
+export function activeRecordForTheme(themeId: string, records = snapshot.records): StudyRecord | undefined {
+  return records.find((r) => r.themeId === themeId && isMine(r) && (r.status === "open" || r.status === "held" || r.status === "judged"));
 }
 export function clearAll(): void {
   emit({ records: [], student: state.student, halted: false, settings: state.settings, classState: state.classState });

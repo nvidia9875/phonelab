@@ -15,7 +15,7 @@ import { Settings } from "./screens/Settings";
 import { Chat } from "./screens/Chat";
 import { repeatsOf, themeById, variantById, type Theme } from "./catalog/themes";
 import { matchRoute, nav, usePath, type Route } from "./router";
-import { activeRecordForTheme, clearAll, createRecord, recordById, setClassState, setHalted, setSettings, setStudent, useStore, type ClassState, type StudyRecord } from "./store/records";
+import { activeRecordForTheme, clearAll, createRecord, myRecordById, setClassState, setHalted, setSettings, setStudent, useStore, type ClassState, type StudyRecord } from "./store/records";
 import { DEFAULT_CLASS_POLICY, detectCaps, themeStatus, type ClassPolicy, type DeviceCaps } from "./store/status";
 import { ClassError, fetchClass, joinClass, resetStudent, setClassHalt, setClassPolicyOnServer, type ClassInfo } from "./agent/classroom";
 import { startRecordSync } from "./agent/sync";
@@ -24,6 +24,7 @@ import { checksFor, clockLabels, clocksOf, type Features } from "./measure/featu
 import { demoFeatures } from "./measure/demo";
 import { probeMotionEvents } from "./measure/pendulum";
 import * as flow from "./flow/useFlow";
+import { askNext, isNextStale } from "./flow/nextStep";
 
 const goHome = () => nav("/");
 
@@ -92,6 +93,8 @@ function resolve(route: Route, rec: StudyRecord | undefined, theme: Theme | unde
   if (!hasStudent) return { redirect: "/me" };
   if (!allowed) return { redirect: "/" }; // 学級の許可・端末の能力で選べないテーマは URL 直打ちでも開かない（9/18 Codex I2）
   if (halted && (route.name === "setup" || route.name === "measure")) return { redirect: "/halted" };
+  // 承認してから測る（D4）。URL を直接開いても、承認していなければ計画へ戻す（10/2 の通し操作で飛ばせた）
+  if ((route.name === "setup" || route.name === "measure") && rec && !rec.approvedAt) return { redirect: `/x/${theme.id}/plan` };
   if (route.name === "predict") {
     if (!rec) return { need: "create" };
     if (rec.stage !== "predict" && rec.variantId) return { redirect: stagePath(theme.id, rec.stage) };
@@ -173,7 +176,7 @@ export function App() {
     onOpenTheme: (t: Theme) => {
       if (!store.student) return nav("/me");
       const r = activeRecordForTheme(t.id, store.records);
-      if (r?.status === "held") return nav(`/x/${t.id}/hold`);
+      if (r?.status === "held") return nav(r.result?.undecided ? `/x/${t.id}/result` : `/x/${t.id}/hold`);
       nav(r && r.variantId ? stagePath(t.id, r.stage) : `/x/${t.id}`);
     },
     onOpenRecord: (id: string) => nav(`/records/${id}`),
@@ -216,29 +219,33 @@ export function App() {
             // 同じ端末で同じ番号なら、保存済みの合言葉を使う（入力欄が空のとき）
             const known = store.student && store.student.classCode === s.classCode && store.student.number === s.number ? store.student.secret : undefined;
             let secret = s.secret ?? known;
+            let fresh: string | null = null;
             try {
               const info = await joinClass(s.classCode, s.number, secret);
               setClassState(classStateFrom(info));
-              if (info.secret) secret = info.secret; // 最初の入場。合言葉はこの端末に保存する
+              if (info.secret) {
+                secret = info.secret; // 最初の入場。合言葉はこの端末に保存する
+                fresh = info.secret;
+              }
             } catch (e: unknown) {
               // テストモードだけ、学級が無くても端末内で進める（404 のときだけ。番号の取り合いは通さない）
               const notFound = e instanceof ClassError && e.status === 404;
-              if (!(store.settings.testMode && notFound)) return e instanceof ClassError ? e.message : "学級につながりませんでした";
+              if (!(store.settings.testMode && notFound)) return { error: e instanceof ClassError ? e.message : "学級につながりませんでした" };
               setClassState(null);
             }
             setStudent({ classCode: s.classCode, number: s.number, secret });
-            goHome();
-            return null;
+            // 初めての入場なら、Me が合言葉の画面を出してからトップへ戻す
+            return { secret: fresh };
           }}
-          onClear={() => { if (confirm("この端末の記録をすべて消します。よろしいですか？")) clearAll(); }}
+          onClear={() => clearAll()}
           onHome={goHome}
         />
       );
     case "record": {
-      const r = recordById(route.id);
+      const r = myRecordById(route.id);
       const t = r && themeById(r.themeId);
       if (!r || !t) return <Home {...homeProps} />;
-      return <Record theme={t} variant={variantById(t, r.variantId) ?? null} record={r} onVerify={() => alert("端末で再検証: IndexedDB の生データから再計算します（実装予定）")} onHome={goHome} />;
+      return <Record theme={t} variant={variantById(t, r.variantId) ?? null} record={r} onHome={goHome} />;
     }
     case "home":
     case "gallery":
@@ -261,7 +268,7 @@ export function App() {
           hintMessage={r.prediction.hints > 0 ? `ヒントは ${r.prediction.hints} / 3 回使いました` : null}
           onSubmit={async (text) => {
             const next = await flow.submitPrediction(r, t, text);
-            nav(next === "predict" ? `/x/${t.id}` : `/x/${t.id}/${next}`);
+            nav(next === "halted" ? "/halted" : next === "predict" ? `/x/${t.id}` : `/x/${t.id}/${next}`);
           }}
           onHome={goHome}
         />
@@ -286,6 +293,11 @@ export function App() {
           predictionText={r.prediction.text}
           why={flow.planWhy(r, t)}
           source={r.plan?.source}
+          trail={r.plan?.trail}
+          selfCorrected={r.plan?.selfCorrected}
+          traceId={r.plan?.traceId}
+          alternatives={flow.alternativesFor(r, t)}
+          onPick={(id) => flow.pickVariant(r, t, id)}
           onApprove={() => { flow.approve(r, t); nav(`/x/${t.id}/setup/A`); }}
           onOther={goHome}
           onHome={goHome}
@@ -388,6 +400,9 @@ export function App() {
           explain={r.explain}
           nextVariant={nextVariant}
           nextDirection={r.nextPrediction?.direction ?? null}
+          suggestion={r.nextSuggestion ?? null}
+          stale={isNextStale(r)}
+          onLoadNext={() => askNext(r, t)}
           retries={r.retries}
           maxRetry={flow.MAX_RETRY}
           repeats={repeatsOf(variant!)}
