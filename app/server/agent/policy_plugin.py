@@ -46,6 +46,8 @@ LIMIT_REACHED_TEXT = (
 )
 
 PLAN_CANDIDATES_KEY = "plan_candidates"
+# 生徒の予想文。問い返しが生徒自身の言葉（「なぜ低くなると思う？」）をくり返すのは漏えいではないので、それと突き合わせる
+STUDENT_TEXT_KEY = "student_text"
 REPLAN_CANDIDATES_KEY = "replan_candidates"
 REPLAN_CALLS_KEY = "replan_calls"
 REPLAN_CALLS_PER_RECORD = 3
@@ -236,7 +238,7 @@ class PolicyPlugin(BasePlugin):
             )
         candidates = [str(c) for c in (state.get(PLAN_CANDIDATES_KEY) or [])]
         if candidates:
-            return _check_plan(candidates, llm_response)
+            return _check_plan(candidates, llm_response, str(state.get(STUDENT_TEXT_KEY) or ""))
         if state.get(NEXT_CANDIDATES_KEY) is not None:
             return _check_next([str(c) for c in state.get(NEXT_CANDIDATES_KEY) or []], llm_response)
         if state.get(REPLAN_CANDIDATES_KEY) is not None:
@@ -255,7 +257,9 @@ class PolicyPlugin(BasePlugin):
         return _text_response(LEAK_FALLBACK_TEXT, {ANSWER_LEAK_KEY: True})
 
 
-def _check_plan(candidates: list[str], llm_response: LlmResponse) -> LlmResponse | None:
+def _check_plan(
+    candidates: list[str], llm_response: LlmResponse, student_text: str = ""
+) -> LlmResponse | None:
     """Planner の出力を候補と突き合わせる。直したところだけ印を付けて返す"""
     plan = parse_plan(_response_text(llm_response))
     flags: dict[str, object] = {}
@@ -270,7 +274,7 @@ def _check_plan(candidates: list[str], llm_response: LlmResponse) -> LlmResponse
         if RESULT_WORDS.search(plan.why_this):
             plan = plan.model_copy(update={"why_this": NEUTRAL_WHY})
             flags[PLAN_WHY_REPLACED_KEY] = True
-        if plan.question_back and RESULT_WORDS.search(plan.question_back):
+        if plan.question_back and new_result_words(plan.question_back, student_text):
             # 問い返しも出口で検査する（「高くなると思う？」のように結果を誘導しない。10/2 採点 2-6）
             plan = plan.model_copy(update={"question_back": NEUTRAL_QUESTION_BACK})
             flags[PLAN_WHY_REPLACED_KEY] = True
@@ -380,6 +384,12 @@ def _is_tool_followup(llm_request: LlmRequest) -> bool:
         return False
     last = llm_request.contents[-1]
     return any(p.function_response for p in (last.parts or []))
+
+
+def new_result_words(text: str, student_text: str) -> bool:
+    """生徒が書いていない結果の言葉が混じっているか（生徒の言葉をくり返すのは許す）"""
+    said = _squash(student_text)
+    return any(m.group(0) not in said for m in RESULT_WORDS.finditer(text))
 
 
 def _squash(text: str) -> str:

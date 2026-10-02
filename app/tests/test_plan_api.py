@@ -283,7 +283,18 @@ def test_a_question_back_that_leads_to_a_result_is_replaced(client, fake_llm):
     """10/2 採点 2-6: 問い返しも出口で検査する"""
     fake_llm.reply = plan_json(question_back="強くはじいたら高くなるって思わない？")
 
-    data = client.post("/api/plan", json=body(text="高くなる")).json()
+    data = client.post("/api/plan", json=body(text="強くはじくと音が変わると思う")).json()
 
     assert data["kind"] == "question"
     assert "高くな" not in data["question_back"]
+
+
+def test_a_question_back_may_repeat_the_students_own_words(client, fake_llm):
+    """問い返しが生徒自身の言葉（「低くなる」）をくり返すのは漏えいではない（10/2 の評価で、これを直して問い返しが消えていた）"""
+    fake_llm.reply = plan_json(question_back="どうして強くはじくと低くなると思う？")
+
+    data = client.post("/api/plan", json=body(text="強くはじくと低くなる")).json()
+
+    assert data["kind"] == "question"
+    assert data["question_back"] == "どうして強くはじくと低くなると思う？"
+    assert data["fix_reasons"] == []

@@ -57,6 +57,7 @@ from server.agent.policy_plugin import (
     REPLAN_CALLS_PER_RECORD,
     REPLAN_CANDIDATES_KEY,
     SKIP_REASON_KEY,
+    STUDENT_TEXT_KEY,
     TOOL_CALLS_KEY,
     TOOL_DENIED_KEY,
     PolicyPlugin,
@@ -411,6 +412,7 @@ async def run_planner(
     class_halted: bool = False,
     tool_state: dict[str, object] | None = None,
     armor_text: str | None = None,
+    student_text: str | None = None,
 ) -> PlannerReply:
     """candidates を渡すと、PolicyPlugin が出力を候補と突き合わせる（スパイクは渡さない）。
     突き合わせで直されたら、理由を添えて 1 回だけ作り直させる（自己修正）"""
@@ -423,6 +425,8 @@ async def run_planner(
         }
         if armor_text and prompt == text:  # 作り直しでは同じ文をもう一度検査しない
             state[ARMOR_TEXT_KEY] = armor_text
+        if student_text:
+            state[STUDENT_TEXT_KEY] = student_text
         if candidates:
             state[PLAN_CANDIDATES_KEY] = list(candidates)
         outcome = await _run_once(runner, SPIKE_USER_ID, prompt, state)

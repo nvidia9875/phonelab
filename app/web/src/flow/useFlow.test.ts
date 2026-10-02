@@ -224,7 +224,7 @@ describe("submitPrediction", () => {
     vi.stubGlobal("fetch", vi.fn(async () => { throw new TypeError("network"); }));
     const rec = createRecord(sound.id);
 
-    expect(await submitPrediction(rec, sound, "強くはじくと高くなると思う")).toBe("plan");
+    expect(await submitPrediction(rec, sound, "強くはじくとゴムが速く震えるから、高くなると思う")).toBe("plan");
 
     const after = recordById(rec.id)!;
     expect(after.variantId).toBe("sound_pluck_strength");
@@ -266,7 +266,7 @@ describe("submitPrediction", () => {
     serverAnswers(reply({ variant_id: "energy_height" }));
     const rec = createRecord(sound.id);
 
-    expect(await submitPrediction(rec, sound, "強くはじくと高くなると思う")).toBe("plan");
+    expect(await submitPrediction(rec, sound, "強くはじくとゴムが速く震えるから、高くなると思う")).toBe("plan");
 
     expect(recordById(rec.id)!.variantId).toBe("sound_pluck_strength");
     expect(recordById(rec.id)!.plan?.source).toBe("stub");

@@ -26,6 +26,7 @@ from pydantic import BaseModel, Field, field_validator
 from server.agent.answers import MODEL_ANSWERS, phrases_for
 from server.agent.catalog import CATALOG, candidates_for, short_changes
 from server.agent.model_armor import armor_from_env
+from server.agent.models import gemini
 from server.agent.planner import (
     HoldCode,
     PlanContext,
@@ -159,7 +160,9 @@ def require_spike_agent_enabled() -> None:
 
 @lru_cache(maxsize=1)
 def get_planner_runner() -> Runner:
-    return build_runner(planner_model(), with_tools=planner_tools_enabled(), armor=armor_from_env())
+    return build_runner(
+        gemini(planner_model()), with_tools=planner_tools_enabled(), armor=armor_from_env()
+    )
 
 
 @app.post("/api/spike/agent", dependencies=[Depends(require_spike_agent_enabled)])
@@ -361,6 +364,7 @@ async def plan(
                     class_halted=halted,
                     tool_state=tool_state,
                     armor_text=body.text,
+                    student_text=body.text,
                 ),
                 timeout=PLAN_TIMEOUT_S,
             )
@@ -516,7 +520,7 @@ class ReplanResponse(BaseModel):
 
 @lru_cache(maxsize=1)
 def get_replan_runner() -> Runner:
-    return build_replan_runner(planner_model())
+    return build_replan_runner(gemini(planner_model()))
 
 
 @app.post("/api/replan")
@@ -682,7 +686,7 @@ class ChatResponse(BaseModel):
 
 @lru_cache(maxsize=1)
 def get_tutor_runner() -> Runner:
-    return build_tutor_runner(chat_model(), armor=armor_from_env())
+    return build_tutor_runner(gemini(chat_model()), armor=armor_from_env())
 
 
 @lru_cache(maxsize=1)

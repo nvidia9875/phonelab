@@ -16,6 +16,7 @@ from opentelemetry import trace
 from pydantic import BaseModel, Field, field_validator
 
 from server.agent.catalog import CATALOG, variant_by_id
+from server.agent.models import gemini
 from server.agent.next_step import (
     NEXT_CALLS_PER_RECORD,
     NextContext,
@@ -103,7 +104,7 @@ class NextResponse(BaseModel):
 
 @lru_cache(maxsize=1)
 def get_next_runner() -> Runner:
-    return build_next_runner(planner_model())
+    return build_next_runner(gemini(planner_model()))
 
 
 @lru_cache(maxsize=1)

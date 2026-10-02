@@ -21,6 +21,7 @@ from opentelemetry import trace
 from pydantic import BaseModel, Field
 
 from server.agent.class_agent import build_snapshot
+from server.agent.models import gemini
 from server.agent.planner import planner_model
 from server.agent.runner import InsightReply, build_insight_runner, run_insight
 from server.classroom import ClassStore, now_iso
@@ -63,7 +64,7 @@ _cache: dict[str, tuple[float, InsightResponse]] = {}
 
 @lru_cache(maxsize=1)
 def get_insight_runner() -> Runner:
-    return build_insight_runner(planner_model())
+    return build_insight_runner(gemini(planner_model()))
 
 
 @lru_cache(maxsize=1)

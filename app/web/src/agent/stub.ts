@@ -95,7 +95,8 @@ export interface PlanChoice {
 export function choosePlan(text: string, theme: Theme, done: string[]): PlanChoice {
   const claim = readClaim(text, theme);
   const variant = pickVariant(theme, claim, done);
-  const tooShort = text.trim().length < 6 || !/から|ので|ため|思う|はず|と|だ/.test(text);
+  // 理由は「なぜ」の説明（から・ので・ため・同じで・見たことがある）。「思う」「はず」は気持ちの言葉なので数えない（サーバの Planner と同じ線引き）
+  const tooShort = text.trim().length < 6 || !/から|ので|ため|同じ|見たこと|聞いたこと|なぜなら/.test(text);
   const questionBack = tooShort ? "どうしてそう思う？ 理由を一言足してから、実験を選びます" : null;
   const why =
     claim.variable !== "unknown" && claim.variable === variant.variable
