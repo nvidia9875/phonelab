@@ -320,8 +320,9 @@ flowchart LR
 
 推奨: X1・X2・X4・X5 はやる、X3 は撮影前に間に合えば、X6・X7 は見送り。→ **10/2 本人の判断で全部やる**。
 
-**10/2 実装済み（ブランチ `feat/agent-loop`、未デプロイ）**: X1 `/api/next` と結果画面、X2 自己修正（plan / replan / next）、X3 `/api/class/{code}/insight` と教員画面の「ラボ先生の見立て」、X4 判断の跡（計画・保留・結果・教員画面の記録、Cloud Trace へのリンク）、X5 `scripts/eval_agent.py` → `docs/eval.md`、X6 Planner のツール（評価で遅く高いと分かったので既定オフ）、X7 Model Armor（テンプレート `phonelab-student` を us-central1 に作成、`before_model_callback`）。E1 見本の記録 D-01〜D-06。評価で見つけた高さの規則の誤検知（「1.98 m/s」）も直した。pytest 122・vitest 62。
-**デプロイに要るもの**: env `PHONELAB_MODEL_ARMOR_TEMPLATE` と `PHONELAB_DEMO_SAMPLES=1`、Cloud Run のサービスアカウントに `roles/modelarmor.user`。
+**10/2 実装済み（ブランチ `feat/agent-loop`。同日 Cloud Run にデプロイ、revision `phonelab-00026-7dh`。main へのマージは未）**: X1 `/api/next` と結果画面、X2 自己修正（plan / replan / next）、X3 `/api/class/{code}/insight` と教員画面の「ラボ先生の見立て」、X4 判断の跡（計画・保留・結果・教員画面の記録、Cloud Trace へのリンク）、X5 `scripts/eval_agent.py` → `docs/eval.md`、X6 Planner のツール（評価で遅く高いと分かったので既定オフ）、X7 Model Armor（テンプレート `phonelab-student` を us-central1 に作成、`before_model_callback`）。E1 見本の記録 D-01〜D-06。評価で見つけた高さの規則の誤検知（「1.98 m/s」）も直した。pytest 122・vitest 62。
+デプロイで足したもの: env `PHONELAB_MODEL_ARMOR_TEMPLATE` と `PHONELAB_DEMO_SAMPLES=1`、サービスアカウントに `roles/modelarmor.user`。本番で見立てが出なかった不具合（断ったツール呼び出しで回数を使い切る）を直して再デプロイ。
+**10/2 Codex（gpt-6-astra）のルーブリック採点: 総合 57.4**（軸1 60.0・軸2 57.1・軸3 55.0）。`docs/reviews/2026-10-02-codex-score.md`。最低は 3-8 実機（1 点）、2-4 停止と上限・2-6 セキュリティ・3-6 運用（2 点）。
 
 ### D. 統制層（〜10/1）— 審査軸②の本体
 
