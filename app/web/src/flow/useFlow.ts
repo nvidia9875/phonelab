@@ -66,10 +66,11 @@ export function trailText(trail: string[] | undefined): string | null {
 
 const DIRECTIONS: ReadonlySet<string> = new Set(["faster", "slower", "same", "unknown"]);
 const PLAN_SOURCE_LABEL: Record<PlanInfo["source"], string> = {
-  agent: "ラボ先生（Gemini）が予想を読んで選んだ",
+  agent: "ラボ先生（AI）が予想を読んで選んだ",
   policy: "Policy の判断",
   catalog: "カタログの順で選んだ",
   stub: "オフラインのため端末内の規則で選んだ",
+  student: "生徒が自分で選んだ",
 };
 
 /** 端末内の縮退（サーバにつながらない・遅いとき）。答えは持たない */
@@ -215,7 +216,7 @@ export async function askHoldAdvice(rec: StudyRecord, theme: Theme): Promise<Hol
     const traceId = /^0+$/.test(reply.trace_id) ? null : reply.trace_id;
     const advice: HoldAdvice = { measurementIndex: index, action: reply.action, experimentId: reply.experiment_id, advice: reply.advice, source: reply.source, traceId, trail: reply.trail };
     updateRecord(rec.id, (r) => {
-      const label = reply.source === "agent" ? "ラボ先生（Gemini）が保留の理由を読んで提案" : "定型の提案";
+      const label = reply.source === "agent" ? "ラボ先生（AI）が保留の理由を読んで提案" : "定型の提案";
       const n = addEvent(withTrace({ ...r, holdAdvice: advice, replanCalls: reply.replan_calls }, traceId), "再計画", `${reply.action === "switch" ? "別の実験へ" : "同じ実験で直す"}: ${reply.advice}（${label}）`);
       const trail = trailText(reply.trail);
       return trail ? addEvent(n, "判断", trail) : n;
@@ -230,6 +231,25 @@ export async function askHoldAdvice(rec: StudyRecord, theme: Theme): Promise<Hol
 
 export function planWhy(rec: StudyRecord, theme: Theme): string {
   return rec.plan?.why || choosePlan(rec.prediction.text, theme, doneVariantIds(theme.id).filter((v) => v !== rec.variantId)).why;
+}
+
+/** 計画の画面で、生徒がこのテーマのほかの実験を自分で選ぶ（「別の実験を見る」でトップへ戻っていた。10/2 の通し操作） */
+export function pickVariant(rec: StudyRecord, theme: Theme, variantId: string): void {
+  const v = variantById(theme, variantId);
+  if (!v) return;
+  updateRecord(rec.id, (r) =>
+    addEvent(
+      { ...r, variantId: v.id, plan: { source: "student", why: `${v.changes.split("（")[0]}を変えて確かめる（自分で選んだ）`, traceId: null } },
+      "計画",
+      `${v.title}。${PLAN_SOURCE_LABEL.student}`,
+    ),
+  );
+}
+
+/** 計画の画面に出す、このテーマのほかの実験（いまの実験とやり終えたものを除く） */
+export function alternativesFor(rec: StudyRecord, theme: Theme) {
+  const done = new Set([...doneVariantIds(theme.id), rec.variantId]);
+  return variantsOf(theme).filter((v) => !done.has(v.id));
 }
 
 export function approve(rec: StudyRecord, theme: Theme): void {
@@ -321,19 +341,19 @@ export function ensureJudged(rec: StudyRecord, theme: Theme): StudyRecord | null
   const mb = averageOf(rec, "B", repeats);
   const result = judge(ma.value, mb.value, ma.unc + mb.unc, rec.prediction.claim, variant);
   return updateRecord(rec.id, (r) => {
-    const within = Math.abs(result.delta) <= result.tolerance ? "内側" : "外側";
+    const within = Math.abs(result.delta) <= result.tolerance ? "より小さい" : "より大きい";
     const verdict = result.undecided
       ? "保留: 差が測定のばらつきに埋もれて決められない"
       : result.consistent === null
         ? "予想の向きが読めず判定なし"
         : result.consistent
           ? "予想は成り立った"
-          : "予想は成り立たず";
+          : "予想とちがった（発見）";
     // ばらつきに埋もれた判定は保留として扱う（先生の保留リストに入り、次の一手へ進まない）
     let n: StudyRecord = result.undecided
       ? { ...r, result, status: "held", stage: "result", holdCodes: ["too_uncertain"] }
       : { ...r, result, status: "judged", stage: "result" };
-    n = addEvent(n, "判定", `${verdict}。差 ${formatQuantity(Math.abs(result.delta), variant.unit)} は許容 ${formatQuantity(result.tolerance, variant.unit)} の${within}`);
+    n = addEvent(n, "判定", `${verdict}。差 ${formatQuantity(Math.abs(result.delta), variant.unit)} は、ずれの目安 ${formatQuantity(result.tolerance, variant.unit)} ${within}`);
     return n;
   });
 }
@@ -384,7 +404,7 @@ export async function closeAndNext(rec: StudyRecord, theme: Theme): Promise<Stud
       : { source: "catalog", why: `前の実験の続きとして、次は${nv.changes.split("（")[0]}だけを変えます`, traceId: null };
     let n: StudyRecord = { ...r, variantId: nv.id, stage: "plan", plan, prediction: { ...r.prediction, text, claim: { variable: nv.variable, direction }, questionBack: null } };
     n = addEvent(n, "予想", `${text}（前の実験の結果を見て記入）`, "orange");
-    n = addEvent(n, "計画", `${nv.title}。${fromAgent ? "前の結果を読んだラボ先生（Gemini）が次の一手として選んだ" : PLAN_SOURCE_LABEL.catalog}`);
+    n = addEvent(n, "計画", `${nv.title}。${fromAgent ? "前の結果を読んだラボ先生（AI）が次の一手として選んだ" : PLAN_SOURCE_LABEL.catalog}`);
     return n;
   });
   return recordById(next.id) ?? null;

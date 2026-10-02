@@ -247,7 +247,7 @@ class PlanResponse(BaseModel):
     skipped: bool = False
     # Policy が Planner の出力を直した（候補外の id、理由に混じった結果、読めない出力）
     policy_fixed: bool = False
-    # 1 回目が検査に落ち、理由を返して作り直させたら、その理由と結果
+    # 1 回目が検査に落ち、理由を伝えて作り直してもらったら、その理由と結果
     fix_reasons: list[str] = Field(default_factory=list)
     self_corrected: bool = False
     # 判断の跡（何を読み、何を選び、統制層が何を直したか）。本文は入れない
@@ -403,7 +403,10 @@ async def plan(
             ),
             planner_calls=reply.planner_calls,
             source="policy",
-            trail=trail(read, "モデルの前の検査: Model Armor が検知 → 却下（モデルは呼ばない）"),
+            trail=trail(
+                read,
+                "AI に渡す前のチェック（Model Armor）: 命令や授業に合わない言葉 → 止めた（AI は呼ばない）",
+            ),
             trace_id=trace_id,
         )
     if reply.skipped:

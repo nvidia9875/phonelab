@@ -145,7 +145,7 @@ def _from_agent(reply: InsightReply | None, students: int, trace_id: str) -> Ins
     lines = [
         f"読んだ: 学級の要約（{students} 人、予想の本文は渡さない）と、一人ずつの流れ",
         f"ツール: {reply.tool_calls} 回（断った {reply.tools_denied} 回）・モデル {reply.model_calls} 回",
-        "モデルの後の検査: "
+        "AI の答えのチェック: "
         + ("停止の勧め・要約に無い人数・学級にいない番号を落とした" if reply.fixed else "通過"),
         "操作: しない（ボタンを押すのは先生）",
     ]
@@ -182,7 +182,7 @@ def _from_rules(snapshot: dict, trace_id: str) -> InsightResponse:
         visit_first=visit,
         suggestion="",
         source="rules",
-        trail=["ラボ先生につながらないので、決まりごとだけで数えました（モデルは呼ばない）"],
+        trail=["ラボ先生につながらないので、決まりごとだけで数えました（AI は呼ばない）"],
         generated_at=now_iso(),
         trace_id=trace_id,
     )

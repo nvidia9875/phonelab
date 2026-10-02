@@ -235,7 +235,7 @@ def test_redoes_an_off_catalog_pick_once_with_the_reason(client, fake_llm):
     assert data["planner_calls"] == 2
     assert len(fake_llm.requests) == 2
     assert "前回の出力の直すところ" in prompt_of(fake_llm.requests[1])
-    assert any("作り直し: 検査を通過" in line for line in data["trail"])
+    assert any("作り直し: チェックを通った" in line for line in data["trail"])
 
 
 def test_keeps_the_policy_replacement_when_the_redo_also_fails(client, fake_llm):
@@ -249,7 +249,7 @@ def test_keeps_the_policy_replacement_when_the_redo_also_fails(client, fake_llm)
     assert "変わらない" not in data["why"]
     assert data["self_corrected"] is False
     assert data["policy_fixed"] is True
-    assert any("統制層が差し替えた" in line for line in data["trail"])
+    assert any("安全な文に差し替えた" in line for line in data["trail"])
 
 
 def test_does_not_redo_when_the_call_limit_is_reached(client, fake_llm):
@@ -268,7 +268,7 @@ def test_a_clean_plan_is_called_once_and_leaves_a_trail(client, fake_llm):
     assert len(fake_llm.requests) == 1
     assert data["fix_reasons"] == []
     assert data["trail"][0].startswith("読んだ:")
-    assert "モデルの後の検査: 通過" in data["trail"]
+    assert "AI の答えのチェック: 問題なし" in data["trail"]
     # 判断の跡に予想の本文は入れない
     assert all("強くはじく" not in line for line in data["trail"])
 
@@ -276,7 +276,7 @@ def test_a_clean_plan_is_called_once_and_leaves_a_trail(client, fake_llm):
 def test_a_rejection_trail_says_the_model_was_not_called(client, fake_llm):
     data = client.post("/api/plan", json=body(text="スマホを落として音を測りたい")).json()
 
-    assert any("モデルは呼ばない" in line for line in data["trail"])
+    assert any("AI は呼ばない" in line for line in data["trail"])
 
 
 def test_a_question_back_that_leads_to_a_result_is_replaced(client, fake_llm):
@@ -297,4 +297,14 @@ def test_a_question_back_may_repeat_the_students_own_words(client, fake_llm):
 
     assert data["kind"] == "question"
     assert data["question_back"] == "どうして強くはじくと低くなると思う？"
+    assert data["fix_reasons"] == []
+
+
+def test_a_question_back_may_repeat_a_prediction_written_in_hiragana(client, fake_llm):
+    """10/2 の通し操作: 生徒が「たかくなる」と書いたら、問い返しの「高くなる」はくり返し（差し替えない）"""
+    fake_llm.reply = plan_json(question_back="どうして強くはじくと高くなると思う？")
+
+    data = client.post("/api/plan", json=body(text="つよくはじくとたかくなる")).json()
+
+    assert data["question_back"] == "どうして強くはじくと高くなると思う？"
     assert data["fix_reasons"] == []

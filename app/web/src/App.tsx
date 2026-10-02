@@ -93,6 +93,8 @@ function resolve(route: Route, rec: StudyRecord | undefined, theme: Theme | unde
   if (!hasStudent) return { redirect: "/me" };
   if (!allowed) return { redirect: "/" }; // 学級の許可・端末の能力で選べないテーマは URL 直打ちでも開かない（9/18 Codex I2）
   if (halted && (route.name === "setup" || route.name === "measure")) return { redirect: "/halted" };
+  // 承認してから測る（D4）。URL を直接開いても、承認していなければ計画へ戻す（10/2 の通し操作で飛ばせた）
+  if ((route.name === "setup" || route.name === "measure") && rec && !rec.approvedAt) return { redirect: `/x/${theme.id}/plan` };
   if (route.name === "predict") {
     if (!rec) return { need: "create" };
     if (rec.stage !== "predict" && rec.variantId) return { redirect: stagePath(theme.id, rec.stage) };
@@ -217,21 +219,25 @@ export function App() {
             // 同じ端末で同じ番号なら、保存済みの合言葉を使う（入力欄が空のとき）
             const known = store.student && store.student.classCode === s.classCode && store.student.number === s.number ? store.student.secret : undefined;
             let secret = s.secret ?? known;
+            let fresh: string | null = null;
             try {
               const info = await joinClass(s.classCode, s.number, secret);
               setClassState(classStateFrom(info));
-              if (info.secret) secret = info.secret; // 最初の入場。合言葉はこの端末に保存する
+              if (info.secret) {
+                secret = info.secret; // 最初の入場。合言葉はこの端末に保存する
+                fresh = info.secret;
+              }
             } catch (e: unknown) {
               // テストモードだけ、学級が無くても端末内で進める（404 のときだけ。番号の取り合いは通さない）
               const notFound = e instanceof ClassError && e.status === 404;
-              if (!(store.settings.testMode && notFound)) return e instanceof ClassError ? e.message : "学級につながりませんでした";
+              if (!(store.settings.testMode && notFound)) return { error: e instanceof ClassError ? e.message : "学級につながりませんでした" };
               setClassState(null);
             }
             setStudent({ classCode: s.classCode, number: s.number, secret });
-            goHome();
-            return null;
+            // 初めての入場なら、Me が合言葉の画面を出してからトップへ戻す
+            return { secret: fresh };
           }}
-          onClear={() => { if (confirm("この端末の記録をすべて消します。よろしいですか？")) clearAll(); }}
+          onClear={() => clearAll()}
           onHome={goHome}
         />
       );
@@ -290,6 +296,8 @@ export function App() {
           trail={r.plan?.trail}
           selfCorrected={r.plan?.selfCorrected}
           traceId={r.plan?.traceId}
+          alternatives={flow.alternativesFor(r, t)}
+          onPick={(id) => flow.pickVariant(r, t, id)}
           onApprove={() => { flow.approve(r, t); nav(`/x/${t.id}/setup/A`); }}
           onOther={goHome}
           onHome={goHome}

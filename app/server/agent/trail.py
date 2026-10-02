@@ -22,11 +22,11 @@ def read_line(what: str) -> str:
 
 def policy_before_line(kind: str) -> str:
     return {
-        "allow": "モデルの前の検査: 通過",
-        "hint": "モデルの前の検査: 答えを求める文 → ヒントで返す（モデルは呼ばない）",
-        "reject": "モデルの前の検査: 禁止動作・メモの中の命令 → 却下（モデルは呼ばない）",
-        "class_policy": "モデルの前の検査: 学級の許可がない → 止める（モデルは呼ばない）",
-        "limit": "回数の上限 → モデルを呼ばずにカタログの順",
+        "allow": "AI に渡す前のチェック: 問題なし",
+        "hint": "AI に渡す前のチェック: 答えを聞く文 → ヒントで返した（AI は呼ばない）",
+        "reject": "AI に渡す前のチェック: 危ない実験・メモの中の命令 → 止めた（AI は呼ばない）",
+        "class_policy": "AI に渡す前のチェック: 学級で許されていない → 止めた（AI は呼ばない）",
+        "limit": "聞ける回数の上限 → AI を呼ばずにリストの順",
     }[kind]
 
 
@@ -54,13 +54,15 @@ def variable_words(theme_id: str, variable: str) -> str:
 def check_lines(fix_reasons: tuple[str, ...], retried: bool, self_corrected: bool) -> list[str]:
     """モデルの後の検査と自己修正。落ちなかったら「通過」の 1 行"""
     if not fix_reasons:
-        return ["モデルの後の検査: 通過"]
+        return ["AI の答えのチェック: 問題なし"]
     found = "・".join(FIX_WORDS[r] for r in fix_reasons)
     if not retried:
-        return [f"モデルの後の検査: {found} → 回数の上限なので統制層が差し替えた"]
-    lines = [f"モデルの後の検査: {found} → 理由を返して作り直させた"]
+        return [f"AI の答えのチェック: {found} → 回数の上限なので安全な文に差し替えた"]
+    lines = [f"AI の答えのチェック: {found} → 理由を伝えて作り直してもらった"]
     lines.append(
-        "作り直し: 検査を通過" if self_corrected else "作り直し: まだ通らない → 統制層が差し替えた"
+        "作り直し: チェックを通った"
+        if self_corrected
+        else "作り直し: まだだめ → 安全な文に差し替えた"
     )
     return lines
 

@@ -12,3 +12,12 @@
 @media (prefers-reduced-motion: reduce) {
   .countdown__n, .go-cue { animation: none; }
 }
+
+/* 予想が外れた瞬間（発見）: 橙の縁で少しだけ弾む */
+.discovery > .card { box-shadow: 0 0 0 3px var(--orange); animation: discovery-pop 420ms var(--ease-out); }
+@keyframes discovery-pop { 0% { transform: scale(0.97); } 60% { transform: scale(1.015); } 100% { transform: none; } }
+@media (prefers-reduced-motion: reduce) { .discovery > .card { animation: none; } }
+/* 結果: 測り直しは畳んで下へ */
+.remeasure { border: 1.5px solid var(--line); border-radius: var(--r-card); padding: 10px 14px; display: flex; flex-direction: column; gap: 8px; }
+.remeasure__summary { font-size: 13px; font-weight: 700; color: var(--ink-2); cursor: pointer; min-height: 32px; display: flex; align-items: center; }
+.remeasure[open] { gap: 10px; }

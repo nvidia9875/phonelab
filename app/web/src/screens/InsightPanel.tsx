@@ -12,7 +12,7 @@ export interface InsightPanelProps {
 }
 
 const SOURCE_NOTE: Record<InsightInfo["source"], string> = {
-  agent: "ラボ先生（Gemini）が、読み取り専用のツールで学級の要約を読みました。予想の本文と名前は渡していません。操作はしません",
+  agent: "ラボ先生（AI）が、読み取り専用のツールで学級の要約を読みました。予想の本文と名前は渡していません。操作はしません",
   rules: "ラボ先生につながらないので、決まりごとだけで数えました",
 };
 

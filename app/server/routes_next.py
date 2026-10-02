@@ -161,7 +161,7 @@ async def next_step(
                 why=REFLECT_WHY,
                 source="catalog",
                 next_calls=count.start,
-                trail=trail(read, chose_line("ふり返りへ（残りの実験なし。モデルは呼ばない）")),
+                trail=trail(read, chose_line("ふり返りへ（残りの実験なし。AI は呼ばない）")),
                 trace_id=trace_id,
             )
         prompt = build_next_prompt(

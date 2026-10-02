@@ -51,6 +51,8 @@ export function Teacher({ classCode, cls, halted, onHalt, onPolicy, onResetStude
   const enabled = new Set(dash?.teacher_enabled ?? cls?.teacherEnabled ?? []);
   const live = !!cls && cls.classCode === code.trim().toUpperCase();
   const unlocked = pin.length > 0 && code.trim().length >= 3;
+  // PIN が通って学級の様子が取れるまで、停止と許可は押せない見た目に（PIN 前に押すと止めたつもりになった。10/2 の通し操作）
+  const ready = unlocked && !!dash;
 
   // PIN が入っている間、5 秒ごとに学級の様子を取る
   useEffect(() => {
@@ -130,7 +132,8 @@ export function Teacher({ classCode, cls, halted, onHalt, onPolicy, onResetStude
           <button
             type="button"
             className={`tbtn ${isHalted ? "tbtn--outline" : "tbtn--halt"}`}
-            disabled={busy}
+            disabled={busy || !ready}
+            title={ready ? undefined : "学級コードと教師 PIN を入れると押せます"}
             aria-pressed={isHalted}
             onClick={() => void run(() => onHalt(live || unlocked ? code : null, pin, !isHalted), isHalted ? "停止を解除しました" : "全端末の測定を止めました")}
           >
@@ -139,7 +142,8 @@ export function Teacher({ classCode, cls, halted, onHalt, onPolicy, onResetStude
         </div>
       </header>
       {message && <p className="tmessage" role="status">{message}</p>}
-      {!unlocked && <p className="tmessage">学級コードと教師 PIN を入れると、生徒の進み方が出ます（5 秒ごとに更新）。名前は出ません、番号だけです。</p>}
+      {!unlocked && <p className="tmessage">学級コードと教師 PIN を入れると、生徒の進み方が出て、停止や許可のボタンが押せるようになります（5 秒ごとに更新）。名前は出ません、番号だけです。</p>}
+      {dash && <p className="tupdated">{new Date(dash.fetched_at).toLocaleTimeString("ja-JP")} 時点（5 秒ごとに更新）</p>}
       {dashError && <p className="tmessage" role="alert">{dashError}</p>}
 
       <div className="teacher__grid">
@@ -182,7 +186,7 @@ export function Teacher({ classCode, cls, halted, onHalt, onPolicy, onResetStude
           <div className="tstats">
             <p><strong>{online}</strong> 人が接続（10 分以内）</p>
             <p><strong>{held}</strong> 件 保留中</p>
-            <p><strong>{rejected}</strong> 件 Policy の却下</p>
+            <p><strong>{rejected}</strong> 件 安全のため止めた</p>
             <p><strong>{signed}</strong> 件 記録済み</p>
           </div>
         </section>
@@ -195,7 +199,7 @@ export function Teacher({ classCode, cls, halted, onHalt, onPolicy, onResetStude
               {TOGGLE_SENSORS.map((p) => (
                 <div className="perm" key={p.sensor}>
                   <p>{p.label}</p>
-                  <button type="button" role="switch" aria-checked={allowed.has(p.sensor)} disabled={busy || !unlocked} className={`toggle${allowed.has(p.sensor) ? " toggle--on" : ""}`} aria-label={p.label} onClick={() => toggleSensor(p.sensor)}>
+                  <button type="button" role="switch" aria-checked={allowed.has(p.sensor)} disabled={busy || !ready} className={`toggle${allowed.has(p.sensor) ? " toggle--on" : ""}`} aria-label={p.label} onClick={() => toggleSensor(p.sensor)}>
                     <span className="toggle__knob" />
                   </button>
                 </div>
@@ -209,7 +213,7 @@ export function Teacher({ classCode, cls, halted, onHalt, onPolicy, onResetStude
               {HOME_THEMES.map((h) => (
                 <div className="perm" key={h.id}>
                   <p>{h.label}</p>
-                  <button type="button" role="switch" aria-checked={enabled.has(h.id)} disabled={busy || !unlocked} className={`toggle${enabled.has(h.id) ? " toggle--on" : ""}`} aria-label={h.label} onClick={() => toggleHome(h.id)}>
+                  <button type="button" role="switch" aria-checked={enabled.has(h.id)} disabled={busy || !ready} className={`toggle${enabled.has(h.id) ? " toggle--on" : ""}`} aria-label={h.label} onClick={() => toggleHome(h.id)}>
                     <span className="toggle__knob" />
                   </button>
                 </div>

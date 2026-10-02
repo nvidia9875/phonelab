@@ -20,7 +20,7 @@ export function stateOf(r: RecordSummary | null): StateLabel {
   if (r.status === "held") return { text: "保留", tone: "navy" };
   if (r.rejection_title && r.stage === "plan") return { text: "却下 → 代替", tone: "navy" };
   if (r.status === "signed") return { text: "記録済み", tone: "outline" };
-  if (r.status === "judged" || r.stage === "result") return { text: "次の予測", tone: "outline" };
+  if (r.status === "judged" || r.stage === "result") return { text: "判定まで済み", tone: "outline" };
   switch (r.stage) {
     case "predict": return { text: r.prediction ? "予想の続き" : "予想中", tone: "outline" };
     case "plan": return { text: "承認待ち", tone: "outline" };

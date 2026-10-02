@@ -40,6 +40,11 @@ export function Home({ student, records, caps, policy, halted, school, onOpenThe
   const done = records.filter((r) => r.status === "signed").length;
   const signed = records.filter((r) => r.status === "signed" || r.status === "judged");
   const hero = HERO[school];
+  // 番号は教科書の流れの順（進み方の区画と同じ）。並べるのは、いまできるテーマが先
+  const numbered = statuses.map((s, i) => ({ ...s, no: i + 1 }));
+  const ready = numbered.filter((s) => s.status.kind !== "unavailable");
+  const later = numbered.filter((s) => s.status.kind === "unavailable");
+  const started = numbered.some((s) => s.status.kind !== "new" && s.status.kind !== "unavailable");
 
   return (
     <Screen
@@ -79,15 +84,27 @@ export function Home({ student, records, caps, policy, halted, school, onOpenThe
         </div>
       )}
 
-      <Progress cells={statuses} signedCount={done} onOpenTheme={onOpenTheme} />
+      {/* 進み方は、何か始めてから出す（最初に「0」と「選べない」を見せない。10/2 の通し操作） */}
+      {started && <Progress cells={statuses} signedCount={done} onOpenTheme={onOpenTheme} />}
 
       <Section label={hero.section}>
         <div className="themes">
-          {statuses.map(({ theme, status }, i) => (
-            <ThemeCard key={theme.id} no={i + 1} theme={theme} status={status} disabled={!student} onOpen={() => onOpenTheme(theme)} />
+          {ready.map(({ theme, status, no }) => (
+            <ThemeCard key={theme.id} no={no} theme={theme} status={status} disabled={!student} onOpen={() => onOpenTheme(theme)} />
           ))}
         </div>
       </Section>
+
+      {later.length > 0 && (
+        <details className="later">
+          <summary className="later__summary">これから増えるテーマ（{later.length}）</summary>
+          <div className="themes">
+            {later.map(({ theme, status, no }) => (
+              <ThemeCard key={theme.id} no={no} theme={theme} status={status} disabled={!student} onOpen={() => onOpenTheme(theme)} />
+            ))}
+          </div>
+        </details>
+      )}
 
       <Section label="記録">
         {signed.length === 0 ? (
@@ -146,7 +163,7 @@ function ThemeCard({ no, theme, status, disabled, onOpen }: { no: number; theme:
           <span className="theme__no">{no}</span>
           {theme.title}
         </span>
-        <span className="theme__tag">{theme.course}　{theme.tagline}</span>
+        <span className="theme__tag">{theme.tagline}</span>
       </span>
       <span className="theme__foot">
         {badge}

@@ -441,10 +441,26 @@ def _is_tool_followup(llm_request: LlmRequest) -> bool:
     return any(p.function_response for p in (last.parts or []))
 
 
+# 結果の言葉のひらがな（生徒が「たかくなる」と書いたら、問い返しの「高くなる」はくり返し。10/2 の通し操作）
+RESULT_READINGS = {
+    "速くな": "はやくな",
+    "遅くな": "おそくな",
+    "高くな": "たかくな",
+    "低くな": "ひくくな",
+    "変わらな": "かわらな",
+    "同じにな": "おなじにな",
+    "長くな": "ながくな",
+    "短くな": "みじかくな",
+}
+
+
 def new_result_words(text: str, student_text: str) -> bool:
-    """生徒が書いていない結果の言葉が混じっているか（生徒の言葉をくり返すのは許す）"""
+    """生徒が書いていない結果の言葉が混じっているか（生徒の言葉をくり返すのは許す。ひらがなで書いても同じ）"""
     said = _squash(student_text)
-    return any(m.group(0) not in said for m in RESULT_WORDS.finditer(text))
+    return any(
+        m.group(0) not in said and RESULT_READINGS.get(m.group(0), "\0") not in said
+        for m in RESULT_WORDS.finditer(text)
+    )
 
 
 def _squash(text: str) -> str:

@@ -77,7 +77,7 @@ def test_does_not_call_the_model_when_no_experiment_is_left(client, fake_llm):
     assert data["action"] == "reflect"
     assert data["source"] == "catalog"
     assert fake_llm.requests == []
-    assert any("モデルは呼ばない" in line for line in data["trail"])
+    assert any("AI は呼ばない" in line for line in data["trail"])
 
 
 def test_an_off_catalog_pick_is_redone_then_replaced(client, fake_llm):

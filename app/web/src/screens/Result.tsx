@@ -32,7 +32,7 @@ export interface ResultProps {
 
 /** 画面 3: 結果と次の予測。「正解」と言わない。「測定が言っていること」と言う */
 const NEXT_SOURCE: Record<NextSuggestion["source"], string> = {
-  agent: "ラボ先生（Gemini）が、あなたの予想と測った結果を読んで選びました。次の結果は言っていません",
+  agent: "ラボ先生（AI）が、あなたの予想と測った結果を読んで選びました。次の結果は言っていません",
   catalog: "ラボ先生に聞ける回数の上限のため、カタログの順です",
   stub: "いまはラボ先生につながらないので、カタログの順です",
 };
@@ -71,11 +71,14 @@ export function Result({ variant, judgement, explain, nextVariant, nextDirection
       {repeats > 1 && <p className="card__hint">それぞれ {repeats} 回測った平均です</p>}
       {sample && <p className="card__hint">テストモードのサンプル値です。実際の測定ではありません</p>}
 
+      {/* 予想が外れた瞬間は失敗ではなく発見として見せる（中学は興味と理解。10/2 の通し操作） */}
+      <div className={j.consistent === false ? "discovery" : undefined}>
       <Card variant="navy">
-        <Eyebrow>{j.undecided ? "保留 ― 測定が言っていること" : "測定が言っていること"}</Eyebrow>
+        <Eyebrow>{j.undecided ? "保留 ― 測定が言っていること" : j.consistent === false ? "予想とちがった！ ここが発見" : j.consistent ? "予想どおり！ 測定が言っていること" : "測定が言っていること"}</Eyebrow>
         <CardTitle>{j.statement}</CardTitle>
         <CardBody>{j.detail}</CardBody>
       </Card>
+      </div>
 
       <Section label="なぜそうなったと思う？　自分の言葉で">
         <Field value={text} onChange={(e) => setText(e.target.value)} onBlur={() => onExplain(text)} placeholder="たとえば：変えたのは〇〇だけなのに、△△が変わらなかったのは…" />
@@ -96,7 +99,12 @@ export function Result({ variant, judgement, explain, nextVariant, nextDirection
         </Card>
       )}
 
-      {j.undecided ? (
+      {reflect && !j.undecided ? (
+        <Card variant="line">
+          <Eyebrow>次の予測は、理由を書いたら出てきます</Eyebrow>
+          <p className="card__hint">上の「なぜそうなったと思う？」に自分の考えを書くか、ラボ先生と話してから。</p>
+        </Card>
+      ) : j.undecided ? (
         <Card variant="line">
           <Eyebrow>保留のあいだは、次の実験に進みません</Eyebrow>
           <p className="card__hint">差があるかどうかを決めるには、条件をそろえて測り直します。下の「測り直す」から。先生の画面にも保留として出ています。</p>
@@ -133,8 +141,8 @@ export function Result({ variant, judgement, explain, nextVariant, nextDirection
         </Card>
       )}
 
-      <Card variant="line">
-        <Eyebrow>うまく取れていなかった？</Eyebrow>
+      <details className="remeasure" open={j.undecided}>
+        <summary className="remeasure__summary">うまく取れていなかった？ 測り直す</summary>
         <p className="card__hint">気になる条件をもう一度測れます。前の測定も記録に残り、判定は新しい測定でやり直します（1 条件 {maxRetry} 回まで）</p>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
           {(["A", "B"] as CondKey[]).map((cond, i) => (
@@ -143,21 +151,28 @@ export function Result({ variant, judgement, explain, nextVariant, nextDirection
             </Button>
           ))}
         </div>
-      </Card>
+      </details>
 
       <Foot>
-        {nextVariant && !j.undecided ? (
-          <Button disabled={!nextDirection} onClick={() => { onExplain(text); onGoNext(); }}>次の実験へ</Button>
+        {/* ふり返りが先なら、話すボタンを主に（主のボタンは 1 つだけ） */}
+        {reflect ? (
+          <>
+            <Button onClick={() => { onExplain(text); onChat(); }}>ラボ先生と、なぜそうなったか話す</Button>
+            <Button secondary onClick={() => { onExplain(text); onFinish(); }}>トップへ</Button>
+          </>
         ) : (
-          <Button onClick={() => { onExplain(text); onFinish(); }}>トップへ</Button>
+          <>
+            {nextVariant && !j.undecided ? (
+              <Button disabled={!nextDirection} onClick={() => { onExplain(text); onGoNext(); }}>次の実験へ</Button>
+            ) : (
+              <Button onClick={() => { onExplain(text); onFinish(); }}>トップへ</Button>
+            )}
+            <Button secondary onClick={() => { onExplain(text); onChat(); }}>ラボ先生と、なぜそうなったか話す</Button>
+          </>
         )}
-        <Button secondary={!reflect} onClick={() => { onExplain(text); onChat(); }}>ラボ先生と、なぜそうなったか話す</Button>
         <LinkRow>
           <Link icon="ribbon" onClick={() => { onExplain(text); onRecord(); }}>
-            実験記録（ハッシュ付き）
-          </Link>
-          <Link icon="list" onClick={() => { onExplain(text); onRecord(); }}>
-            トレースを見る
+            実験の記録を見る
           </Link>
         </LinkRow>
         <FootNote>この結果は記録に残ります。</FootNote>

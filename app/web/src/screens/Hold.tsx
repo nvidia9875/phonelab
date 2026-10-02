@@ -40,7 +40,7 @@ const PROPOSAL: Record<CheckCode, string> = {
 
 /** 画面 4: 保留。理由と再測定の提案。上限に達したら別の実験へ */
 const SOURCE_NOTE: Record<HoldAdvice["source"], string> = {
-  agent: "ラボ先生（Gemini）が、保留の理由を読んで提案しました。結果は言っていません",
+  agent: "ラボ先生（AI）が、保留の理由を読んで提案しました。結果は言っていません",
   catalog: "ラボ先生に聞ける回数の上限のため、定型の提案です",
   policy: "Policy の判断です",
   stub: "いまはラボ先生につながらないので、定型の提案です",

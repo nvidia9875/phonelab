@@ -58,7 +58,7 @@ export interface RecordEvent {
 }
 /** 実験を誰が選んだか。agent = ラボ先生（Gemini）、policy = 決定論の Policy、catalog = カタログの順（上限・読めない出力）、stub = 端末内（オフライン） */
 export interface PlanInfo {
-  source: "agent" | "policy" | "catalog" | "stub";
+  source: "agent" | "policy" | "catalog" | "stub" | "student";
   why: string;
   traceId: string | null;
   /** 判断の跡（古い記録には無い） */

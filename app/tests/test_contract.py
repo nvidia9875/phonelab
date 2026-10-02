@@ -18,7 +18,7 @@ WEB = Path(__file__).resolve().parents[1] / "web" / "src"
 
 def test_hold_codes_match_the_web_check_codes():
     source = (WEB / "measure" / "checks.ts").read_text()
-    union = re.search(r"export type CheckCode =(.*?);", source, re.S)
+    union = re.search(r"export type CheckCode =(.*?);", source, re.DOTALL)
     assert union
     web_codes = set(re.findall(r'"(\w+)"', union.group(1)))
 
