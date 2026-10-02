@@ -56,6 +56,9 @@ NEXT_REQUESTS_PER_WINDOW = 240
 NEXT_WINDOW_S = 600
 MAX_TEXT = 500
 MAX_DONE_IDS = 10
+REFLECT_MISMATCH_WHY = (
+    "予想と結果が食い違ったので、次の実験へ進む前に、なぜそうなったかを自分の言葉で書いてみよう"
+)
 REFLECT_WHY = (
     "このテーマの実験はひととおり終わりました。なぜそうなったかを、ラボ先生とふり返りましょう"
 )
@@ -201,6 +204,21 @@ async def next_step(
     fixes = {"fix_reasons": list(reply.fix_reasons), "self_corrected": reply.self_corrected}
     checked = check_lines(reply.fix_reasons, reply.retried, reply.self_corrected)
     if reply.skipped or reply.plan is None:
+        if body.consistent is False and not body.explained:
+            # モデルが使えなくても、食い違って理由がまだならふり返りが先（規則は同じ。10/2 採点 3 回目 2-7）
+            return NextResponse(
+                action="reflect",
+                why=REFLECT_MISMATCH_WHY,
+                source="catalog",
+                next_calls=calls,
+                trail=trail(
+                    read,
+                    policy_before_line("limit") if reply.skipped else checked,
+                    chose_line("ふり返りへ（食い違いの理由がまだ。決まりごと）"),
+                ),
+                trace_id=trace_id,
+                **fixes,
+            )
         first = remaining[0]
         return NextResponse(
             action="next",

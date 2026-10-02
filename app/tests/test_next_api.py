@@ -124,3 +124,15 @@ def test_falls_back_to_the_catalog_when_the_limit_is_reached(client, fake_llm):
 
 def test_rejects_a_variant_from_another_theme(client):
     assert client.post("/api/next", json=body(variant_id="energy_height")).status_code == 422
+
+
+def test_the_fallback_also_reflects_first_on_an_unexplained_mismatch(client, fake_llm):
+    """10/2 採点 3 回目 2-7: 上限や読めない出力のときも、食い違って理由がまだならふり返りが先"""
+    data = client.post(
+        "/api/next",
+        json=body(consistent=False, explained=False, observed="faster", next_calls=3),
+    ).json()
+
+    assert data["action"] == "reflect"
+    assert data["source"] == "catalog"
+    assert fake_llm.requests == []
