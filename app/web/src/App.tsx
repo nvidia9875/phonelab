@@ -174,7 +174,7 @@ export function App() {
     onOpenTheme: (t: Theme) => {
       if (!store.student) return nav("/me");
       const r = activeRecordForTheme(t.id, store.records);
-      if (r?.status === "held") return nav(`/x/${t.id}/hold`);
+      if (r?.status === "held") return nav(r.result?.undecided ? `/x/${t.id}/result` : `/x/${t.id}/hold`);
       nav(r && r.variantId ? stagePath(t.id, r.stage) : `/x/${t.id}`);
     },
     onOpenRecord: (id: string) => nav(`/records/${id}`),

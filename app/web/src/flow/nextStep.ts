@@ -20,7 +20,7 @@ export function nextBasis(rec: StudyRecord): string {
 }
 
 export function isNextStale(rec: StudyRecord): boolean {
-  return !!rec.result && rec.nextSuggestion?.basis !== nextBasis(rec);
+  return !!rec.result && !rec.result.undecided && rec.nextSuggestion?.basis !== nextBasis(rec);
 }
 
 function fallback(rec: StudyRecord, theme: Theme): NextSuggestion {
@@ -40,7 +40,8 @@ function fallback(rec: StudyRecord, theme: Theme): NextSuggestion {
 }
 
 export async function askNext(rec: StudyRecord, theme: Theme): Promise<NextSuggestion | null> {
-  if (!rec.result || !rec.variantId) return null;
+  // 保留（差が決められない）では、結論を前提にした次の一手を聞かない。まず測り直す
+  if (!rec.result || rec.result.undecided || !rec.variantId) return null;
   const basis = nextBasis(rec);
   if (rec.nextSuggestion?.basis === basis) return rec.nextSuggestion;
   const again = !!rec.nextSuggestion;

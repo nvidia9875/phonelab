@@ -346,3 +346,27 @@ describe("停止と上限は、通信の失敗と分ける（10/2 採点 2-7）"
     expect(recordById(rec.id)!.plan?.source).toBe("stub");
   });
 });
+
+
+/** 二本の時計（基本周波数と倍音）が大きく食い違う音。ばらつきが許容誤差より大きくなる */
+function noisyPitch(f0: number, fromH2: number): Features {
+  return { ...(pitch(f0) as Extract<Features, { profile: "pitch" }>), f0_from_h2_hz: fromH2 };
+}
+
+describe("ensureJudged — ばらつきに埋もれたら保留として保存する", () => {
+  beforeEach(() => clearAll());
+
+  it("stores an undecided result as held with a reason the teacher sees", () => {
+    const rec = record(sound.id, "sound_pluck_strength", {
+      stage: "measure_B",
+      prediction: { text: "強くはじくと高くなる", claim: { variable: "strength", direction: "faster" }, questionBack: null, hints: 0 },
+      measurements: [measurement("A", noisyPitch(220, 245)), measurement("B", noisyPitch(232, 205))],
+    });
+
+    const judged = ensureJudged(rec, sound)!;
+
+    expect(judged.result?.undecided).toBe(true);
+    expect(judged.status).toBe("held");
+    expect(judged.holdCodes).toEqual(["too_uncertain"]);
+  });
+});

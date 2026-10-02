@@ -327,7 +327,10 @@ export function ensureJudged(rec: StudyRecord, theme: Theme): StudyRecord | null
         : result.consistent
           ? "予想は成り立った"
           : "予想は成り立たず";
-    let n: StudyRecord = { ...r, result, status: "judged", stage: "result" };
+    // ばらつきに埋もれた判定は保留として扱う（先生の保留リストに入り、次の一手へ進まない）
+    let n: StudyRecord = result.undecided
+      ? { ...r, result, status: "held", stage: "result", holdCodes: ["too_uncertain"] }
+      : { ...r, result, status: "judged", stage: "result" };
     n = addEvent(n, "判定", `${verdict}。差 ${formatQuantity(Math.abs(result.delta), variant.unit)} は許容 ${formatQuantity(result.tolerance, variant.unit)} の${within}`);
     return n;
   });

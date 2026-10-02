@@ -145,6 +145,7 @@ HoldCode = Literal[
     "two_clocks_disagree",
     "unstable",
     "weak_autocorr",
+    "too_uncertain",
 ]
 
 HOLD_WORDS: dict[str, str] = {
@@ -160,6 +161,7 @@ HOLD_WORDS: dict[str, str] = {
     "two_clocks_disagree": "二つの測り方の値が合わない",
     "unstable": "前半と後半で周期が変わった",
     "weak_autocorr": "周期がはっきり出ない",
+    "too_uncertain": "差が測定のばらつきに埋もれて決められない",
 }
 
 # モデルが読めない・上限のときの、検査コードごとの定型（web の Hold.tsx と同じ趣旨）
@@ -176,6 +178,7 @@ HOLD_TEMPLATE: dict[str, str] = {
     "two_clocks_disagree": "二つの測り方が合いませんでした。袋の中で端末が回っていないか、ほかの音が入っていないかを確かめて、もう一度。",
     "unstable": "前半と後半で値が変わりました。途中で触っていないか確かめて、もう一度。",
     "weak_autocorr": "周期がはっきり出ませんでした。もう少し大きく、でも 30° 以内で振って、もう一度。",
+    "too_uncertain": "差が測定のばらつきに埋もれて、決められませんでした。条件をそろえて、もう一度測りましょう。",
 }
 
 

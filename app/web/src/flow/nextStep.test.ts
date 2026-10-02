@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { themeById } from "../catalog/themes";
 import { clearAll, createRecord, recordById, updateRecord, type StudyRecord } from "../store/records";
 import { askNext, isNextStale } from "./nextStep";
+import { chatSituation } from "../agent/chat";
 import { closeAndNext, chooseNext, nextVariantFor, trailText } from "./useFlow";
 
 const sound = themeById("sound")!;
@@ -135,5 +136,20 @@ describe("trailText", () => {
     expect(trailText(["読んだ: A", "選んだ: B"])).toBe("読んだ: A → 選んだ: B");
     expect(trailText([])).toBeNull();
     expect(trailText(["あ".repeat(400)])?.length).toBe(300);
+  });
+});
+
+describe("ばらつきで保留した判定（10/2 採点 2 回目 1-3）", () => {
+  beforeEach(() => clearAll());
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("does not ask for a next step and the chat treats it as a hold", async () => {
+    const fetchMock = serverAnswers(NEXT);
+    const rec = judged({ status: "held", holdCodes: ["too_uncertain"], result: { a: 220, b: 230, delta: 10, tolerance: 20, observed: "unknown", consistent: null, undecided: true, statement: "決められなかった（保留）", detail: "" } });
+
+    expect(await askNext(rec, sound)).toBeNull();
+    expect(isNextStale(rec)).toBe(false);
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(chatSituation(rec)).toBe("hold");
   });
 });

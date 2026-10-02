@@ -96,7 +96,12 @@ export function Result({ variant, judgement, explain, nextVariant, nextDirection
         </Card>
       )}
 
-      {nextVariant ? (
+      {j.undecided ? (
+        <Card variant="line">
+          <Eyebrow>保留のあいだは、次の実験に進みません</Eyebrow>
+          <p className="card__hint">差があるかどうかを決めるには、条件をそろえて測り直します。下の「測り直す」から。先生の画面にも保留として出ています。</p>
+        </Card>
+      ) : nextVariant ? (
         <Card variant="orange" panel>
           <CardLabel icon="bulb" orange>
             {question ? "次の予測 ― ラボ先生が選んだ次の一手" : "次の予測"}
@@ -141,7 +146,7 @@ export function Result({ variant, judgement, explain, nextVariant, nextDirection
       </Card>
 
       <Foot>
-        {nextVariant ? (
+        {nextVariant && !j.undecided ? (
           <Button disabled={!nextDirection} onClick={() => { onExplain(text); onGoNext(); }}>次の実験へ</Button>
         ) : (
           <Button onClick={() => { onExplain(text); onFinish(); }}>トップへ</Button>
