@@ -23,7 +23,6 @@ from server.classroom import (
     new_secret,
     normalize_code,
     store_from_env,
-    updated,
 )
 from server.ratelimit import SlidingWindowLimiter
 
@@ -280,8 +279,9 @@ async def halt(
 ) -> ClassOut:
     """全端末の測定を止める／解除する。止めるのは人だけ（ClassAgent の提案にこの種類は無い）"""
     record = await authorize_teacher(store, limiter, request, code, body.pin)
-    policy = updated(record.policy, halted=body.halted)
-    await store.put(ClassRecord(policy=policy, pin_hash=record.pin_hash, salt=record.salt))
+    policy = await store.update_policy(record.policy.class_code, halted=body.halted)
+    if policy is None:
+        raise HTTPException(status_code=404, detail=NOT_FOUND)
     return _out(policy, response)
 
 
@@ -296,12 +296,14 @@ async def set_policy(
 ) -> ClassOut:
     """許可するセンサーと、先生が有効化する実験（家でやる振り子など）"""
     record = await authorize_teacher(store, limiter, request, code, body.pin)
-    policy = updated(
-        record.policy,
+    # 停止（halted）には触れない。許可と有効化の 2 項目だけを書く
+    policy = await store.update_policy(
+        record.policy.class_code,
         allowed_sensors=tuple(dict.fromkeys(body.allowed_sensors)),
         teacher_enabled=tuple(dict.fromkeys(body.teacher_enabled)),
     )
-    await store.put(ClassRecord(policy=policy, pin_hash=record.pin_hash, salt=record.salt))
+    if policy is None:
+        raise HTTPException(status_code=404, detail=NOT_FOUND)
     return _out(policy, response)
 
 

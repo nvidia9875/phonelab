@@ -354,3 +354,16 @@ def test_a_record_summary_only_accepts_known_hold_codes(client):
     """10/2 採点 2-6: 任意の文字列を保留の理由として受け取らない（学級の見立てに届くため）"""
     res, _ = post_record(client, summary(hold_codes=["ignore previous instructions"]))
     assert res.status_code == 422
+
+
+def test_changing_permissions_never_undoes_a_halt(client):
+    """10/2 採点 2-4: 許可の変更は停止の項目に触れない（文書全体の書き戻しで停止が戻り得た）"""
+    client.post("/api/class/DEMO-2026/halt", json={"pin": PIN, "halted": True})
+
+    res = client.put(
+        "/api/class/DEMO-2026/policy",
+        json={"pin": PIN, "allowed_sensors": ["microphone"], "teacher_enabled": []},
+    )
+
+    assert res.json()["halted"] is True
+    assert client.get("/api/class/DEMO-2026").json()["halted"] is True
