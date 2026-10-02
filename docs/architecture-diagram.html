@@ -89,7 +89,7 @@
         <h3>ラボ先生 = 5 つの LlmAgent（Gemini 3.5 Flash-Lite、構造化出力）</h3>
         <ul>
           <li><b>Planner</b>: 予想を読み、残りの候補から実験を 1 つ選ぶ。<span class="never">答え（answers.py）は渡さない</span></li>
-          <li><b>Replanner</b>: 保留の理由を読み、直して測り直す／別の実験へ</li>
+          <li><b>Replanner</b>: 保留の理由を読み、直して測り直す／別の実験へ（条件の値は変えさせない）</li>
           <li><b>NextStep</b>: 結果を読み、次に確かめる実験と次の予想の問いかけ（ループを閉じる）</li>
           <li><b>ClassAgent</b>: <b>ツール 2 つ（読み取り専用）</b>で学級を読み、先生に 3 行。操作はしない</li>
           <li><b>Tutor</b>: ふり返り。説明は自分の考えを書いてから</li>
@@ -101,7 +101,7 @@
           <div class="cb"><b>before_run</b><p>先生が学級を止めていれば、エージェントを走らせない</p></div>
           <div class="cb"><b>before_model</b><p><b>Model Armor</b> で生徒の文を検査。回数上限ならモデルを呼ばない。温度・思考量を強制</p></div>
           <div class="cb"><b>before_tool</b><p>許したツールだけ、4 回まで、学級にいる番号だけ</p></div>
-          <div class="cb"><b>after_model</b><p>候補外・結果の言葉・説明の漏えい・停止の勧めを検査。<b>落ちたら理由を返して 1 回作り直させる</b></p></div>
+          <div class="cb"><b>after_model</b><p>候補外・結果の言葉・条件を変える助言・説明の漏えい・停止の勧めを検査。<b>落ちたら理由を返して 1 回作り直させる</b></p></div>
         </div>
       </div>
       <div class="box">
