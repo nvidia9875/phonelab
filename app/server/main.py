@@ -67,6 +67,7 @@ from server.classroom import ClassStore, normalize_code, seed_demo
 from server.guards import (
     HALTED_DETAIL,
     MAX_CLASS_CODE_CHARS,
+    RetryGate,
     call_count,
     check_limits,
     class_denies_theme,
@@ -356,6 +357,7 @@ async def plan(
         )
         count = await count.reserve(store, PLANNER_CALLS_PER_EXPERIMENT)
         planner_calls = count.start
+        gate = RetryGate(count, store, PLANNER_CALLS_PER_EXPERIMENT)
         try:
             reply = await asyncio.wait_for(
                 run_planner(
@@ -367,6 +369,7 @@ async def plan(
                     tool_state=tool_state,
                     armor_text=body.text,
                     student_text=body.text,
+                    before_retry=gate,
                 ),
                 timeout=PLAN_TIMEOUT_S,
             )
@@ -380,7 +383,7 @@ async def plan(
         span.set_attribute("phonelab.plan_readable", reply.plan is not None)
         span.set_attribute("phonelab.policy_fixed", reply.off_catalog or reply.why_replaced)
         span.set_attribute("phonelab.self_corrected", reply.self_corrected)
-    await count.settle(store, reply.planner_calls - planner_calls)
+    await gate.settle(reply.planner_calls - planner_calls)
 
     checked = check_lines(reply.fix_reasons, reply.retried, reply.self_corrected)
     fixes = {"fix_reasons": list(reply.fix_reasons), "self_corrected": reply.self_corrected}
@@ -570,6 +573,7 @@ async def replan(
         span.set_attribute("phonelab.retries", body.retries)
         trace_id = format(span.get_span_context().trace_id, "032x")
         count = await count.reserve(store, REPLAN_CALLS_PER_RECORD)
+        gate = RetryGate(count, store, REPLAN_CALLS_PER_RECORD)
         try:
             reply = await asyncio.wait_for(
                 run_replan(
@@ -578,6 +582,7 @@ async def replan(
                     replan_calls=count.start,
                     candidates=[v.id for v in others],
                     class_halted=halted,
+                    before_retry=gate,
                 ),
                 timeout=REPLAN_TIMEOUT_S,
             )
@@ -589,7 +594,7 @@ async def replan(
         span.set_attribute("phonelab.skipped", reply.skipped)
         span.set_attribute("phonelab.plan_readable", reply.plan is not None)
 
-    await count.settle(store, reply.calls_used)
+    await gate.settle(reply.calls_used)
     calls = min(count.start + reply.calls_used, REPLAN_CALLS_PER_RECORD)
     read = read_line(
         f"保留の理由 {len(body.hold_codes)} 件・同じ条件の保留 {body.retries} 回・ほかの実験 {len(others)} 件"

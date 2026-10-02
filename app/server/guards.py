@@ -122,6 +122,30 @@ class CallCount:
             await store.add_counter(*self.key, used - self.reserved)
 
 
+class RetryGate:
+    """自己修正のやり直しの前にも枠を 1 つ取る（取れなければやり直さない）。取った数を settle に足す。
+    10/2 採点 3 回目: やり直しを事後に数えていたので、上限 5 に対して 9 回呼べた"""
+
+    def __init__(self, count: CallCount, store: ClassStore, limit: int) -> None:
+        self._count = count
+        self._store = store
+        self._limit = limit
+        self.taken = 0
+
+    async def __call__(self) -> bool:
+        if not self._count.key:
+            return True
+        if await self._store.reserve_counter(*self._count.key, 0, self._limit) is None:
+            return False
+        self.taken += 1
+        return True
+
+    async def settle(self, used: int) -> None:
+        await replace(self._count, reserved=self._count.reserved + self.taken).settle(
+            self._store, used
+        )
+
+
 async def call_count(
     store: ClassStore,
     *,
@@ -134,8 +158,11 @@ async def call_count(
 ) -> CallCount:
     """端末の申告（claimed）とサーバの数えの大きい方から始める（10/2 採点 2-4: 回数が自己申告だった）。
     合言葉が違えば 403。学級に入っていない端末は申告のまま（IP ごとの回数制限はかかる）"""
-    if not (class_code and number):
+    if not class_code:
         return CallCount(start=claimed)
+    if not number:
+        # 学級コードを付けて番号を省くと、端末の申告に戻れた（10/2 採点 3 回目 2-4）
+        raise HTTPException(status_code=403, detail="学級の番号が要ります")
     if not (secret and record_id and COUNTER_KEY_RE.match(record_id)):
         # 学級の生徒は合言葉と記録 id が要る（省けば端末の申告に戻れた。10/2 採点 2-4）
         raise HTTPException(status_code=403, detail="合言葉と記録 id が要ります")

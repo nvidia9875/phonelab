@@ -250,6 +250,7 @@ def test_the_planner_refuses_a_theme_whose_sensor_the_class_does_not_allow(clien
         json={"pin": PIN, "allowed_sensors": ["microphone"], "teacher_enabled": []},
     )
 
+    secret = join(client, "S-31").json()["secret"]
     res = client.post(
         "/api/plan",
         json={
@@ -260,6 +261,9 @@ def test_the_planner_refuses_a_theme_whose_sensor_the_class_does_not_allow(clien
             "previous_question_back": None,
             "planner_calls": 0,
             "class_code": "DEMO-2026",
+            "number": "S-31",
+            "secret": secret,
+            "record_id": "R31",
         },
     )
 
@@ -451,3 +455,44 @@ def test_a_class_request_without_the_secret_is_refused(client):
         "planner_calls": 0,
     }
     assert client.post("/api/plan", json=body).status_code == 403
+
+
+def test_a_class_request_without_a_number_is_refused(client):
+    """10/2 採点 3 回目 2-4: 学級コードを付けて番号を省くと、端末の申告の数えに戻れた"""
+    body = {
+        "theme_id": "sound",
+        "school": "jhs",
+        "text": "強くはじくと高くなる。速く震えるから",
+        "class_code": "DEMO-2026",
+    }
+    assert client.post("/api/plan", json=body).status_code == 403
+
+
+def test_self_correction_retries_also_need_a_slot(client, fake_llm):
+    """10/2 採点 3 回目: やり直しを事後に数えていたので、上限 5 に対して 9 回呼べた。
+    いつも候補外を返すモデルでも、学級の生徒の呼び出しは合計 5 回で止まる"""
+    fake_llm.reply = json.dumps(
+        {
+            "claim_variable": "strength",
+            "claim_direction": "faster",
+            "experiment_id": "energy_height",
+            "why_this": "確かめます",
+            "question_back": None,
+        },
+        ensure_ascii=False,
+    )
+    secret = join(client, "S-32").json()["secret"]
+    body = {
+        "theme_id": "sound",
+        "school": "jhs",
+        "text": "強くはじくとゴムが速く震えるから、音が高くなると思う",
+        "planner_calls": 0,
+        "class_code": "DEMO-2026",
+        "number": "S-32",
+        "secret": secret,
+        "record_id": "R32",
+    }
+    for _ in range(6):
+        client.post("/api/plan", json=body)
+
+    assert len(fake_llm.requests) == 5

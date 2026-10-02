@@ -212,6 +212,7 @@ async def run_replan(
     replan_calls: int,
     candidates: list[str],
     class_halted: bool = False,
+    before_retry=None,
 ) -> ReplanReply:
 
     async def attempt(text: str, calls: int) -> ReplanReply:
@@ -238,7 +239,7 @@ async def run_replan(
     if not reasons:
         return first
     second = await _self_correct(
-        "replan", reasons, lambda fb: attempt(f"{prompt}\n{fb}", replan_calls + 1)
+        "replan", reasons, lambda fb: attempt(f"{prompt}\n{fb}", replan_calls + 1), before_retry
     )
     if second is None or second.skipped:
         return replace(first, fix_reasons=reasons)
@@ -276,6 +277,7 @@ async def run_next(
     next_calls: int,
     candidates: list[str],
     class_halted: bool = False,
+    before_retry=None,
 ) -> NextReply:
     """結果のあとの次の一手。検査に落ちたら 1 回だけ作り直させる"""
 
@@ -303,7 +305,7 @@ async def run_next(
     if not reasons:
         return first
     second = await _self_correct(
-        "next", reasons, lambda fb: attempt(f"{prompt}\n{fb}", next_calls + 1)
+        "next", reasons, lambda fb: attempt(f"{prompt}\n{fb}", next_calls + 1), before_retry
     )
     if second is None or second.skipped:
         return replace(first, fix_reasons=reasons)
@@ -416,6 +418,7 @@ async def run_planner(
     tool_state: dict[str, object] | None = None,
     armor_text: str | None = None,
     student_text: str | None = None,
+    before_retry=None,
 ) -> PlannerReply:
     """candidates を渡すと、PolicyPlugin が出力を候補と突き合わせる（スパイクは渡さない）。
     突き合わせで直されたら、理由を添えて 1 回だけ作り直させる（自己修正）"""
@@ -453,7 +456,7 @@ async def run_planner(
     if not reasons:
         return first
     second = await _self_correct(
-        "plan", reasons, lambda fb: attempt(f"{text}\n{fb}", first.planner_calls)
+        "plan", reasons, lambda fb: attempt(f"{text}\n{fb}", first.planner_calls), before_retry
     )
     if second is None or second.skipped:
         return replace(first, fix_reasons=reasons)
@@ -481,9 +484,15 @@ def _fix_reasons(
     )
 
 
-async def _self_correct(kind: str, reasons: tuple[str, ...], redo):
-    """落ちた理由をモデルに返して作り直させる。Trace に phonelab.self_correct のスパンが出る"""
+async def _self_correct(kind: str, reasons: tuple[str, ...], redo, before_retry=None):
+    """落ちた理由をモデルに返して作り直させる。Trace に phonelab.self_correct のスパンが出る。
+    before_retry が False を返したら（回数の枠が取れない）、やり直さない"""
     if SELF_CORRECT_ATTEMPTS < 1:
+        return None
+    if before_retry is not None and not await before_retry():
+        with _tracer.start_as_current_span("phonelab.self_correct") as span:
+            span.set_attribute("phonelab.agent", kind)
+            span.set_attribute("phonelab.decision", "no_budget")
         return None
     feedback = "【前回の出力の直すところ】" + " ".join(FEEDBACK[r] for r in reasons)
     with _tracer.start_as_current_span("phonelab.self_correct") as span:

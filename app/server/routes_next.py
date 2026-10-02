@@ -37,6 +37,7 @@ from server.classroom import ClassStore
 from server.guards import (
     HALTED_DETAIL,
     MAX_CLASS_CODE_CHARS,
+    RetryGate,
     call_count,
     check_limits,
     class_is_halted,
@@ -174,6 +175,7 @@ async def next_step(
             )
         )
         count = await count.reserve(store, NEXT_CALLS_PER_RECORD)
+        gate = RetryGate(count, store, NEXT_CALLS_PER_RECORD)
         try:
             reply = await asyncio.wait_for(
                 run_next(
@@ -182,6 +184,7 @@ async def next_step(
                     next_calls=count.start,
                     candidates=[v.id for v in remaining],
                     class_halted=halted,
+                    before_retry=gate,
                 ),
                 timeout=NEXT_TIMEOUT_S,
             )
@@ -193,7 +196,7 @@ async def next_step(
         span.set_attribute("phonelab.skipped", reply.skipped)
         span.set_attribute("phonelab.self_corrected", reply.self_corrected)
 
-    await count.settle(store, reply.calls_used)
+    await gate.settle(reply.calls_used)
     calls = min(count.start + reply.calls_used, NEXT_CALLS_PER_RECORD)
     fixes = {"fix_reasons": list(reply.fix_reasons), "self_corrected": reply.self_corrected}
     checked = check_lines(reply.fix_reasons, reply.retried, reply.self_corrected)
