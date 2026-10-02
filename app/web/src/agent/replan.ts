@@ -12,6 +12,8 @@ export interface ReplanReply {
   advice: string;
   source: "agent" | "policy" | "catalog";
   policy_fixed: boolean;
+  self_corrected?: boolean;
+  trail?: string[];
   replan_calls: number;
   trace_id: string;
 }

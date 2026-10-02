@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { Icon } from "../components/ui";
 import type { Sensor } from "../catalog/themes";
-import { ClassError, fetchDashboard, type DashboardInfo, type StudentRow } from "../agent/classroom";
+import { ClassError, fetchDashboard, traceUrl, type DashboardInfo, type InsightInfo, type StudentRow } from "../agent/classroom";
+import { InsightPanel } from "./InsightPanel";
 import type { ClassState } from "../store/records";
 import { attentionOf, checkTextOf, claimTextOf, distributionOf, isOnline, stateOf } from "./dashboard";
 import "./teacher.css";
@@ -17,6 +18,7 @@ export interface TeacherProps {
   onResetStudent: (classCode: string, pin: string, number: string) => Promise<void>;
   /** テスト用。省略時はサーバから取る */
   load?: (classCode: string, pin: string) => Promise<DashboardInfo>;
+  loadInsight?: (classCode: string, pin: string) => Promise<InsightInfo>;
 }
 
 const TOGGLE_SENSORS: { sensor: Sensor; label: string }[] = [
@@ -36,7 +38,7 @@ function errorText(e: unknown): string {
  * 教員画面（docs/personas.md §3）: 上に予想の向きの分布、下に保留・却下の子、右上に全端末停止。
  * 生徒の名前は無い。番号だけ。学級コードと教師 PIN で開く。
  */
-export function Teacher({ classCode, cls, halted, onHalt, onPolicy, onResetStudent, load = fetchDashboard }: TeacherProps) {
+export function Teacher({ classCode, cls, halted, onHalt, onPolicy, onResetStudent, load = fetchDashboard, loadInsight }: TeacherProps) {
   const [code, setCode] = useState(classCode);
   const [pin, setPin] = useState("");
   const [busy, setBusy] = useState(false);
@@ -186,6 +188,7 @@ export function Teacher({ classCode, cls, halted, onHalt, onPolicy, onResetStude
         </section>
 
         <div className="teacher__side">
+          <InsightPanel classCode={code} pin={pin} unlocked={unlocked} onSelect={setSelected} load={loadInsight} />
           <section className="tpanel">
             <h2>この学級の許可</h2>
             <div className="perm-grid">
@@ -225,15 +228,17 @@ export function Teacher({ classCode, cls, halted, onHalt, onPolicy, onResetStude
             {selectedRow?.current ? (
               <div className="ttrace">
                 {selectedRow.current.events.map((it, i) => (
-                  <div className="ttrace__row" key={i}>
+                  <div className={`ttrace__row${it.k === "判断" ? " ttrace__row--agent" : ""}`} key={i}>
                     <p className="ttrace__t">{it.t}</p>
                     <p className={it.k === "却下" || it.k.includes("保留") ? "ttrace__strong" : undefined}>{it.k}: {it.body}</p>
                   </div>
                 ))}
                 {selectedRow.current.trace_id && (
-                  <p className="ttrace__row" style={{ opacity: 0.7 }}>
+                  <p className="ttrace__row" style={{ opacity: 0.8 }}>
                     <span className="ttrace__t">trace</span>
-                    <span>{selectedRow.current.trace_id.slice(0, 16)}…（Cloud Trace）</span>
+                    <a className="ttrace__link" href={traceUrl(selectedRow.current.trace_id)} target="_blank" rel="noreferrer">
+                      {selectedRow.current.trace_id.slice(0, 16)}… を Cloud Trace で開く（開発者向け）
+                    </a>
                   </p>
                 )}
                 <button type="button" className="tbtn tbtn--outline tbtn--sm" disabled={busy} onClick={() => void run(() => onResetStudent(code, pin, selectedRow.number), `${selectedRow.number} の合言葉を消しました。次の入場で新しい合言葉が出ます`)}>

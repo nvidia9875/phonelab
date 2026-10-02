@@ -51,7 +51,15 @@ from server.agent.runner import (
     run_replan,
     run_tutor,
 )
-from server.agent.trail import check_lines, chose_line, policy_before_line, read_line, trail
+from server.agent.trail import (
+    check_lines,
+    chose_line,
+    experiment_words,
+    policy_before_line,
+    read_line,
+    trail,
+    variable_words,
+)
 from server.agent.tutor import ChatTurn, TutorContext, build_tutor_prompt, chat_model
 from server.classroom import ClassStore, normalize_code, seed_demo
 from server.guards import (
@@ -371,7 +379,7 @@ async def plan(
             planner_calls=reply.planner_calls,
             skipped=True,
             source="catalog",
-            trail=trail(read, policy_before_line("limit"), chose_line(first.id)),
+            trail=trail(read, policy_before_line("limit"), chose_line(experiment_words(first.id))),
             trace_id=trace_id,
         )
     if reply.plan is None:
@@ -386,7 +394,7 @@ async def plan(
                 read,
                 policy_before_line("allow"),
                 checked,
-                chose_line(f"{first.id}（カタログの順）"),
+                chose_line(f"{experiment_words(first.id)}（カタログの順）"),
             ),
             trace_id=trace_id,
             **fixes,
@@ -418,7 +426,10 @@ async def plan(
         trail=trail(
             read,
             policy_before_line("allow"),
-            chose_line(f"{out.experiment_id}（予想の変数: {out.claim_variable}）"),
+            chose_line(
+                f"{experiment_words(out.experiment_id)}"
+                f"（予想は「{variable_words(body.theme_id, out.claim_variable)}」を変える話と読んだ）"
+            ),
             checked,
         ),
         trace_id=trace_id,

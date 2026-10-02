@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+from server.agent.catalog import CATALOG, short_changes
 from server.agent.runner import FIX_OFF_CATALOG, FIX_RESULT_WORDS, FIX_UNREADABLE
 
 FIX_WORDS = {
@@ -31,6 +32,23 @@ def policy_before_line(kind: str) -> str:
 
 def chose_line(what: str) -> str:
     return f"選んだ: {what}"
+
+
+def experiment_words(experiment_id: str | None) -> str:
+    """id ではなく題名で（生徒が読む）。カタログに無い id はそのまま"""
+    for theme in CATALOG.values():
+        for v in theme.variants:
+            if v.id == experiment_id:
+                return f"「{v.title}」"
+    return str(experiment_id)
+
+
+def variable_words(theme_id: str, variable: str) -> str:
+    """予想の変数を、カタログの「変えるもの」の言葉で"""
+    for v in CATALOG[theme_id].variants:
+        if v.variable == variable:
+            return short_changes(v)
+    return "読み取れなかった"
 
 
 def check_lines(fix_reasons: tuple[str, ...], retried: bool, self_corrected: bool) -> list[str]:

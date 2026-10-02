@@ -24,7 +24,14 @@ from server.agent.next_step import (
 )
 from server.agent.planner import planner_model
 from server.agent.runner import build_next_runner, run_next
-from server.agent.trail import check_lines, chose_line, policy_before_line, read_line, trail
+from server.agent.trail import (
+    check_lines,
+    chose_line,
+    experiment_words,
+    policy_before_line,
+    read_line,
+    trail,
+)
 from server.classroom import ClassStore
 from server.guards import (
     HALTED_DETAIL,
@@ -188,14 +195,14 @@ async def next_step(
             trail=trail(
                 read,
                 policy_before_line("limit") if reply.skipped else checked,
-                chose_line(f"{first.id}（カタログの順）"),
+                chose_line(f"{experiment_words(first.id)}（カタログの順）"),
             ),
             trace_id=trace_id,
             **fixes,
         )
     out = reply.plan
     chosen = (
-        f"{out.experiment_id} と次の予想の問いかけ"
+        f"{experiment_words(out.experiment_id)}と、次の予想の問いかけ"
         if out.action == "next"
         else "ふり返りへ（食い違いの理由がまだ書かれていない）"
     )

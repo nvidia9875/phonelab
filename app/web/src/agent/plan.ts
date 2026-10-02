@@ -30,6 +30,11 @@ export interface PlanReply {
   planner_calls: number;
   skipped: boolean;
   policy_fixed: boolean;
+  /** 1 回目が検査に落ちて作り直させたときの理由（古いサーバには無い） */
+  fix_reasons?: string[];
+  self_corrected?: boolean;
+  /** 判断の跡: 何を読み、何を選び、統制層が何を直したか。本文は入らない */
+  trail?: string[];
   source: PlanSource;
   trace_id: string;
 }

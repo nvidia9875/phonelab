@@ -24,6 +24,7 @@ import { checksFor, clockLabels, clocksOf, type Features } from "./measure/featu
 import { demoFeatures } from "./measure/demo";
 import { probeMotionEvents } from "./measure/pendulum";
 import * as flow from "./flow/useFlow";
+import { askNext } from "./flow/nextStep";
 
 const goHome = () => nav("/");
 
@@ -286,6 +287,9 @@ export function App() {
           predictionText={r.prediction.text}
           why={flow.planWhy(r, t)}
           source={r.plan?.source}
+          trail={r.plan?.trail}
+          selfCorrected={r.plan?.selfCorrected}
+          traceId={r.plan?.traceId}
           onApprove={() => { flow.approve(r, t); nav(`/x/${t.id}/setup/A`); }}
           onOther={goHome}
           onHome={goHome}
@@ -388,6 +392,8 @@ export function App() {
           explain={r.explain}
           nextVariant={nextVariant}
           nextDirection={r.nextPrediction?.direction ?? null}
+          suggestion={r.nextSuggestion ?? null}
+          onLoadNext={() => askNext(r, t)}
           retries={r.retries}
           maxRetry={flow.MAX_RETRY}
           repeats={repeatsOf(variant!)}

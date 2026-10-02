@@ -59,6 +59,10 @@ export interface PlanInfo {
   source: "agent" | "policy" | "catalog" | "stub";
   why: string;
   traceId: string | null;
+  /** 判断の跡（古い記録には無い） */
+  trail?: string[];
+  /** 検査に落ちた 1 回目を、ラボ先生が自分で作り直した */
+  selfCorrected?: boolean;
 }
 /** 保留のあとのラボ先生の提案（保留ごとに 1 回。measurementIndex でどの保留の分かを持つ） */
 export interface HoldAdvice {
@@ -68,6 +72,17 @@ export interface HoldAdvice {
   advice: string;
   source: "agent" | "policy" | "catalog" | "stub";
   traceId: string | null;
+  trail?: string[];
+}
+/** 結果のあとの次の一手（POST /api/next）。next なら次の実験と問いかけ、reflect ならふり返りが先 */
+export interface NextSuggestion {
+  action: "next" | "reflect";
+  variantId: string | null;
+  question: string;
+  why: string;
+  source: "agent" | "catalog" | "stub";
+  traceId: string | null;
+  trail: string[];
 }
 export interface Rejection {
   title: string;
@@ -99,6 +114,10 @@ export interface StudyRecord {
   result: Judgement | null;
   explain: string;
   nextPrediction: { variantId: string | null; direction: Direction } | null;
+  /** ラボ先生が選んだ次の一手（古い記録には無い） */
+  nextSuggestion?: NextSuggestion | null;
+  /** 次の一手を聞いた回数（サーバの上限 3 回 / 記録） */
+  nextCalls?: number;
   events: RecordEvent[];
   signature: { signer: string; hash: string; server: boolean } | null;
   /** 古い記録には無い（undefined は null として扱う） */

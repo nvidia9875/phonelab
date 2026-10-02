@@ -294,3 +294,21 @@ export function Link({ icon, onClick, children }: { icon: IconName; onClick?: ()
 }
 
 export { Icon };
+
+/** 判断の跡（エージェントが何を読み、何を選び、統制層が何を直したか）。開くと段ごとに並ぶ */
+export function Trail({ steps, selfCorrected = false, traceId = null }: { steps: string[]; selfCorrected?: boolean; traceId?: string | null }) {
+  if (steps.length === 0) return null;
+  return (
+    <details className="trail">
+      <summary className="trail__summary">
+        ラボ先生の判断の跡（{steps.length} 段）{selfCorrected && <span className="trail__badge">自分で直した</span>}
+      </summary>
+      <ol className="trail__steps">
+        {steps.map((step, i) => (
+          <li key={i} className="trail__step">{step}</li>
+        ))}
+      </ol>
+      {traceId && <p className="trail__trace">trace {traceId.slice(0, 16)}…（先生は Cloud Trace で同じ段を見られます）</p>}
+    </details>
+  );
+}

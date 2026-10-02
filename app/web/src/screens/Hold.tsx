@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Button, Card, CardBody, CardTitle, Check, Checks, Eyebrow, Foot, FootNote, Screen, Wave } from "../components/ui";
+import { Button, Card, CardBody, CardTitle, Check, Checks, Eyebrow, Foot, FootNote, Screen, Trail, Wave } from "../components/ui";
 import type { CheckCode, LocalCheck } from "../measure/checks";
 import type { HoldAdvice } from "../store/records";
 
@@ -103,6 +103,7 @@ export function Hold({ checks, conditionLabel, retry, maxRetry, advice, onLoadAd
         <Eyebrow>ラボ先生の提案</Eyebrow>
         <p style={{ fontSize: 14, lineHeight: 1.6 }}>{text}</p>
         {canRetry && !loading && <p className="card__hint">{current ? SOURCE_NOTE[current.source] : SOURCE_NOTE.stub}</p>}
+        {!loading && current?.trail && <Trail steps={current.trail} traceId={current.traceId} />}
       </Card>
 
       <Foot>

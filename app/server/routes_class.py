@@ -34,7 +34,7 @@ PIN_ATTEMPTS_PER_WINDOW = 10
 PIN_WINDOW_S = 600
 RECORD_POSTS_PER_WINDOW = 120
 RECORD_WINDOW_S = 600
-MAX_EVENTS = 8
+MAX_EVENTS = 12  # 判断の跡の行が増えたので 8 → 12（10/2）
 NOT_FOUND = "学級コードが見つかりません。先生に確認してください"
 
 Sensor = Literal["accelerometer", "gyroscope", "microphone", "camera"]

@@ -1,4 +1,4 @@
-import { Button, Card, CardLabel, CardTitle, Foot, FootNote, InfoRow, Pair, PermitChip, Screen, Section } from "../components/ui";
+import { Button, Card, CardLabel, CardTitle, Foot, FootNote, InfoRow, Pair, PermitChip, Screen, Section, Trail } from "../components/ui";
 import { SENSOR_LABEL, type Theme, type Variant } from "../catalog/themes";
 import type { PlanInfo } from "../store/records";
 
@@ -16,13 +16,17 @@ export interface PlanProps {
   why: string;
   /** 誰が選んだか（古い記録には無い） */
   source?: PlanInfo["source"];
+  /** 判断の跡と、検査に落ちた 1 回目を自分で直したか（古い記録には無い） */
+  trail?: string[];
+  selfCorrected?: boolean;
+  traceId?: string | null;
   onApprove: () => void;
   onOther: () => void;
   onHome: () => void;
 }
 
 /** 画面 1: 計画と承認。許可チップは承認ボタンの真上 */
-export function Plan({ theme, variant, predictionText, why, source, onApprove, onOther, onHome }: PlanProps) {
+export function Plan({ theme, variant, predictionText, why, source, trail = [], selfCorrected = false, traceId = null, onApprove, onOther, onHome }: PlanProps) {
   const sensors = theme.sensors.map((s) => SENSOR_LABEL[s]).join("・");
   const denied = ["microphone", "camera"].filter((s) => !theme.sensors.includes(s as never)).map((s) => SENSOR_LABEL[s as "microphone" | "camera"]);
   const deniedText = `${[...denied, "位置"].join("、")}は使わない`;
@@ -40,6 +44,7 @@ export function Plan({ theme, variant, predictionText, why, source, onApprove, o
         <CardTitle>{variant.title}</CardTitle>
         <p className="card__hint">{why}</p>
         {source && <p className="card__hint">{SOURCE_NOTE[source]}</p>}
+        <Trail steps={trail} selfCorrected={selfCorrected} traceId={traceId} />
         <Pair items={[{ k: "変えるもの", v: variant.changes }, { k: "一定にするもの", v: variant.holds }]} />
         <PermitChip sensors={sensors} seconds={theme.seconds} denied={deniedText} />
         <InfoRow icon="box-check">

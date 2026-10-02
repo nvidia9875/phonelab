@@ -6,7 +6,7 @@
 import { postRecordSummary, type RecordSummary } from "./classroom";
 import { getState, subscribeStore, type StudyRecord } from "../store/records";
 
-const MAX_EVENTS = 8;
+const MAX_EVENTS = 12;
 const DEBOUNCE_MS = 800;
 
 export function summarizeRecord(rec: StudyRecord): RecordSummary {

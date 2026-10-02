@@ -154,3 +154,52 @@ export async function fetchDashboard(classCode: string, pin: string): Promise<Da
   }
   return (await res.json()) as DashboardInfo;
 }
+
+/** 学級の見立て（POST /api/class/{code}/insight）。ラボ先生が読み取り専用のツールで学級を読み、先生に 3 行で伝える */
+export interface InsightInfo {
+  lines: string[];
+  visit_first: string[];
+  suggestion: string;
+  source: "agent" | "rules";
+  policy_fixed: boolean;
+  trail: string[];
+  model_calls: number;
+  tool_calls: number;
+  tools_denied: number;
+  cached: boolean;
+  generated_at: string;
+  trace_id: string;
+}
+
+const INSIGHT_TIMEOUT_MS = 25_000;
+
+export async function fetchInsight(classCode: string, pin: string): Promise<InsightInfo> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), INSIGHT_TIMEOUT_MS);
+  let res: Response;
+  try {
+    res = await fetch(`/api/class/${enc(classCode)}/insight`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pin }), signal: controller.signal, cache: "no-store" });
+  } catch {
+    throw new ClassError("ラボ先生につながりませんでした", 0);
+  } finally {
+    clearTimeout(timer);
+  }
+  if (!res.ok) {
+    let detail = "";
+    try {
+      detail = String(((await res.json()) as { detail?: unknown }).detail ?? "");
+    } catch {
+      /* JSON でない */
+    }
+    throw new ClassError(detail || `見立てを取れませんでした（${res.status}）`, res.status);
+  }
+  const data = (await res.json()) as InsightInfo;
+  if (!Array.isArray(data.lines) || !Array.isArray(data.visit_first)) throw new ClassError("見立てを読み取れませんでした", 0);
+  return data;
+}
+
+/** 開発者・審査向け: 記録の trace_id から Cloud Trace の画面へ（学級の先生は GCP にログインしていないので開けない） */
+export const TRACE_PROJECT = "phonelab-2026";
+export function traceUrl(traceId: string): string {
+  return `https://console.cloud.google.com/traces/list?project=${TRACE_PROJECT}&tid=${encodeURIComponent(traceId)}`;
+}
