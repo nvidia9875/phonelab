@@ -35,7 +35,11 @@ export interface NextInput {
 
 const TIMEOUT_MS = 13_000;
 
-export class NextError extends Error {}
+export class NextError extends Error {
+  constructor(message: string, readonly status?: number) {
+    super(message);
+  }
+}
 
 export async function requestNext(input: NextInput): Promise<NextReply> {
   const controller = new AbortController();
@@ -66,7 +70,7 @@ export async function requestNext(input: NextInput): Promise<NextReply> {
   } finally {
     clearTimeout(timer);
   }
-  if (!res.ok) throw new NextError(`ラボ先生が答えられませんでした（${res.status}）`);
+  if (!res.ok) throw new NextError(`ラボ先生が答えられませんでした（${res.status}）`, res.status);
   const data = (await res.json()) as NextReply;
   if ((data.action !== "next" && data.action !== "reflect") || typeof data.question !== "string") throw new NextError("返事を読み取れませんでした");
   return data;

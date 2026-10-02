@@ -3,7 +3,8 @@ import { themeById, variantById } from "../catalog/themes";
 import type { Features } from "../measure/features";
 import type { LocalCheck } from "../measure/checks";
 import { clearAll, createRecord, recordById, updateRecord, type CondKey, type Measurement, type StudyRecord } from "../store/records";
-import { MAX_RETRY, ensureJudged, finishMeasure, remeasure, submitPrediction, switchExperiment } from "./useFlow";
+import { BUSY_MESSAGE, MAX_RETRY, ensureJudged, finishMeasure, remeasure, submitPrediction, switchExperiment } from "./useFlow";
+import { getState, setClassState } from "../store/records";
 import type { PlanReply } from "../agent/plan";
 
 const sound = themeById("sound")!;
@@ -306,5 +307,42 @@ describe("switchExperiment", () => {
 
     expect(switchExperiment(rec, sound)).toBeNull();
     expect(recordById(rec.id)!.status).toBe("held");
+  });
+});
+
+
+describe("停止と上限は、通信の失敗と分ける（10/2 採点 2-7）", () => {
+  beforeEach(() => clearAll());
+  afterEach(() => vi.unstubAllGlobals());
+
+  function serverSays(status: number) {
+    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: false, status, json: async () => ({ detail: "" }) })));
+  }
+
+  it("a halted class stops the device instead of planning locally", async () => {
+    setClassState({ classCode: "DEMO-2026", school: "jhs", allowedSensors: ["microphone"], teacherEnabled: [], halted: false, updatedAt: "", seenAt: "" });
+    serverSays(409);
+    const rec = createRecord(sound.id);
+
+    expect(await submitPrediction(rec, sound, "強くはじくと高くなると思う")).toBe("halted");
+    expect(getState().classState?.halted).toBe(true);
+    expect(recordById(rec.id)!.variantId).toBeNull();
+  });
+
+  it("a rate limit asks to wait instead of planning locally", async () => {
+    serverSays(429);
+    const rec = createRecord(sound.id);
+
+    expect(await submitPrediction(rec, sound, "強くはじくと高くなると思う")).toBe("predict");
+    expect(recordById(rec.id)!.prediction.questionBack).toBe(BUSY_MESSAGE);
+    expect(recordById(rec.id)!.variantId).toBeNull();
+  });
+
+  it("a network failure still falls back to the device", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => { throw new Error("offline"); }));
+    const rec = createRecord(sound.id);
+
+    expect(await submitPrediction(rec, sound, "強くはじくとゴムが速く震えるから、音が高くなると思う")).toBe("plan");
+    expect(recordById(rec.id)!.plan?.source).toBe("stub");
   });
 });

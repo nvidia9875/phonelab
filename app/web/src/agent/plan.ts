@@ -44,7 +44,12 @@ export const PLAN_TIMEOUT_MS = 13_000;
 const MAX_TEXT = 500;
 const MAX_DONE_IDS = 10;
 
-export class PlanError extends Error {}
+/** status: サーバが返した HTTP の番号（つながらなかったときは無い）。409 は先生の停止、429 は回数の上限 */
+export class PlanError extends Error {
+  constructor(message: string, readonly status?: number) {
+    super(message);
+  }
+}
 
 function isPlanReply(value: unknown): value is PlanReply {
   if (typeof value !== "object" || value === null) return false;
@@ -69,7 +74,7 @@ export async function requestPlan(req: PlanRequest, timeoutMs = PLAN_TIMEOUT_MS)
   } finally {
     clearTimeout(timer);
   }
-  if (!res.ok) throw new PlanError(`ラボ先生が答えられませんでした（${res.status}）`);
+  if (!res.ok) throw new PlanError(`ラボ先生が答えられませんでした（${res.status}）`, res.status);
   const data: unknown = await res.json();
   if (!isPlanReply(data)) throw new PlanError("ラボ先生の返事を読み取れませんでした");
   return data;

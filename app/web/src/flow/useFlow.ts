@@ -4,14 +4,14 @@
  * judge / sign はまだ端末内（サーバ実装後に差し替える）。
  */
 import type { ChatReply } from "../agent/chat";
-import { requestPlan, type PlanReply } from "../agent/plan";
+import { PlanError, requestPlan, type PlanReply } from "../agent/plan";
 import { requestReplan } from "../agent/replan";
 import { checkPolicy, choosePlan, judge, readClaim } from "../agent/stub";
 import { QUANTITY, formatQuantity, type Unit } from "../catalog/quantity";
 import { SENSOR_LABEL, repeatsOf, themeById, variantById, variantsOf, type Theme } from "../catalog/themes";
 import type { LocalCheck } from "../measure/checks";
 import { clocksSummary, measuredValue, type Features } from "../measure/features";
-import { activeRecordForTheme, addEvent, createRecord, currentClassCode, currentNumber, recordById, recordsForTheme, updateRecord, type ChatLog, type Claim, type CondKey, type Direction, type HoldAdvice, type PlanInfo, type Rejection, type StudyRecord } from "../store/records";
+import { activeRecordForTheme, addEvent, getState, setClassState, setHalted, createRecord, currentClassCode, currentNumber, recordById, recordsForTheme, updateRecord, type ChatLog, type Claim, type CondKey, type Direction, type HoldAdvice, type PlanInfo, type Rejection, type StudyRecord } from "../store/records";
 
 export const MAX_RETRY = 3;
 const EMPTY_TRIES: Record<CondKey, number> = { A: 0, B: 0 };
@@ -146,8 +146,20 @@ function applyDecision(rec: StudyRecord, text: string, d: Decision, plannerCalls
   return "plan";
 }
 
-/** 予想を出す → サーバの Policy と Planner（つながらなければ端末内）。戻り値で次の画面を決める */
-export async function submitPrediction(rec: StudyRecord, theme: Theme, text: string): Promise<"plan" | "rejected" | "predict"> {
+/** サーバが停止を返したら、ポーリングを待たずに端末も止める */
+export function markHalted(): void {
+  const cls = getState().classState;
+  if (cls) setClassState({ ...cls, halted: true });
+  else setHalted(true);
+}
+
+export const BUSY_MESSAGE = "いまラボ先生に聞く回数が多すぎます。少し待ってから、もう一度送ってください";
+
+/**
+ * 予想を出す → サーバの Policy と Planner（つながらなければ端末内）。戻り値で次の画面を決める。
+ * 先生の停止（409）と回数の上限（429）は、通信の失敗と区別する（端末内で選んで進めると、停止と上限の意味が無くなる。10/2 採点 2-7）
+ */
+export async function submitPrediction(rec: StudyRecord, theme: Theme, text: string): Promise<"plan" | "rejected" | "predict" | "halted"> {
   const done = doneVariantIds(theme.id);
   const plannerCalls = rec.plannerCalls ?? 0;
   try {
@@ -163,7 +175,15 @@ export async function submitPrediction(rec: StudyRecord, theme: Theme, text: str
     });
     const decision = decideFromServer(reply, theme, text);
     if (decision) return applyDecision(rec, text, decision, reply.planner_calls);
-  } catch {
+  } catch (e: unknown) {
+    if (e instanceof PlanError && e.status === 409) {
+      markHalted();
+      return "halted";
+    }
+    if (e instanceof PlanError && e.status === 429) {
+      updateRecord(rec.id, (r) => ({ ...r, prediction: { ...r.prediction, text, questionBack: BUSY_MESSAGE } }));
+      return "predict";
+    }
     /* つながらない・遅い・返事が崩れている → 端末内で選ぶ。記録に stub と残る */
   }
   return applyDecision(rec, text, decideLocally(rec, theme, text, done), plannerCalls);

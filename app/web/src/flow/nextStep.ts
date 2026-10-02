@@ -4,11 +4,11 @@
  * 記録に残す（教員画面にも「次の一手」と「判断」の行が届く）。
  * つながらないときはカタログの順（まだやっていない実験）で、出どころを stub と残す。
  */
-import { requestNext } from "../agent/next";
+import { NextError, requestNext } from "../agent/next";
 import { QUANTITY } from "../catalog/quantity";
 import { variantsOf, type Theme } from "../catalog/themes";
 import { addEvent, recordById, updateRecord, type NextSuggestion, type StudyRecord } from "../store/records";
-import { doneVariantIds, trailText } from "./useFlow";
+import { doneVariantIds, markHalted, trailText } from "./useFlow";
 
 const MIN_EXPLAIN_CHARS = 8;
 
@@ -70,7 +70,12 @@ export async function askNext(rec: StudyRecord, theme: Theme): Promise<NextSugge
       trail: reply.trail ?? [],
       basis,
     };
-  } catch {
+  } catch (e: unknown) {
+    // 先生が止めているときは、カタログの順で先へ進めない
+    if (e instanceof NextError && e.status === 409) {
+      markHalted();
+      return null;
+    }
     suggestion = { ...fallback(rec, theme), basis };
   }
   // 待っている間に、同じものを見た次の一手が入っていたら、そちらを使う

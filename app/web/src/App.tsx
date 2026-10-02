@@ -262,7 +262,7 @@ export function App() {
           hintMessage={r.prediction.hints > 0 ? `ヒントは ${r.prediction.hints} / 3 回使いました` : null}
           onSubmit={async (text) => {
             const next = await flow.submitPrediction(r, t, text);
-            nav(next === "predict" ? `/x/${t.id}` : `/x/${t.id}/${next}`);
+            nav(next === "halted" ? "/halted" : next === "predict" ? `/x/${t.id}` : `/x/${t.id}/${next}`);
           }}
           onHome={goHome}
         />
