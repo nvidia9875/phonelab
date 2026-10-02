@@ -1,6 +1,6 @@
 # PhoneLab — スマホが実験器具。AI は答えを言わない。
 
-第 5 回 Agentic AI Hackathon with Google Cloud への提出物。中学校の理科で、生徒が「こうなると思う」を書くと、AI（ラボ先生 = Gemini）がその予想を壊せる実験をカタログから選び、端末のセンサーで測って、機械が検査して怪しければ結論を保留する。判断と解釈はいつも生徒。先生は学級を一目で見て、必要なら全端末を止められる。
+第 5 回 Agentic AI Hackathon with Google Cloud への提出物。中学校の理科で、生徒が「こうなると思う」を書くと、AI（ラボ先生 = Gemini）がその予想を壊せる実験をカタログから選び、端末のセンサーで測って、機械が検査して怪しければ結論を保留する。結果が出ると、ラボ先生は**次に何を確かめにいくか**を自分で選び、次の予想を促す（答えは言わない）。判断と解釈はいつも生徒。先生は学級を一目で見て、ラボ先生に**学級の見立て**を聞き、必要なら全端末を止められる。
 
 - 本番 URL: **https://phonelab-1094091671194.asia-northeast1.run.app**（Cloud Run、asia-northeast1）
 - 設計ドキュメント: [`docs/`](docs/README.md)（ペルソナと使う場面、アーキテクチャ、Policy、Verifier、実験カタログ、記録の形）
@@ -15,6 +15,7 @@
 | 項目 | 値 |
 |---|---|
 | 学級コード | `DEMO-2026` |
+| 見本の記録 | `D-01`〜`D-06`（保留・却下・判定・次の一手・計画中）。教員画面で開くとすぐ見えます。この番号では入場できません |
 | 出席番号 | `S-01` 〜 好きな番号（例 `S-04`）。**最初に入った端末に 6 文字の合言葉が出ます**。別の端末で同じ番号を使うときはその合言葉を入れます（他人の番号に記録を書けないようにするため。合言葉をなくしたら教員画面でリセット） |
 | 教員画面 | `/teacher` → 学級コード `DEMO-2026`、教師 PIN `4826` |
 
@@ -24,9 +25,10 @@
 2. テーマ「音の高さ」（マイクだけで動く）→ 輪ゴムを箱にかけて、はじいてみる → 予想を書く（理由が無いとラボ先生が問い返します）
 3. 「ラボ先生に実験を考えてもらう」→ Gemini が予想を読み、実験を 1 つ選びます（2 秒前後）。計画画面に「誰が選んだか」と「答えは渡していません」が出ます
 4. 承認 → 「準備はいい？ 3, 2, 1」→ マイクで 5 秒 → 二本の時計（基本周波数と倍音）→ 機械の検査 → 通れば次の条件、怪しければ **保留**
-5. 結果は「測定が言っていること」として出ます（「正解」とは言いません）。ふり返りのチャットは、自分の考えを書いてから
-6. 試してほしい経路: 予想欄に「スマホを落として測りたい」→ Policy が**モデルを呼ばずに**却下し、理由 3 つと代替実験を出します。「答えだけ教えて」→ 答えは出ません
-7. 振り子（加速度センサー）は iPhone / Android / iPad で。先生が「家でやる実験」を有効化すると、トップに「家で」の印で出ます
+5. 結果は「測定が言っていること」として出ます（「正解」とは言いません）。その下に**ラボ先生の次の一手**: 予想と測定が合ったなら別の変数へ、食い違っていて理由をまだ書いていないなら「先にふり返り」。ふり返りのチャットは、自分の考えを書いてから
+6. 計画・保留の画面の「ラボ先生の判断の跡」を開くと、何を読み、何を選び、統制層が何を直したか（自分で作り直したか）が段ごとに見えます
+7. 試してほしい経路: 予想欄に「スマホを落として測りたい」→ Policy が**モデルを呼ばずに**却下し、理由 3 つと代替実験を出します。「答えだけ教えて」→ 答えは出ません
+8. 振り子（加速度センサー）は iPhone / Android / iPad で。先生が「家でやる実験」を有効化すると、トップに「家で」の印で出ます
 
 センサーの無い PC で流れだけ見る場合は、右上の ⚙ 設定 → **テストモード**（サンプルの測定で進めます。記録に「サンプル」と残ります）。
 
@@ -34,30 +36,46 @@
 
 1. `/teacher` を開き、学級コード `DEMO-2026` と PIN `4826` を入れる → 5 秒ごとに学級の様子が出ます
 2. 上から: 予想の向きの分布（「高くなる 6 人」など）→ **いま見に行く子**（保留 → 却下の順）→ 全員の表（番号だけ）→ 選んだ子の記録の流れ
-3. 右上の **「全端末の測定を止める」** → 生徒の端末は 2 秒以内に停止画面になり、ラボ先生（Gemini）も呼ばれなくなります（`/api/plan` `/api/chat` は 409、ADK の `before_run_callback` でも止まる）。解除も同じボタン
-4. 許可のトグル（マイク・加速度・カメラ）と「家でやる実験」の有効化も、この画面から
+3. 右の **「ラボ先生の見立て」→「見立てを聞く」** → ラボ先生がツールで学級の要約を読み、3 行・見に行く順・先生が選べる手を返します（見本の記録だと「音の高さで 2 人がまわりの雑音で保留」など）。操作はしません。番号を押すとその子の記録の流れ（「判断」の行も）へ
+4. 右上の **「全端末の測定を止める」** → 生徒の端末は 2 秒以内に停止画面になり、ラボ先生（Gemini）も呼ばれなくなります（`/api/plan` `/api/chat` は 409、ADK の `before_run_callback` でも止まる）。解除も同じボタン
+5. 許可のトグル（マイク・加速度・カメラ）と「家でやる実験」の有効化も、この画面から
 
 > 審査の期間中（〜2026-12-01）は動作する状態を保ちます。学級 `DEMO-2026` は共用なので、他の人の番号の記録が見えることがあります。
 
 ## 何が「エージェント」か（審査軸②）
 
-LLM（Gemini）が判断するのは 3 つだけ。そのすべてを ADK の統制層が囲んでいます。
+予想 → 計画 → 測定 → 検査 → 判定 → **次の予想**、のループのうち、言葉と判断が要るところを 4 つのエージェントが受け持ち、測定と検査は機械が受け持つ。どのエージェントも ADK の統制層（`PolicyPlugin`）に囲まれている。
 
-| 判断 | 誰が | どう囲むか |
+| 判断 | エージェント（ADK `LlmAgent`） | 統制 |
 |---|---|---|
-| 予想を読み、確かめられる実験を選ぶ | **Planner**（`LlmAgent`、構造化出力 `PlanOutput`） | 候補はそのテーマの実験だけ。候補外の id は `after_model_callback` が差し替え。「なぜこの実験か」に結果の言葉が混じれば中立の文に差し替え。答え（`answers.py`）は渡さない |
-| 保留の理由を読んで、次の一手（同じ実験で直す／別の実験へ）を提案する | **Replanner**（`LlmAgent`、構造化出力 `ReplanOutput`） | 候補外の実験への切り替えは測り直しに、助言に混じった結果の言葉は中立の文に差し替え。読めなければ検査コードごとの定型 |
-| 測定のあとのふり返り | **Tutor**（ラボ先生、`LlmAgent`） | 説明は生徒が自分の考えを書き、判定が出ているときだけプロンプトに入る。閉じている間に説明の言い回しが出たら問い返しに差し替え（保留中は結果の言い回しも） |
-| 安全（禁止動作・メモ内の指示・答えの要求） | 決定論の Policy（`server/agent/policy.py`） | **モデルを呼ぶ前に**判定。却下は理由 3 つ＋代替 |
-| 測定の検査・判定文・停止・署名 | 端末内の計算とテンプレート | LLM は関与しない |
+| 予想を読み、確かめられる実験を選ぶ。理由が無ければ 1 回だけ問い返す | **Planner**（構造化出力 `PlanOutput`） | 候補はそのテーマの残りの実験だけ（学級の許可・やり終えた実験を除く）。答え（`answers.py`）は渡さない |
+| 保留の理由を読み、同じ実験で直すか別の実験へ切り替えるかを提案する | **Replanner**（`ReplanOutput`） | 候補外への切り替えは測り直しに |
+| 結果を読み、次に確かめる実験と次の予想の問いかけを選ぶ（食い違って理由がまだなら「先にふり返り」） | **NextStep**（`NextOutput`、`POST /api/next`） | 問いかけに結果の言葉が混じれば差し替え。残りが無ければモデルを呼ばない |
+| 学級の要約を**ツールで読み**、先生に 3 行・見に行く順・選べる手を伝える | **ClassAgent**（ツール `get_class_snapshot` / `get_student_timeline`、`POST /api/class/{code}/insight`） | ツールは読み取り専用で、予想の本文と名前は渡さない。呼べるツール・回数（4 回、一人ずつは 3 人まで）・番号を `before_tool_callback` で制限。「止める」を勧める文は落とす |
+| 測定後のふり返り | **Tutor**（ラボ先生） | 説明は、生徒が自分の考えを書いて判定が出ているときだけ。閉じている間の説明の言い回しは問い返しに差し替え |
+| 安全（禁止動作・メモ内の指示・答えの要求） | 決定論の Policy（`policy.py`） | **モデルを呼ぶ前に**判定。却下は理由 3 つ＋代替 |
+| 測定の検査・判定文・停止 | 端末内の計算とテンプレート | LLM は関与しない |
 
-`PolicyPlugin`（`server/agent/policy_plugin.py`、ADK `BasePlugin`）は Runner に一度登録され、両エージェントに同じ統制がかかる:
+### 統制層 `PolicyPlugin`（ADK `BasePlugin`、`server/agent/policy_plugin.py`）
 
 - `before_run_callback` — 先生が学級を止めていればエージェントを走らせない
-- `before_model_callback` — 回数上限（Planner 5 回 / 実験、Tutor 10 往復 / 記録）ならモデルを呼ばない。温度・出力長・思考量を強制
-- `after_model_callback` — 候補外の実験、結果の言葉、説明の漏えいを差し替える
+- `before_model_callback` — ① **Model Armor**（us-central1 のテンプレート）で生徒の文を 1 回だけ検査し、検知したらモデルを呼ばない ② 回数上限（Planner 5 回 / 実験、Replanner・次の一手 3 回 / 記録、Tutor 10 往復）③ 温度・出力長・思考量を強制
+- `before_tool_callback` — 許可したツールだけ、回数の上限まで、学級にいる番号だけ。断るときはツールを走らせずに理由を返す
+- `after_model_callback` — 候補外の実験、結果の言葉、説明の漏えい、停止の勧めを検査する
 
-すべて Cloud Trace に `phonelab.policy` スパン（`check` と `decision`）として残ります。生徒の文はスパンに入れません。
+**検査に落ちた出力は、理由を添えて 1 回だけモデルに作り直させる**（自己修正）。作り直しも落ちたら統制層が差し替える。どちらになったかは応答の `trail`（判断の跡）に残り、生徒の画面・教員画面・Cloud Trace（`phonelab.self_correct` スパン）で同じ段が見える。生徒の文はスパンに入れない。
+
+### 数字で見る（[`docs/eval.md`](docs/eval.md)、本物の Gemini と Model Armor で 10/2 に計測）
+
+| | |
+|---|---|
+| 予想の変数の読み取り | 24 / 24（中学の 3 テーマ、予想 30 件） |
+| 応答時間（Planner） | 中央値 1.2 秒、95% 1.8 秒 |
+| 注入・禁止動作 20 件 | Model Armor で 4、決定論のパターンで 6、残り 10 件はモデルに届いたが **最終出力に結果・答えが出たのは 0 件** |
+| 次の一手の問いかけに結果の言葉 | 0 / 8 |
+| 費用 | 1 人 1 実験（計画＋次の一手）約 0.14 円、31 人の学級で 1 時間 約 15 円 |
+
+Model Armor は日本語の言い換えの多くを拾わなかった（英語と「開発者モード」は拾った）。だから三層（Model Armor → 決定論のパターン → 構造化出力と出力の検査）で守る。Planner にツールで候補を読ませる方式（`PHONELAB_PLANNER_TOOLS=1`）も比べたが、正答率は同じで 0.9 秒遅く、トークンが 2.4 倍だったので既定はオフ。
 
 ## 構成（どこを今回開発したか）
 
@@ -67,20 +85,30 @@ LLM（Gemini）が判断するのは 3 つだけ。そのすべてを ADK の統
 phonelab/
 ├── app/                      実装（Cloud Run にデプロイするもの、Dockerfile が Web もビルド）
 │   ├── server/               FastAPI + Google ADK（Python 3.12）
-│   │   ├── main.py             /api/plan（Planner）、/api/chat（ラボ先生）、PWA の配信
+│   │   ├── main.py             /api/plan（Planner）、/api/replan、/api/chat（ラボ先生）、PWA の配信
+│   │   ├── routes_next.py      /api/next（次の一手）
+│   │   ├── routes_insight.py   /api/class/{code}/insight（学級の見立て）
 │   │   ├── routes_class.py     /api/class/*（入場・停止・許可・教員画面の元データ）、/api/records
+│   │   ├── guards.py           エージェントの入口に共通の検査（回数・停止・学級の許可）
+│   │   ├── samples.py          審査用の見本の記録 D-01〜D-06
 │   │   ├── classroom.py        学級の保存（Firestore ／ メモリ）、PIN
 │   │   ├── ratelimit.py        接続元ごとの回数制限
 │   │   ├── telemetry.py        Cloud Trace（本文は送らない）
 │   │   └── agent/
-│   │       ├── planner.py        Planner の指示・構造化出力・プロンプト
+│   │       ├── planner.py        Planner と Replanner の指示・構造化出力・プロンプト
+│   │       ├── next_step.py      次の一手の指示・構造化出力
+│   │       ├── class_agent.py    学級の見立て（ツール 2 つ、読み取り専用）
+│   │       ├── planner_tools.py  Planner のツール（既定オフ、評価で比較）
+│   │       ├── model_armor.py    Model Armor（REST、fail-open）
+│   │       ├── trail.py          判断の跡
 │   │       ├── tutor.py          ラボ先生の指示・プロンプト
 │   │       ├── policy.py         決定論の Policy（禁止動作・注入・答えの要求）
-│   │       ├── policy_plugin.py  統制層（ADK BasePlugin の 3 コールバック）
+│   │       ├── policy_plugin.py  統制層（ADK BasePlugin の 4 コールバック）
 │   │       ├── catalog.py        Planner に渡す実験カタログ（答え無し）
 │   │       ├── answers.py        先生の説明と漏えい語句（サーバだけが持つ）
-│   │       └── runner.py         Runner の組み立て、1 リクエスト = 1 セッション
-│   ├── tests/                pytest 71 件（Policy・Plugin・API・学級）
+│   │       └── runner.py         Runner の組み立て、自己修正、1 リクエスト = 1 セッション
+│   ├── scripts/eval_agent.py  評価（本物の Gemini・Model Armor で数える → docs/eval.md）
+│   ├── tests/                pytest 122 件（Policy・Plugin・ツール統制・自己修正・API・学級）
 │   └── web/                  PWA（Vite + React + TypeScript）
 │       └── src/
 │           ├── screens/        12 画面（予想・計画・準備・測定・保留・却下・結果・チャット・記録・教員 など）
@@ -97,16 +125,16 @@ phonelab/
 └── THIRD_PARTY_LICENSES.md   使っている OSS とライセンス
 ```
 
-Web の vitest は 54 件。実験カタログの id は `web/src/catalog/themes.ts` と `server/agent/catalog.py` で同じ（テストで突き合わせ）。
+Web の vitest は 62 件。実験カタログの id は `web/src/catalog/themes.ts` と `server/agent/catalog.py` で同じ（テストで突き合わせ）。
 
 ## 実装済みと、設計だけのもの（正直な線引き）
 
 | できていること（本番で動く） | 設計だけ（`docs/` にあるが未実装） |
 |---|---|
-| 予想ゲート、Planner（Gemini、構造化出力）、決定論の Policy、PolicyPlugin の 3 コールバック、ラボ先生のチャットと説明のゲート、Cloud Trace | サーバ側の Verifier（いまは端末内の検査だけ。サーバは特徴量の要約を受け取るが再検証しない） |
+| 予想ゲート、Planner・Replanner・次の一手・学級の見立て（Gemini、構造化出力）、自己修正、判断の跡、決定論の Policy、PolicyPlugin の 4 コールバック、Model Armor、ラボ先生のチャットと説明のゲート、Cloud Trace | サーバ側の Verifier（いまは端末内の検査だけ。サーバは特徴量の要約を受け取るが再検証しない） |
 | 端末内の測定（振り子の速さ・周期、音の高さ）、二本の時計、検査と保留、測り直し、3 回の平均 | Cloud KMS による記録の署名（いまは端末で計算した SHA-256 のハッシュだけ。画面にもそう書いてある） |
-| 学級（Firestore）、学級コードで入場、先生の許可・家でやる実験・全端末停止（2 秒ポーリング）、教員画面の実データ | Model Armor（決定論のパターンだけ） |
-| 記録の要約のサーバ保存と、先生の 1 画面（分布・見に行く子・記録の流れ） | ClassAgent（教員側の観察と提案。10/1 に Go/No-Go） |
+| 学級（Firestore）、学級コードで入場、先生の許可・家でやる実験・全端末停止（2 秒ポーリング）、教員画面の実データ | ClassAgent の「提案を先生が承認して学級の設定に反映する」部分（見立ては読み取りと表示だけ） |
+| 記録の要約のサーバ保存と、先生の 1 画面（分布・見に行く子・見立て・記録の流れ） | 実機 3 機種での閾値の決め直し（手順書 `docs/device-check.md`） |
 | オフライン縮退（サーバにつながらないときは端末内の規則で選び、記録に「stub」と残る） | 記録の共有 URL（保護者・Classroom 用）、PDF |
 
 ## Google Cloud の使い方
@@ -114,12 +142,13 @@ Web の vitest は 54 件。実験カタログの id は `web/src/catalog/themes
 | サービス | 用途 |
 |---|---|
 | **Cloud Run**（asia-northeast1、min-instances 0） | FastAPI + ADK と PWA の配信。`gcloud run deploy --source`（Cloud Build） |
-| **Vertex AI — Gemini 3.5 Flash-Lite** | Planner と Tutor。構造化出力、thinking low。1 回 1.4〜2.7 秒。3.8 Flash は 25〜50 秒かかる時間帯があり、生徒を待たせるので不採用 |
-| **Agent Development Kit 2.8** | `LlmAgent` × 2、`Runner`、`BasePlugin`（統制層）、`InMemorySessionService`（1 リクエスト = 1 セッション） |
+| **Vertex AI — Gemini 3.5 Flash-Lite** | 5 つのエージェントすべて。構造化出力、thinking low。Planner の中央値 1.2 秒。3.8 Flash は 25〜50 秒かかる時間帯があり、生徒を待たせるので不採用 |
+| **Agent Development Kit 2.8** | `LlmAgent` × 5、`FunctionTool` × 2（学級の見立て）、構造化出力とツールの併用、`Runner`、`BasePlugin`（統制層）、`InMemorySessionService` |
+| **Model Armor**（テンプレート `phonelab-student`、us-central1） | 生徒の文の注入・脱獄・有害表現の検査（Planner とチャットの前）。東京リージョンには多言語の検出が無いため us-central1 |
 | **Firestore**（native） | 学級 `classes/{code}`、生徒 `students/{no}`（いまの記録の要約）、`records/{id}`（履歴）。クライアント SDK は使わず API 経由だけ |
 | **Cloud Trace**（Telemetry API、OTLP） | 1 実験 = 1 トレース。`phonelab.plan → invoke_agent → call_llm → phonelab.policy` |
 
-費用の考え方: Gemini は 1 実験あたり Planner 1〜2 回＋チャット最大 10 往復（Flash-Lite）。接続元ごとにレート制限（plan / chat 30 回 / 10 分、記録 120 回 / 10 分、PIN 10 回 / 10 分）。Cloud Run はアイドル課金なし。
+費用の考え方: Gemini は 1 実験あたり Planner 1 回（自己修正で最大 2 回）＋次の一手 1 回＋チャット最大 10 往復（Flash-Lite）。実測で 1 人 1 実験 約 0.14 円（[`docs/eval.md`](docs/eval.md)）。接続元ごとにレート制限（plan / chat 30 回 / 10 分、記録 120 回 / 10 分、PIN 10 回 / 10 分）。Cloud Run はアイドル課金なし。
 
 ## ローカルで動かす
 
@@ -129,15 +158,16 @@ cd app
 PHONELAB_CLASS_STORE=memory PHONELAB_DEMO_PIN=1234 \
 GOOGLE_GENAI_USE_VERTEXAI=true GOOGLE_CLOUD_PROJECT=<project> GOOGLE_CLOUD_LOCATION=global \
 uv run uvicorn server.main:app --port 8080
-uv run pytest -q            # 71 件（Gemini は呼ばない。FakeLlm）
+uv run pytest -q            # 122 件（Gemini は呼ばない。FakeLlm / ScriptedLlm）
+uv run python -m scripts.eval_agent   # 評価（本物の Gemini・Model Armor を呼ぶ。env は先頭の docstring）
 
 # Web（Vite。/api は 8080 へプロキシ）
 cd app/web
 npm ci && npm run dev -- --port 5179
-npx vitest run              # 54 件
+npx vitest run              # 62 件
 ```
 
-環境変数: `PHONELAB_MODEL` / `PHONELAB_CHAT_MODEL`（既定 `gemini-3.5-flash-lite`）、`PHONELAB_CLASS_STORE`（`memory` | `firestore`。Cloud Run 上は既定で firestore）、`PHONELAB_DEMO_PIN`（起動時に学級 `DEMO-2026` を作る）、`PHONELAB_TRACE_TO_CLOUD=1`（Cloud Trace へ送る）。
+環境変数: `PHONELAB_MODEL` / `PHONELAB_CHAT_MODEL`（既定 `gemini-3.5-flash-lite`）、`PHONELAB_CLASS_STORE`（`memory` | `firestore`。Cloud Run 上は既定で firestore）、`PHONELAB_DEMO_PIN`（起動時に学級 `DEMO-2026` を作る）、`PHONELAB_TRACE_TO_CLOUD=1`（Cloud Trace へ送る）、`PHONELAB_MODEL_ARMOR_TEMPLATE`（`projects/.../locations/us-central1/templates/...`、無ければ使わない）、`PHONELAB_DEMO_SAMPLES=1`（見本の記録 D-01〜D-06 を起動時に置く）、`PHONELAB_PLANNER_TOOLS=1`（Planner にツールで候補を読ませる。既定オフ）。
 
 ## ライセンス
 
