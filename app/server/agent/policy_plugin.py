@@ -73,6 +73,8 @@ ARMOR_CHECKED_KEY = "armor_checked"
 ARMOR_BLOCKED_KEY = "phonelab.armor_blocked"
 ARMOR_BLOCKED_TEXT = "この文には、ラボ先生への指示や、授業に合わない言葉が含まれていたので、ラボ先生には渡しませんでした。予想を自分の言葉で書き直してください。"
 TOOL_CALLS_KEY = "tool_calls"
+# 断った呼び出しも含めた試行の数。上限はこちらで数える（断られた呼び出しを繰り返してモデルの回数を使い切らないように。10/2 本番で起きた）
+TOOL_ATTEMPTS_KEY = "tool_attempts"
 TIMELINE_CALLS_KEY = "timeline_calls"
 TIMELINE_LIMIT = 3
 TOOL_DENIED_KEY = "phonelab.tool_denied"
@@ -153,8 +155,21 @@ class PolicyPlugin(BasePlugin):
         if self._thinking_level:
             update["thinking_config"] = types.ThinkingConfig(thinking_level=self._thinking_level)
         base = llm_request.config or types.GenerateContentConfig()
+        if self._must_answer_now(callback_context.state, calls):
+            # ツールの枠を使い切ったか、モデルを呼べるのが最後の 1 回なら、ツールを外して答えさせる
+            update["tools"] = _without(base.tools, self._allowed_tools)
+            with _tracer.start_as_current_span("phonelab.policy") as span:
+                span.set_attribute("phonelab.check", "tool_budget")
+                span.set_attribute("phonelab.decision", "remove_tools")
         llm_request.config = base.model_copy(update=update)
         return None
+
+    def _must_answer_now(self, state, calls: int) -> bool:
+        if not self._allowed_tools:
+            return False
+        attempts = int(state.get(TOOL_ATTEMPTS_KEY, 0))
+        last_call = self._count_tool_followups and calls + 1 >= self._call_limit
+        return attempts >= self._tool_limit or last_call
 
     async def _screen(self, callback_context: CallbackContext) -> LlmResponse | None:
         """生徒の文（state の armor_text）を、この実行で最初のモデル呼び出しの前に一度だけ Model Armor に通す"""
@@ -181,26 +196,27 @@ class PolicyPlugin(BasePlugin):
         if tool.name == STRUCTURED_OUTPUT_TOOL:
             return None
         state = tool_context.state
-        calls = int(state.get(TOOL_CALLS_KEY, 0))
+        attempts = int(state.get(TOOL_ATTEMPTS_KEY, 0))
+        state[TOOL_ATTEMPTS_KEY] = attempts + 1
         with _tracer.start_as_current_span("phonelab.policy") as span:
             span.set_attribute("phonelab.check", "tool_call")
             span.set_attribute("phonelab.tool", tool.name)
-            span.set_attribute("phonelab.tool_calls", calls)
-            denied = self._deny_tool(tool.name, tool_args, state, calls)
+            span.set_attribute("phonelab.tool_attempts", attempts)
+            denied = self._deny_tool(tool.name, tool_args, state, attempts)
             span.set_attribute("phonelab.decision", "deny" if denied else "allow")
             if denied:
                 span.set_attribute("phonelab.deny_reason", denied)
                 state[TOOL_DENIED_KEY] = int(state.get(TOOL_DENIED_KEY, 0)) + 1
                 return {"error": denied}
-        state[TOOL_CALLS_KEY] = calls + 1
+        state[TOOL_CALLS_KEY] = int(state.get(TOOL_CALLS_KEY, 0)) + 1
         if tool.name == "get_student_timeline":
             state[TIMELINE_CALLS_KEY] = int(state.get(TIMELINE_CALLS_KEY, 0)) + 1
         return None
 
-    def _deny_tool(self, name: str, args: dict[str, Any], state, calls: int) -> str | None:
+    def _deny_tool(self, name: str, args: dict[str, Any], state, attempts: int) -> str | None:
         if name not in self._allowed_tools:
             return "このツールは使えません"
-        if calls >= self._tool_limit:
+        if attempts >= self._tool_limit:
             return "ツールを呼べる回数の上限です。読んだ範囲で答えてください"
         if name == "get_student_timeline":
             if int(state.get(TIMELINE_CALLS_KEY, 0)) >= TIMELINE_LIMIT:
@@ -335,6 +351,22 @@ def _check_insight(known: list[str], llm_response: LlmResponse) -> LlmResponse |
     if not changed:
         return None
     return _text_response(fixed.model_dump_json(), {INSIGHT_FIXED_KEY: True})
+
+
+def _without(tools: list | None, names: tuple[str, ...]) -> list | None:
+    """生成設定のツールから、名前が names のものを外す（構造化出力の内部ツールは残す）"""
+    if not tools:
+        return tools
+    kept = []
+    for tool in tools:
+        decls = getattr(tool, "function_declarations", None)
+        if not decls:
+            kept.append(tool)
+            continue
+        rest = [d for d in decls if d.name not in names]
+        if rest:
+            kept.append(tool.model_copy(update={"function_declarations": rest}))
+    return kept or None
 
 
 def _is_tool_followup(llm_request: LlmRequest) -> bool:

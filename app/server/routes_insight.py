@@ -121,7 +121,18 @@ async def insight(
             span.set_attribute("phonelab.tool_calls", reply.tool_calls)
             span.set_attribute("phonelab.tools_denied", reply.tools_denied)
             span.set_attribute("phonelab.model_calls", reply.model_calls)
-    out = _from_agent(reply, len(rows), trace_id) or _from_rules(snapshot, trace_id)
+    out = _from_agent(reply, len(rows), trace_id)
+    if out is None:
+        if rows:
+            logger.warning(
+                "学級の見立てを決まりごとで返した (trace_id=%s, reply=%s)",
+                trace_id,
+                "none"
+                if reply is None
+                else f"skipped={reply.skipped} readable={reply.plan is not None} "
+                f"model_calls={reply.model_calls} tool_calls={reply.tool_calls}",
+            )
+        out = _from_rules(snapshot, trace_id)
     _cache[class_code] = (time.monotonic(), out)
     return out
 

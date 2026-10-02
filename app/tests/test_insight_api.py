@@ -165,3 +165,28 @@ def test_the_same_insight_is_reused_for_thirty_seconds(client, scripted_llm):
 
 def test_needs_the_teacher_pin(client):
     assert ask(client, pin="0000").status_code == 403
+
+
+def tool_names(request) -> set[str]:
+    return {
+        d.name
+        for tool in (request.config.tools or [])
+        for d in (getattr(tool, "function_declarations", None) or [])
+    }
+
+
+def test_denied_calls_count_and_the_agent_still_answers(client, scripted_llm):
+    """10/2 本番: 断られた呼び出しを繰り返してモデルの回数を使い切り、見立てが出なかった。
+    断った呼び出しも枠に数え、枠を使い切ったらツールを外して答えさせる"""
+    scripted_llm.script = [
+        {"name": "get_student_timeline", "args": {"number": "S-99"}} for _ in range(4)
+    ] + [answer()]
+
+    data = ask(client).json()
+
+    assert data["source"] == "agent"
+    assert data["tools_denied"] == 4
+    last = scripted_llm.requests[-1]
+    assert "get_student_timeline" not in tool_names(last)
+    assert "get_class_snapshot" not in tool_names(last)
+    assert len(scripted_llm.requests) == 5
