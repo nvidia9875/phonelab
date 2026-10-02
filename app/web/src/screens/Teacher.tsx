@@ -4,7 +4,7 @@ import type { Sensor } from "../catalog/themes";
 import { ClassError, fetchDashboard, traceUrl, type DashboardInfo, type InsightInfo, type StudentRow } from "../agent/classroom";
 import { InsightPanel } from "./InsightPanel";
 import type { ClassState } from "../store/records";
-import { attentionOf, checkTextOf, claimTextOf, distributionOf, isOnline, stateOf } from "./dashboard";
+import { attentionOf, checkTextOf, claimTextOf, distributionOf, isOnline, measurementLinesOf, stateOf, tracesOfRow } from "./dashboard";
 import "./teacher.css";
 
 export interface TeacherProps {
@@ -245,11 +245,17 @@ export function Teacher({ classCode, cls, halted, onHalt, onPolicy, onResetStude
                     </span>
                   </p>
                 )}
-                {(selectedRow.current.trace_ids?.length ? selectedRow.current.trace_ids : selectedRow.current.trace_id ? [selectedRow.current.trace_id] : []).map((id) => (
-                  <p className="ttrace__row" style={{ opacity: 0.8 }} key={id}>
-                    <span className="ttrace__t">trace</span>
-                    <a className="ttrace__link" href={traceUrl(id)} target="_blank" rel="noreferrer">
-                      {id.slice(0, 16)}… を Cloud Trace で開く（開発者向け）
+                {measurementLinesOf(selectedRow.current).map((m) => (
+                  <p className={`ttrace__row${m.pass ? "" : " ttrace__strong"}`} key={m.key}>
+                    <span className="ttrace__t">{m.label}</span>
+                    <span>{m.text}</span>
+                  </p>
+                ))}
+                {tracesOfRow(selectedRow.current).map((t) => (
+                  <p className="ttrace__row" style={{ opacity: 0.8 }} key={t.id}>
+                    <span className="ttrace__t">{t.stage}</span>
+                    <a className="ttrace__link" href={traceUrl(t.id)} target="_blank" rel="noreferrer">
+                      trace {t.id.slice(0, 16)}… を Cloud Trace で開く（開発者向け）
                     </a>
                   </p>
                 ))}

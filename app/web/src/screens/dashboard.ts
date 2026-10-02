@@ -57,6 +57,22 @@ export function checkTextOf(r: RecordSummary | null): { text: string; strong: bo
   return { text: "測定中", strong: false };
 }
 
+/** 記録のトレースを段の名前つきで。古い形（trace_ids・trace_id）は段が分からないので「エージェント」 */
+export function tracesOfRow(r: RecordSummary): { stage: string; id: string }[] {
+  if (r.traces?.length) return r.traces;
+  const ids = r.trace_ids?.length ? r.trace_ids : r.trace_id ? [r.trace_id] : [];
+  return ids.map((id) => ({ stage: "エージェント", id }));
+}
+
+/** 測定ごとの 1 行: 「A 1.210 / 1.190 通過」「B — / 2.400 飽和」 */
+export function measurementLinesOf(r: RecordSummary): { key: string; label: string; text: string; pass: boolean }[] {
+  return (r.measurements ?? []).map((m, i) => {
+    const values = m.values.map((v) => (v === null ? "—" : v.toPrecision(4))).join(" / ");
+    const verdict = m.pass ? "通過" : m.failed.map((c) => (CHECK_WORDS as Record<string, string>)[c] ?? c).join("・") || "保留";
+    return { key: `${m.at}-${i}`, label: `測定 ${m.condition}`, text: `${values}　${verdict}`, pass: m.pass };
+  });
+}
+
 /** 「いまの予想」の列。短く */
 export function claimTextOf(r: RecordSummary | null, max = 22): string {
   if (!r || !r.prediction) return "（まだ書いていない）";

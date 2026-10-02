@@ -523,3 +523,58 @@ def test_a_summary_carries_every_agent_trace_values_and_the_full_hash(client):
     assert row["current"]["trace_ids"] == ["a" * 32, "b" * 32]
     assert row["current"]["hash"] == "c" * 64
     assert row["current"]["result"]["tolerance"] == 6.6
+
+
+def test_a_summary_names_the_stage_of_each_trace_and_carries_each_measurement(client):
+    """10/2 採点 4 回目 2-5: 会話を含めて段と trace を対応づける。測定ごとの値・落ちた検査・生データのハッシュ"""
+    rec = summary(
+        status="held",
+        hold_codes=["saturation"],
+        traces=[
+            {"stage": "計画", "id": "a" * 32},
+            {"stage": "再計画", "id": "b" * 32},
+            {"stage": "会話", "id": "c" * 32},
+        ],
+        measurements=[
+            {
+                "condition": "A",
+                "values": [1.21, 1.19],
+                "failed": [],
+                "pass": True,
+                "raw_hash": "d" * 64,
+                "at": "2026-10-02T10:00:00Z",
+            },
+            {
+                "condition": "B",
+                "values": [None, 2.4],
+                "failed": ["saturation"],
+                "pass": False,
+                "raw_hash": None,
+                "at": "2026-10-02T10:01:00Z",
+            },
+        ],
+    )
+    res, _ = post_record(client, rec)
+    assert res.status_code == 200
+    row = next(
+        s
+        for s in client.post("/api/class/DEMO-2026/dashboard", json={"pin": PIN}).json()["students"]
+        if s["number"] == "S-04"
+    )
+    assert [t["stage"] for t in row["current"]["traces"]] == ["計画", "再計画", "会話"]
+    second = row["current"]["measurements"][1]
+    assert second["pass"] is False
+    assert second["failed"] == ["saturation"]
+    assert row["current"]["measurements"][0]["values"] == [1.21, 1.19]
+
+
+def test_a_summary_refuses_unknown_trace_stages_and_check_codes(client):
+    bad_stage = summary(traces=[{"stage": "SYSTEM", "id": "a" * 32}])
+    bad_code = summary(
+        measurements=[
+            {"condition": "A", "values": [], "failed": ["rm -rf"], "pass": False, "at": "x"}
+        ]
+    )
+    res, secret = post_record(client, bad_stage)
+    assert res.status_code == 422
+    assert post_record(client, bad_code, secret=secret)[0].status_code == 422

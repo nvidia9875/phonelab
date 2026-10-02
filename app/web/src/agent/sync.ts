@@ -4,9 +4,24 @@
  * 学級に入っている端末だけが送る。送れなくても端末の記録は失われない。
  */
 import { postRecordSummary, type RecordSummary } from "./classroom";
-import { getState, isMine, subscribeStore, type StudyRecord } from "../store/records";
+import { clocksOf } from "../measure/features";
+import { getState, isMine, subscribeStore, tracesOf, MAX_TRACES, type Measurement, type StudyRecord } from "../store/records";
 
 const MAX_EVENTS = 12;
+const MAX_MEASUREMENTS = 12;
+
+/** 測定 1 回ぶんの要約: 二つの測り方の値、落ちた検査、生データのハッシュ。波形そのものは送らない */
+export function summarizeMeasurement(m: Measurement): NonNullable<RecordSummary["measurements"]>[number] {
+  const [c1, c2] = clocksOf(m.features);
+  return {
+    condition: m.condition,
+    values: [c1.value, c2.value].map((v) => (Number.isFinite(v) ? v : null)),
+    failed: m.checks.filter((c) => !c.ok).map((c) => c.code),
+    pass: m.pass,
+    raw_hash: /^[0-9a-f]{64}$/.test(m.rawHash) ? m.rawHash : null,
+    at: m.at,
+  };
+}
 const RETRY_MS = 5_000;
 const DEBOUNCE_MS = 800;
 
@@ -24,7 +39,8 @@ export function summarizeRecord(rec: StudyRecord): RecordSummary {
     result: rec.result ? { observed: rec.result.observed, consistent: rec.result.consistent, statement: rec.result.statement.slice(0, 200), a: rec.result.a, b: rec.result.b, tolerance: rec.result.tolerance } : null,
     plan_source: rec.plan?.source ?? null,
     trace_id: rec.plan?.traceId ?? null,
-    trace_ids: (rec.traceIds ?? []).slice(-6),
+    traces: tracesOf(rec).slice(-MAX_TRACES),
+    measurements: rec.measurements.slice(-MAX_MEASUREMENTS).map(summarizeMeasurement),
     hash: rec.signature?.full ?? null,
     rejection_title: rec.rejection?.title.slice(0, 120) ?? null,
     chat_turns: rec.chat?.turnsUsed ?? 0,

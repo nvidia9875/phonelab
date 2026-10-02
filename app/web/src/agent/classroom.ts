@@ -117,8 +117,12 @@ export interface RecordSummary {
   result: { observed: "faster" | "slower" | "same" | "unknown"; consistent: boolean | null; statement: string; a?: number; b?: number; tolerance?: number } | null;
   plan_source: string | null;
   trace_id: string | null;
-  /** この記録でエージェントを呼んだトレース（計画・再計画・次の一手）。先生・開発者が判断の経路を追える */
+  /** 段の名前のない古い形（10/2 まで）。読むだけ */
   trace_ids?: string[];
+  /** この記録でエージェントを呼んだトレースと段（計画・再計画・次の一手・会話）。先生・開発者が判断の経路を追える */
+  traces?: { stage: string; id: string }[];
+  /** 測定ごとの要約（二つの測り方の値・落ちた検査・生データのハッシュ）。保留に至った経路をたどれる */
+  measurements?: { condition: "A" | "B"; values: (number | null)[]; failed: string[]; pass: boolean; raw_hash: string | null; at: string }[];
   /** 端末で計算した SHA-256（全桁） */
   hash?: string | null;
   rejection_title: string | null;

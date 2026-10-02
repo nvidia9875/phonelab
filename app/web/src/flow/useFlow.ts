@@ -142,7 +142,7 @@ function applyDecision(rec: StudyRecord, text: string, d: Decision, plannerCalls
     n = addEvent(n, "計画", `${title}。${PLAN_SOURCE_LABEL[d.source]}${d.traceId ? `（trace ${d.traceId.slice(0, 8)}）` : ""}`);
     const trail = trailText(d.trail);
     if (trail) n = addEvent(n, "判断", trail);
-    return withTrace(n, d.traceId);
+    return withTrace(n, d.traceId, "計画");
   });
   return "plan";
 }
@@ -217,7 +217,7 @@ export async function askHoldAdvice(rec: StudyRecord, theme: Theme): Promise<Hol
     const advice: HoldAdvice = { measurementIndex: index, action: reply.action, experimentId: reply.experiment_id, advice: reply.advice, source: reply.source, traceId, trail: reply.trail };
     updateRecord(rec.id, (r) => {
       const label = reply.source === "agent" ? "ラボ先生（AI）が保留の理由を読んで提案" : "定型の提案";
-      const n = addEvent(withTrace({ ...r, holdAdvice: advice, replanCalls: reply.replan_calls }, traceId), "再計画", `${reply.action === "switch" ? "別の実験へ" : "同じ実験で直す"}: ${reply.advice}（${label}）`);
+      const n = addEvent(withTrace({ ...r, holdAdvice: advice, replanCalls: reply.replan_calls }, traceId, "再計画"), "再計画", `${reply.action === "switch" ? "別の実験へ" : "同じ実験で直す"}: ${reply.advice}（${label}）`);
       const trail = trailText(reply.trail);
       return trail ? addEvent(n, "判断", trail) : n;
     });
@@ -439,7 +439,7 @@ export function addChatTurn(rec: StudyRecord, studentText: string, reply: ChatRe
   updateRecord(rec.id, (r) => {
     const chat = r.chat ?? EMPTY_CHAT;
     const messages = [...chat.messages, { role: "student" as const, text: studentText, at }, { role: "teacher" as const, text: reply.reply, at }];
-    let n: StudyRecord = { ...r, chat: { ...chat, messages, revealed: chat.revealed || reply.revealed, turnsUsed: reply.turns_used, limitReached: reply.limit_reached } };
+    let n: StudyRecord = withTrace({ ...r, chat: { ...chat, messages, revealed: chat.revealed || reply.revealed, turnsUsed: reply.turns_used, limitReached: reply.limit_reached } }, reply.trace_id, "会話");
     if (reply.revealed && !chat.revealed) n = addEvent(n, "ラボ先生", "自分の考えを書いたあとで、ラボ先生の説明を聞いた", "orange");
     return n;
   });

@@ -88,6 +88,14 @@ export interface NextSuggestion {
   /** 何を見て選んだか（理由を書いたか・判定）。変わったら聞き直す（古い記録には無い） */
   basis?: string;
 }
+export type TraceStage = "計画" | "再計画" | "次の一手" | "会話";
+export interface TraceRef {
+  stage: TraceStage;
+  id: string;
+}
+/** 1 記録で持つトレースの数。計画 5・再計画 3・次の一手 3・会話 10 の上限を足した 21 より少し多く */
+export const MAX_TRACES = 24;
+
 export interface Rejection {
   title: string;
   reasons: string[];
@@ -126,8 +134,10 @@ export interface StudyRecord {
   nextCalls?: number;
   events: RecordEvent[];
   signature: { signer: string; hash: string; server: boolean; full?: string } | null;
-  /** エージェントを呼んだトレース（計画・再計画・次の一手）。古い記録には無い */
+  /** 段の名前のない古い形（10/2 まで）。読むだけ */
   traceIds?: string[];
+  /** エージェントを呼んだトレースと、その段（計画・再計画・次の一手・会話）。新しい MAX_TRACES 件まで。古い記録には無い */
+  traces?: TraceRef[];
   /** 古い記録には無い（undefined は null として扱う） */
   chat?: ChatLog | null;
   createdAt: string;
@@ -309,11 +319,17 @@ export function updateRecord(id: string, patch: (r: StudyRecord) => StudyRecord)
   return out;
 }
 
-/** エージェントのトレース id を記録に足す（ローカル実行の 0 埋めは足さない。新しい 6 件まで） */
-export function withTrace(r: StudyRecord, traceId: string | null | undefined): StudyRecord {
+/** エージェントのトレース id を、どの段の呼び出しかと一緒に記録に足す（ローカル実行の 0 埋めは足さない） */
+export function withTrace(r: StudyRecord, traceId: string | null | undefined, stage: TraceStage): StudyRecord {
   if (!traceId || /^0+$/.test(traceId)) return r;
-  const ids = [...(r.traceIds ?? []).filter((x) => x !== traceId), traceId].slice(-6);
-  return { ...r, traceIds: ids };
+  const traces = [...tracesOf(r).filter((x) => x.id !== traceId), { stage, id: traceId }].slice(-MAX_TRACES);
+  return { ...r, traces };
+}
+
+/** 記録のトレース。古い形（段の名前なし）は「計画など」として読む */
+export function tracesOf(r: StudyRecord): TraceRef[] {
+  if (r.traces) return r.traces;
+  return (r.traceIds ?? []).map((id) => ({ stage: "計画" as const, id }));
 }
 
 export function addEvent(r: StudyRecord, k: string, body: string, tone?: "orange" | "teal"): StudyRecord {

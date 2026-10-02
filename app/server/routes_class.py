@@ -111,6 +111,30 @@ class EventIn(BaseModel):
 
 
 Stage = Literal["predict", "plan", "setup_A", "measure_A", "setup_B", "measure_B", "result"]
+TraceId = Annotated[str, Field(pattern=r"^[0-9a-f]{32}$")]
+# 1 記録のトレース: 計画 5・再計画 3・次の一手 3・会話 10 の上限の合計より少し多く（web の MAX_TRACES と同じ）
+MAX_TRACES = 24
+MAX_MEASUREMENTS = 12
+
+
+class TraceIn(BaseModel):
+    """どの段の呼び出しのトレースか（10/2 採点 4 回目: 段と id を対応づける）"""
+
+    stage: Literal["計画", "再計画", "次の一手", "会話"]
+    id: TraceId
+
+
+class MeasurementIn(BaseModel):
+    """測定 1 回ぶんの要約。二つの測り方の値・落ちた検査・生データのハッシュ（波形は送らない）"""
+
+    condition: Literal["A", "B"]
+    values: list[float | None] = Field(default_factory=list, max_length=2)
+    failed: list[HoldCode] = Field(default_factory=list, max_length=13)
+    pass_: bool = Field(alias="pass")
+    raw_hash: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
+    at: str = Field(max_length=40)
+
+    model_config = {"populate_by_name": True}
 
 
 class RecordSummary(BaseModel):
@@ -130,9 +154,10 @@ class RecordSummary(BaseModel):
     plan_source: str | None = Field(default=None, max_length=10)
     trace_id: str | None = Field(default=None, max_length=32)
     # この記録でエージェントを呼んだトレース（計画・再計画・次の一手）と、端末の SHA-256（全桁）
-    trace_ids: list[Annotated[str, Field(pattern=r"^[0-9a-f]{32}$")]] = Field(
-        default_factory=list, max_length=6
-    )
+    # 段の名前のない古い形（10/2 まで）。新しい端末は traces を送る
+    trace_ids: list[TraceId] = Field(default_factory=list, max_length=6)
+    traces: list[TraceIn] = Field(default_factory=list, max_length=MAX_TRACES)
+    measurements: list[MeasurementIn] = Field(default_factory=list, max_length=MAX_MEASUREMENTS)
     hash: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
     rejection_title: str | None = Field(default=None, max_length=120)
     chat_turns: int = Field(default=0, ge=0, le=50)
@@ -418,7 +443,7 @@ async def post_record(
     await verify_student(store, record.policy.class_code, number, body.secret)
     if not student_limiter.allow(f"{record.policy.class_code}|{number}"):
         raise HTTPException(status_code=429, detail="送信が多すぎます")
-    summary = body.record.model_dump()
+    summary = body.record.model_dump(by_alias=True)
     await store.put_record(record.policy.class_code, number, summary)
     return {"ok": True}
 

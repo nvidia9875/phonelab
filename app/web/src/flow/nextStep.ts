@@ -97,7 +97,7 @@ export async function askNext(rec: StudyRecord, theme: Theme): Promise<NextSugge
   updateRecord(rec.id, (r) => {
     const label = (suggestion.source === "agent" ? "ラボ先生（AI）が結果を読んで選んだ" : "カタログの順") + (again ? "。理由や判定が変わったので聞き直した" : "");
     const body = suggestion.action === "reflect" ? `先にふり返り: ${suggestion.why}（${label}）` : `${suggestion.question}（${label}）`;
-    const n = addEvent(withTrace({ ...r, nextSuggestion: suggestion, nextCalls: calls }, suggestion.traceId), "次の一手", body.slice(0, 300), "orange");
+    const n = addEvent(withTrace({ ...r, nextSuggestion: suggestion, nextCalls: calls }, suggestion.traceId, "次の一手"), "次の一手", body.slice(0, 300), "orange");
     const trail = trailText(suggestion.trail);
     return trail ? addEvent(n, "判断", trail) : n;
   });
