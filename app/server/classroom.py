@@ -116,6 +116,8 @@ class ClassStore(Protocol):
     async def put_record(self, code: str, number: str, summary: Summary) -> None: ...
     async def get_current(self, code: str, number: str) -> Summary | None: ...
     async def list_students(self, code: str) -> list[StudentRow]: ...
+    async def get_counter(self, code: str, number: str, key: str) -> int: ...
+    async def add_counter(self, code: str, number: str, key: str, n: int) -> None: ...
 
 
 class MemoryClassStore:
@@ -127,6 +129,7 @@ class MemoryClassStore:
         self._current: dict[str, dict[str, Summary]] = {}
         self._history: dict[str, dict[str, dict[str, Summary]]] = {}
         self._auth: dict[str, dict[str, StudentAuth]] = {}
+        self._counters: dict[tuple[str, str, str], int] = {}
 
     def seed(self, record: ClassRecord) -> None:
         self._classes[record.policy.class_code] = record
@@ -169,6 +172,13 @@ class MemoryClassStore:
 
     async def get_current(self, code: str, number: str) -> Summary | None:
         return self._current.get(normalize_code(code), {}).get(number)
+
+    async def get_counter(self, code: str, number: str, key: str) -> int:
+        return self._counters.get((normalize_code(code), number, key), 0)
+
+    async def add_counter(self, code: str, number: str, key: str, n: int) -> None:
+        k = (normalize_code(code), number, key)
+        self._counters[k] = self._counters.get(k, 0) + n
 
     async def list_students(self, code: str) -> list[StudentRow]:
         code = normalize_code(code)
@@ -278,6 +288,26 @@ class FirestoreClassStore:
         snap = await self._doc(code).collection("students").document(number).get()
         data = snap.to_dict() if snap.exists else None
         return data.get("current") if data else None
+
+    def _counter(self, code: str, number: str, key: str):
+        return (
+            self._doc(code)
+            .collection("students")
+            .document(number)
+            .collection("counters")
+            .document(key)
+        )
+
+    async def get_counter(self, code: str, number: str, key: str) -> int:
+        snap = await self._counter(code, number, key).get()
+        return int((snap.to_dict() or {}).get("n", 0)) if snap.exists else 0
+
+    async def add_counter(self, code: str, number: str, key: str, n: int) -> None:
+        from google.cloud import firestore
+
+        await self._counter(code, number, key).set(
+            {"n": firestore.Increment(n), "updated_at": now_iso()}, merge=True
+        )
 
     async def list_students(self, code: str) -> list[StudentRow]:
         rows: list[StudentRow] = []

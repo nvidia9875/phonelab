@@ -3,7 +3,7 @@
  * 同じ実験でやり方を一つ直して測り直すか、同じテーマの別の実験へ切り替えるかを提案する。
  * つながらないときは端末内の定型（Hold.tsx）に縮退する。
  */
-import { currentClassCode, currentNumber } from "../store/records";
+import { currentClassCode, currentNumber, currentSecret } from "../store/records";
 import type { CondKey } from "../store/records";
 
 export interface ReplanReply {
@@ -27,6 +27,7 @@ export interface ReplanInput {
   prediction: string;
   doneVariantIds: string[];
   replanCalls: number;
+  recordId: string;
 }
 
 const TIMEOUT_MS = 13_000;
@@ -53,6 +54,8 @@ export async function requestReplan(input: ReplanInput): Promise<ReplanReply> {
         replan_calls: input.replanCalls,
         class_code: currentClassCode(),
         number: currentNumber(),
+        secret: currentSecret(),
+        record_id: input.recordId,
       }),
     });
   } catch {

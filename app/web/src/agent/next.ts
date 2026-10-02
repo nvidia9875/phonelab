@@ -5,7 +5,7 @@
  */
 import type { School } from "../catalog/themes";
 import type { Direction } from "../store/records";
-import { currentClassCode, currentNumber } from "../store/records";
+import { currentClassCode, currentNumber, currentSecret } from "../store/records";
 
 export interface NextReply {
   action: "next" | "reflect";
@@ -31,6 +31,7 @@ export interface NextInput {
   explained: boolean;
   doneVariantIds: string[];
   nextCalls: number;
+  recordId: string;
 }
 
 const TIMEOUT_MS = 13_000;
@@ -63,6 +64,8 @@ export async function requestNext(input: NextInput): Promise<NextReply> {
         next_calls: Math.min(input.nextCalls, 3),
         class_code: currentClassCode(),
         number: currentNumber(),
+        secret: currentSecret(),
+        record_id: input.recordId,
       }),
     });
   } catch {

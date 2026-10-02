@@ -66,6 +66,7 @@ from server.classroom import ClassStore, normalize_code, seed_demo
 from server.guards import (
     HALTED_DETAIL,
     MAX_CLASS_CODE_CHARS,
+    call_count,
     check_limits,
     class_denies_theme,
     class_is_halted,
@@ -207,6 +208,9 @@ class PlanRequest(BaseModel):
     planner_calls: int = Field(default=0, ge=0, le=PLANNER_CALLS_PER_EXPERIMENT)
     class_code: str | None = Field(default=None, max_length=MAX_CLASS_CODE_CHARS)
     number: str | None = Field(default=None, max_length=8)
+    # 学級の生徒は合言葉と記録 id を付ける。回数はサーバが数える
+    secret: str | None = Field(default=None, max_length=6)
+    record_id: str | None = Field(default=None, max_length=12)
 
     @field_validator("theme_id")
     @classmethod
@@ -274,6 +278,16 @@ async def plan(
     halted = await class_is_halted(store, body.class_code)
     if halted:
         raise HTTPException(status_code=409, detail=HALTED_DETAIL)
+    count = await call_count(
+        store,
+        kind="plan",
+        claimed=body.planner_calls,
+        class_code=body.class_code,
+        number=body.number,
+        secret=body.secret,
+        record_id=body.record_id,
+    )
+    planner_calls = count.start
 
     candidates = candidates_for(body.theme_id, body.done_variant_ids)
     first = candidates[0]
@@ -284,7 +298,7 @@ async def plan(
     with _tracer.start_as_current_span("phonelab.plan") as span:
         span.set_attribute("phonelab.theme", body.theme_id)
         span.set_attribute("phonelab.text_len", len(body.text))
-        span.set_attribute("phonelab.planner_calls", body.planner_calls)
+        span.set_attribute("phonelab.planner_calls", planner_calls)
         trace_id = format(span.get_span_context().trace_id, "032x")
 
         check = check_prediction(body.text)
@@ -296,7 +310,7 @@ async def plan(
             return PlanResponse(
                 kind="hint",
                 question_back=check.message,
-                planner_calls=body.planner_calls,
+                planner_calls=planner_calls,
                 source="policy",
                 trail=trail(read, policy_before_line("class_policy" if denied else "hint")),
                 trace_id=trace_id,
@@ -312,7 +326,7 @@ async def plan(
                     quoted=rejection.quoted,
                     alternative_variant_id=first.id,
                 ),
-                planner_calls=body.planner_calls,
+                planner_calls=planner_calls,
                 source="policy",
                 trail=trail(read, policy_before_line("reject")),
                 trace_id=trace_id,
@@ -342,7 +356,7 @@ async def plan(
                 run_planner(
                     runner,
                     text=prompt,
-                    planner_calls=body.planner_calls,
+                    planner_calls=planner_calls,
                     candidates=[c.id for c in candidates],
                     class_halted=halted,
                     tool_state=tool_state,
@@ -360,6 +374,7 @@ async def plan(
         span.set_attribute("phonelab.plan_readable", reply.plan is not None)
         span.set_attribute("phonelab.policy_fixed", reply.off_catalog or reply.why_replaced)
         span.set_attribute("phonelab.self_corrected", reply.self_corrected)
+    await count.add(store, reply.planner_calls - planner_calls)
 
     checked = check_lines(reply.fix_reasons, reply.retried, reply.self_corrected)
     fixes = {"fix_reasons": list(reply.fix_reasons), "self_corrected": reply.self_corrected}
@@ -468,6 +483,8 @@ class ReplanRequest(BaseModel):
     replan_calls: int = Field(default=0, ge=0, le=REPLAN_CALLS_PER_RECORD)
     class_code: str | None = Field(default=None, max_length=MAX_CLASS_CODE_CHARS)
     number: str | None = Field(default=None, max_length=8)
+    secret: str | None = Field(default=None, max_length=6)
+    record_id: str | None = Field(default=None, max_length=12)
 
     @field_validator("theme_id")
     @classmethod
@@ -518,6 +535,15 @@ async def replan(
     halted = await class_is_halted(store, body.class_code)
     if halted:
         raise HTTPException(status_code=409, detail=HALTED_DETAIL)
+    count = await call_count(
+        store,
+        kind="replan",
+        claimed=body.replan_calls,
+        class_code=body.class_code,
+        number=body.number,
+        secret=body.secret,
+        record_id=body.record_id,
+    )
     others = tuple(
         v for v in candidates_for(body.theme_id, body.done_variant_ids) if v.id != body.variant_id
     )
@@ -542,7 +568,7 @@ async def replan(
                 run_replan(
                     runner,
                     prompt=prompt,
-                    replan_calls=body.replan_calls,
+                    replan_calls=count.start,
                     candidates=[v.id for v in others],
                     class_halted=halted,
                 ),
@@ -556,7 +582,8 @@ async def replan(
         span.set_attribute("phonelab.skipped", reply.skipped)
         span.set_attribute("phonelab.plan_readable", reply.plan is not None)
 
-    calls = min(body.replan_calls + reply.calls_used, REPLAN_CALLS_PER_RECORD)
+    await count.add(store, reply.calls_used)
+    calls = min(count.start + reply.calls_used, REPLAN_CALLS_PER_RECORD)
     read = read_line(
         f"保留の理由 {len(body.hold_codes)} 件・同じ条件の保留 {body.retries} 回・ほかの実験 {len(others)} 件"
     )
@@ -684,6 +711,15 @@ async def chat(
     halted = await class_is_halted(store, body.class_code)
     if halted:
         raise HTTPException(status_code=409, detail=HALTED_DETAIL)
+    count = await call_count(
+        store,
+        kind="chat",
+        claimed=body.turns_used,
+        class_code=body.class_code,
+        number=body.number,
+        secret=body.secret,
+        record_id=body.record_id,
+    )
 
     answer = MODEL_ANSWERS[body.variant_id]
     # 保留（有効な測定が無い）では渡さない。測る前に答えを知ってしまうから。docs/policy.md 3.8
@@ -714,7 +750,7 @@ async def chat(
     with _tracer.start_as_current_span("phonelab.chat") as span:
         span.set_attribute("phonelab.situation", body.situation)
         span.set_attribute("phonelab.revealed", revealed)
-        span.set_attribute("phonelab.turns_used", body.turns_used)
+        span.set_attribute("phonelab.turns_used", count.start)
         span.set_attribute("phonelab.prompt_len", len(prompt))
         trace_id = format(span.get_span_context().trace_id, "032x")
         try:
@@ -722,7 +758,7 @@ async def chat(
                 run_tutor(
                     runner,
                     prompt=prompt,
-                    turns_used=body.turns_used,
+                    turns_used=count.start,
                     leak_phrases=phrases_for(answer, body.situation),
                     locked=not revealed,
                     class_halted=halted,
@@ -745,7 +781,8 @@ async def chat(
         span.set_attribute("phonelab.armor_blocked", reply.armor_blocked)
         span.set_attribute("phonelab.skipped", reply.skipped)
 
-    turns_used = body.turns_used if reply.skipped else body.turns_used + 1
+    turns_used = count.start if reply.skipped else count.start + 1
+    await count.add(store, turns_used - count.start)
     return ChatResponse(
         reply=reply.text,
         revealed=revealed and not reply.skipped,

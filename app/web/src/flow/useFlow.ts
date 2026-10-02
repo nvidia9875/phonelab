@@ -11,7 +11,7 @@ import { QUANTITY, formatQuantity, type Unit } from "../catalog/quantity";
 import { SENSOR_LABEL, repeatsOf, themeById, variantById, variantsOf, type Theme } from "../catalog/themes";
 import type { LocalCheck } from "../measure/checks";
 import { clocksSummary, measuredValue, type Features } from "../measure/features";
-import { activeRecordForTheme, addEvent, getState, setClassState, setHalted, createRecord, currentClassCode, currentNumber, recordById, recordsForTheme, updateRecord, type ChatLog, type Claim, type CondKey, type Direction, type HoldAdvice, type PlanInfo, type Rejection, type StudyRecord } from "../store/records";
+import { activeRecordForTheme, addEvent, getState, setClassState, setHalted, createRecord, currentClassCode, currentNumber, currentSecret, recordById, recordsForTheme, updateRecord, type ChatLog, type Claim, type CondKey, type Direction, type HoldAdvice, type PlanInfo, type Rejection, type StudyRecord } from "../store/records";
 
 export const MAX_RETRY = 3;
 const EMPTY_TRIES: Record<CondKey, number> = { A: 0, B: 0 };
@@ -172,6 +172,8 @@ export async function submitPrediction(rec: StudyRecord, theme: Theme, text: str
       planner_calls: plannerCalls,
       class_code: currentClassCode(),
       number: currentNumber(),
+      secret: currentSecret(),
+      record_id: rec.id,
     });
     const decision = decideFromServer(reply, theme, text);
     if (decision) return applyDecision(rec, text, decision, reply.planner_calls);
@@ -208,6 +210,7 @@ export async function askHoldAdvice(rec: StudyRecord, theme: Theme): Promise<Hol
       prediction: rec.prediction.text,
       doneVariantIds: doneVariantIds(theme.id),
       replanCalls: rec.replanCalls ?? 0,
+      recordId: rec.id,
     });
     const traceId = /^0+$/.test(reply.trace_id) ? null : reply.trace_id;
     const advice: HoldAdvice = { measurementIndex: index, action: reply.action, experimentId: reply.experiment_id, advice: reply.advice, source: reply.source, traceId, trail: reply.trail };

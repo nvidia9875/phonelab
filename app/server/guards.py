@@ -5,6 +5,8 @@
 
 from __future__ import annotations
 
+import re
+from dataclasses import dataclass
 from functools import lru_cache
 
 from fastapi import HTTPException, Request
@@ -92,3 +94,41 @@ async def class_rules(store: ClassStore, code: str | None) -> dict[str, object] 
         "teacher_enabled_home_experiments": list(policy.teacher_enabled),
         "max_seconds": policy.max_seconds,
     }
+
+
+COUNTER_KEY_RE = re.compile(r"^[A-Za-z0-9-]{1,12}$")
+
+
+@dataclass(frozen=True)
+class CallCount:
+    """エージェントを呼んだ回数。学級の生徒（合言葉が合う）ならサーバの数え、そうでなければ端末の申告"""
+
+    start: int
+    key: tuple[str, str, str] | None = None
+
+    async def add(self, store: ClassStore, used: int) -> None:
+        if self.key and used > 0:
+            await store.add_counter(*self.key, used)
+
+
+async def call_count(
+    store: ClassStore,
+    *,
+    kind: str,
+    claimed: int,
+    class_code: str | None,
+    number: str | None,
+    secret: str | None,
+    record_id: str | None,
+) -> CallCount:
+    """端末の申告（claimed）とサーバの数えの大きい方から始める（10/2 採点 2-4: 回数が自己申告だった）。
+    合言葉が違えば 403。学級に入っていない端末は申告のまま（IP ごとの回数制限はかかる）"""
+    if not (class_code and number and secret and record_id and COUNTER_KEY_RE.match(record_id)):
+        return CallCount(start=claimed)
+    from server.routes_class import verify_student
+
+    code, no = normalize_code(class_code), number.strip().upper()
+    await verify_student(store, code, no, secret)
+    key = f"{kind}-{record_id}"
+    stored = await store.get_counter(code, no, key)
+    return CallCount(start=max(claimed, stored), key=(code, no, key))

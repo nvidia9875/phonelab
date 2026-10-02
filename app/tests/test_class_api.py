@@ -367,3 +367,47 @@ def test_changing_permissions_never_undoes_a_halt(client):
 
     assert res.json()["halted"] is True
     assert client.get("/api/class/DEMO-2026").json()["halted"] is True
+
+
+def test_the_server_counts_planner_calls_for_a_class_student(client, fake_llm):
+    """10/2 採点 2-4: 回数は端末の申告でなくサーバが数える。端末が 0 と言い続けても上限で止まる"""
+    fake_llm.reply = json.dumps(
+        {
+            "claim_variable": "strength",
+            "claim_direction": "faster",
+            "experiment_id": "sound_pluck_strength",
+            "why_this": "はじく強さだけを変えれば試せます",
+            "question_back": None,
+        },
+        ensure_ascii=False,
+    )
+    secret = join(client, "S-21").json()["secret"]
+    body = {
+        "theme_id": "sound",
+        "school": "jhs",
+        "text": "強くはじくとゴムが速く震えるから、音が高くなると思う",
+        "planner_calls": 0,
+        "class_code": "DEMO-2026",
+        "number": "S-21",
+        "secret": secret,
+        "record_id": "R21",
+    }
+    calls = [client.post("/api/plan", json=body).json() for _ in range(6)]
+
+    assert [c["planner_calls"] for c in calls[:5]] == [1, 2, 3, 4, 5]
+    assert calls[5]["skipped"] is True
+    assert len(fake_llm.requests) == 5
+
+
+def test_a_wrong_secret_cannot_use_someone_elses_counter(client):
+    join(client, "S-22")
+    body = {
+        "theme_id": "sound",
+        "school": "jhs",
+        "text": "強くはじくと高くなると思う。速く震えるから",
+        "class_code": "DEMO-2026",
+        "number": "S-22",
+        "secret": "ZZZZZZ",
+        "record_id": "R22",
+    }
+    assert client.post("/api/plan", json=body).status_code == 403

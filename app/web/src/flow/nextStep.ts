@@ -58,6 +58,7 @@ export async function askNext(rec: StudyRecord, theme: Theme): Promise<NextSugge
       explained: basis.startsWith("1"),
       doneVariantIds: doneVariantIds(theme.id),
       nextCalls: calls,
+      recordId: rec.id,
     });
     calls = reply.next_calls;
     suggestion = {

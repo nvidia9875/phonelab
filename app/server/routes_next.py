@@ -36,6 +36,7 @@ from server.classroom import ClassStore
 from server.guards import (
     HALTED_DETAIL,
     MAX_CLASS_CODE_CHARS,
+    call_count,
     check_limits,
     class_is_halted,
     get_student_limiter,
@@ -75,6 +76,8 @@ class NextRequest(BaseModel):
     next_calls: int = Field(default=0, ge=0, le=NEXT_CALLS_PER_RECORD)
     class_code: str | None = Field(default=None, max_length=MAX_CLASS_CODE_CHARS)
     number: str | None = Field(default=None, max_length=8)
+    secret: str | None = Field(default=None, max_length=6)
+    record_id: str | None = Field(default=None, max_length=12)
 
     @field_validator("theme_id")
     @classmethod
@@ -127,6 +130,15 @@ async def next_step(
     halted = await class_is_halted(store, body.class_code)
     if halted:
         raise HTTPException(status_code=409, detail=HALTED_DETAIL)
+    count = await call_count(
+        store,
+        kind="next",
+        claimed=body.next_calls,
+        class_code=body.class_code,
+        number=body.number,
+        secret=body.secret,
+        record_id=body.record_id,
+    )
 
     done = {*body.done_variant_ids, body.variant_id}
     remaining = tuple(v for v in theme.variants if v.id not in done)
@@ -143,7 +155,7 @@ async def next_step(
                 action="reflect",
                 why=REFLECT_WHY,
                 source="catalog",
-                next_calls=body.next_calls,
+                next_calls=count.start,
                 trail=trail(read, chose_line("ふり返りへ（残りの実験なし。モデルは呼ばない）")),
                 trace_id=trace_id,
             )
@@ -165,7 +177,7 @@ async def next_step(
                 run_next(
                     runner,
                     prompt=prompt,
-                    next_calls=body.next_calls,
+                    next_calls=count.start,
                     candidates=[v.id for v in remaining],
                     class_halted=halted,
                 ),
@@ -179,7 +191,8 @@ async def next_step(
         span.set_attribute("phonelab.skipped", reply.skipped)
         span.set_attribute("phonelab.self_corrected", reply.self_corrected)
 
-    calls = min(body.next_calls + reply.calls_used, NEXT_CALLS_PER_RECORD)
+    await count.add(store, reply.calls_used)
+    calls = min(count.start + reply.calls_used, NEXT_CALLS_PER_RECORD)
     fixes = {"fix_reasons": list(reply.fix_reasons), "self_corrected": reply.self_corrected}
     checked = check_lines(reply.fix_reasons, reply.retried, reply.self_corrected)
     if reply.skipped or reply.plan is None:

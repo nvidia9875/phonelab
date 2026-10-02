@@ -18,6 +18,9 @@ export interface PlanRequest {
   /** 学級コード。停止中ならサーバが 409 で断る */
   class_code: string | null;
   number: string | null;
+  /** 学級の生徒の合言葉と記録 id。回数はサーバが数える */
+  secret?: string | null;
+  record_id?: string | null;
 }
 
 export interface PlanReply {
