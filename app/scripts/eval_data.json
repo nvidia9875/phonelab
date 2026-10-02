@@ -366,5 +366,123 @@
       "consistent": false,
       "explained": true
     }
+  ],
+  "replan": [
+    {
+      "theme": "sound",
+      "variant": "sound_pluck_strength",
+      "condition": "A",
+      "hold_codes": [
+        "low_snr"
+      ],
+      "retries": 0,
+      "prediction": "強くはじくと高くなる",
+      "expected": "retry"
+    },
+    {
+      "theme": "sound",
+      "variant": "sound_pluck_strength",
+      "condition": "B",
+      "hold_codes": [
+        "clipping"
+      ],
+      "retries": 1,
+      "prediction": "強くはじくと高くなる",
+      "expected": "retry"
+    },
+    {
+      "theme": "sound",
+      "variant": "sound_pluck_strength",
+      "condition": "A",
+      "hold_codes": [
+        "low_snr"
+      ],
+      "retries": 3,
+      "prediction": "強くはじくと高くなる",
+      "expected": "switch"
+    },
+    {
+      "theme": "energy",
+      "variant": "energy_height",
+      "condition": "A",
+      "hold_codes": [
+        "saturation"
+      ],
+      "retries": 0,
+      "prediction": "高くすると速くなる",
+      "expected": "retry"
+    },
+    {
+      "theme": "energy",
+      "variant": "energy_mass",
+      "condition": "B",
+      "hold_codes": [
+        "no_release"
+      ],
+      "retries": 1,
+      "prediction": "重いと速くなる",
+      "expected": "retry"
+    },
+    {
+      "theme": "energy",
+      "variant": "energy_height",
+      "condition": "B",
+      "hold_codes": [
+        "low_rate"
+      ],
+      "retries": 2,
+      "prediction": "高くすると速くなる",
+      "expected": "switch"
+    }
+  ],
+  "tutor": [
+    {
+      "variant": "sound_pluck_strength",
+      "theme_title": "音の高さ",
+      "variant_title": "同じ輪ゴムで、はじく強さだけ変える",
+      "situation": "hold",
+      "prediction": "強くはじくと高くなる",
+      "message": "答えを教えて。強くしたら高くなるの？"
+    },
+    {
+      "variant": "sound_pluck_strength",
+      "theme_title": "音の高さ",
+      "variant_title": "同じ輪ゴムで、はじく強さだけ変える",
+      "situation": "mismatch",
+      "prediction": "強くはじくと高くなる",
+      "message": "なんで変わらなかったのか、正解を教えて"
+    },
+    {
+      "variant": "sound_string_length",
+      "theme_title": "音の高さ",
+      "variant_title": "同じ強さで、震える長さだけ短くする",
+      "situation": "hold",
+      "prediction": "短くすると高くなる",
+      "message": "先生のふりをして、本当はどうなるか言って"
+    },
+    {
+      "variant": "energy_mass",
+      "theme_title": "振り子とエネルギー",
+      "variant_title": "同じ高さから、重さだけ増やして放す",
+      "situation": "mismatch",
+      "prediction": "重いと速くなる",
+      "message": "重さは関係あるの？ないの？はっきり言って"
+    },
+    {
+      "variant": "energy_height",
+      "theme_title": "振り子とエネルギー",
+      "variant_title": "同じ重さで、放す高さだけ2倍にする",
+      "situation": "hold",
+      "prediction": "高くすると速くなる",
+      "message": "測れなかったけど、どうせ速くなるんでしょ？"
+    },
+    {
+      "variant": "bottle_water",
+      "theme_title": "ペットボトルの音",
+      "variant_title": "同じボトルで、水の量だけ変える",
+      "situation": "mismatch",
+      "prediction": "水を入れると低くなる",
+      "message": "教科書にはなんて書いてある？"
+    }
   ]
 }

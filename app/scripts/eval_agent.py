@@ -29,8 +29,9 @@ from fastapi.testclient import TestClient
 from google.adk.models.google_llm import Gemini
 from pydantic import Field
 
+from scripts.eval_more import judge_all, lesson_cost, render_more, run_replans, run_tutors
 from server.agent.catalog import CATALOG
-from server.agent.class_agent import allowed_counts, build_snapshot
+from server.agent.class_agent import build_snapshot, count_keys
 from server.agent.model_armor import armor_from_env
 from server.agent.models import RETRY
 from server.agent.planner import planner_model
@@ -38,11 +39,20 @@ from server.agent.policy_plugin import new_result_words
 from server.agent.runner import (
     build_insight_runner,
     build_next_runner,
+    build_replan_runner,
     build_runner,
+    build_tutor_runner,
 )
 from server.classroom import MemoryClassStore, new_class
 from server.guards import get_student_limiter
-from server.main import app, get_plan_limiter, get_planner_runner
+from server.main import (
+    app,
+    get_chat_limiter,
+    get_plan_limiter,
+    get_planner_runner,
+    get_replan_runner,
+    get_tutor_runner,
+)
 from server.ratelimit import SlidingWindowLimiter
 from server.routes_class import get_class_store, get_pin_limiter
 from server.routes_insight import (
@@ -458,6 +468,7 @@ def render_markdown(out: dict[str, Any]) -> str:
             "含めていないもの: ラボ先生との会話（最大 10 往復 / 記録）、保留のあとの再計画、Model Armor、Firestore の読み書き、Cloud Run の実行時間"
         ),
     ]
+    lines += ["", *render_more(out, yen)]
     return "\n".join(lines) + "\n"
 
 
@@ -517,15 +528,37 @@ def main() -> None:
     snapshot, _ = build_snapshot(
         [(r.number, r.last_seen_at, r.current) for r in rows], datetime.now(UTC)
     )
-    counts = allowed_counts(snapshot)
+    counts = count_keys(snapshot)
     out["insight"] = {
         "response": insight,
         "seconds": round(secs, 2),
         "tokens": tokens(model, 0),
-        "allowed_counts": counts,
+        "count_keys": counts,
         "by_theme": snapshot["by_theme"],
     }
     print("insight", insight.get("lines"), insight.get("tool_calls"), flush=True)
+
+    model = CountingGemini(model=name, retry_options=RETRY)
+    app.dependency_overrides[get_replan_runner] = lambda: build_replan_runner(model)
+    out["replan"] = {"rows": run_replans(client, model, data["replan"], timed_post)}
+    print("replan", [(r["action"], r["expected"]) for r in out["replan"]["rows"]], flush=True)
+
+    model = CountingGemini(model=name, retry_options=RETRY)
+    app.dependency_overrides[get_tutor_runner] = lambda: build_tutor_runner(model)
+    app.dependency_overrides[get_chat_limiter] = big_limiter
+    out["tutor"] = {"rows": run_tutors(client, model, data["tutor"], timed_post)}
+    print("tutor", [(r["revealed"], r["phrase_leak"]) for r in out["tutor"]["rows"]], flush=True)
+
+    def title_of(variant_id: str) -> str:
+        for theme in CATALOG.values():
+            for v in theme.variants:
+                if v.id == variant_id:
+                    return f"{theme.title} — {v.title}"
+        return variant_id
+
+    out["judge"] = judge_all(out, title_of)
+    print("judge", out["judge"]["by_kind"], flush=True)
+    out["lesson_cost"] = lesson_cost(out, PRICE_IN, PRICE_OUT)
 
     stamp = datetime.now(UTC).strftime("%Y-%m-%d")
     raw = ROOT / "docs" / "eval" / f"{stamp}.json"
