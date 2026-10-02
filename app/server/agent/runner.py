@@ -24,6 +24,7 @@ from server.agent.class_agent import (
     build_class_agent,
     parse_insight,
 )
+from server.agent.model_armor import ArmorClient
 from server.agent.next_step import NEXT_CALLS_PER_RECORD, NextOutput, build_next_agent, parse_next
 from server.agent.planner import (
     PLANNER_THINKING_LEVEL,
@@ -38,6 +39,8 @@ from server.agent.planner_tools import PLANNER_TOOL_LIMIT, PLANNER_TOOLS
 from server.agent.policy_plugin import (
     ANSWER_LEAK_KEY,
     ANSWER_LOCKED_KEY,
+    ARMOR_BLOCKED_KEY,
+    ARMOR_TEXT_KEY,
     CLASS_HALTED_KEY,
     INSIGHT_FIXED_KEY,
     LEAK_PHRASES_KEY,
@@ -100,6 +103,8 @@ class PlannerReply:
     why_replaced: bool = False
     # 先生の全端末停止で、Runner の入口で止まった
     halted: bool = False
+    # Model Armor が検知した（モデルは呼んでいない）
+    armor_blocked: bool = False
     # 1 回目が検査に落ちた理由（FIX_*）と、作り直しが検査を通ったか
     fix_reasons: tuple[str, ...] = ()
     # 作り直しを実際に走らせたか（上限・停止で走らなかったら False）
@@ -142,6 +147,7 @@ class TutorReply:
     skipped: bool
     leaked: bool
     halted: bool = False
+    armor_blocked: bool = False
 
 
 @dataclass(frozen=True)
@@ -155,6 +161,7 @@ def build_runner(
     model: str | BaseLlm,
     generate_content_config: types.GenerateContentConfig | None = None,
     with_tools: bool = False,
+    armor: ArmorClient | None = None,
 ) -> Runner:
     return Runner(
         app_name=APP_NAME,
@@ -166,6 +173,7 @@ def build_runner(
                 allowed_tools=PLANNER_TOOLS if with_tools else (),
                 tool_limit=PLANNER_TOOL_LIMIT if with_tools else 0,
                 count_tool_followups=False,
+                armor=armor,
             )
         ],
     )
@@ -374,7 +382,7 @@ async def run_insight(
     )
 
 
-def build_tutor_runner(model: str | BaseLlm) -> Runner:
+def build_tutor_runner(model: str | BaseLlm, armor: ArmorClient | None = None) -> Runner:
     return Runner(
         app_name=APP_NAME,
         agent=build_tutor(model),
@@ -387,6 +395,7 @@ def build_tutor_runner(model: str | BaseLlm) -> Runner:
                 temperature=TUTOR_TEMPERATURE,
                 max_output_tokens=TUTOR_MAX_OUTPUT_TOKENS,
                 thinking_level=TUTOR_THINKING_LEVEL,
+                armor=armor,
             )
         ],
     )
@@ -400,6 +409,7 @@ async def run_planner(
     candidates: tuple[str, ...] | list[str] = (),
     class_halted: bool = False,
     tool_state: dict[str, object] | None = None,
+    armor_text: str | None = None,
 ) -> PlannerReply:
     """candidates を渡すと、PolicyPlugin が出力を候補と突き合わせる（スパイクは渡さない）。
     突き合わせで直されたら、理由を添えて 1 回だけ作り直させる（自己修正）"""
@@ -410,13 +420,17 @@ async def run_planner(
             PLANNER_CALLS_KEY: calls,
             CLASS_HALTED_KEY: class_halted,
         }
+        if armor_text and prompt == text:  # 作り直しでは同じ文をもう一度検査しない
+            state[ARMOR_TEXT_KEY] = armor_text
         if candidates:
             state[PLAN_CANDIDATES_KEY] = list(candidates)
         outcome = await _run_once(runner, SPIKE_USER_ID, prompt, state)
-        skipped = SKIP_REASON_KEY in outcome.flags or class_halted
+        armored = ARMOR_BLOCKED_KEY in outcome.flags
+        skipped = SKIP_REASON_KEY in outcome.flags or class_halted or armored
         return PlannerReply(
             text=outcome.text,
             skipped=skipped,
+            armor_blocked=armored,
             planner_calls=int(outcome.state.get(PLANNER_CALLS_KEY, calls)),
             plan=None if skipped or not candidates else parse_plan(outcome.text),
             off_catalog=PLAN_OFF_CATALOG_KEY in outcome.flags,
@@ -480,19 +494,23 @@ async def run_tutor(
     leak_phrases: tuple[str, ...] | list[str],
     locked: bool,
     class_halted: bool = False,
+    armor_text: str | None = None,
 ) -> TutorReply:
     state = {
+        ARMOR_TEXT_KEY: armor_text,
         CHAT_TURNS_KEY: turns_used,
         ANSWER_LOCKED_KEY: locked,
         LEAK_PHRASES_KEY: list(leak_phrases),
         CLASS_HALTED_KEY: class_halted,
     }
     outcome = await _run_once(runner, CHAT_USER_ID, prompt, state)
+    armored = ARMOR_BLOCKED_KEY in outcome.flags
     return TutorReply(
         text=outcome.text,
-        skipped=SKIP_REASON_KEY in outcome.flags or class_halted,
+        skipped=SKIP_REASON_KEY in outcome.flags or class_halted or armored,
         leaked=ANSWER_LEAK_KEY in outcome.flags,
         halted=class_halted,
+        armor_blocked=armored,
     )
 
 

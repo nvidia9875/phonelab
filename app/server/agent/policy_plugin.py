@@ -2,7 +2,8 @@
 
 Runner に一度登録すれば、どのエージェントのモデル呼び出しにも効く。
   before_run_callback:   先生が学級の測定を止めていたら（state の class_halted）、エージェントを走らせない（D8 / D13）
-  before_model_callback: 呼び出し回数が上限ならモデルを呼ばずに応答を返す（スキップ）。
+  before_model_callback: 生徒の文を Model Armor で検査し（1 回の実行で 1 回、注入対策の第 1 層）、検知したらモデルを呼ばない。
+                         呼び出し回数が上限ならモデルを呼ばずに応答を返す（スキップ）。
                          生成設定（温度・出力トークン上限・思考の量）をエージェント側の設定より優先して強制する
   before_tool_callback:  ツールを持つエージェント（学級の見立て）は、許したツールだけ、回数の上限まで、学級にいる番号だけを読める
   after_model_callback:  先生の説明がまだ閉じているのに、応答が説明の言い回しを含んだら、問い返しの文に差し替える
@@ -25,6 +26,7 @@ from google.genai import types
 from opentelemetry import trace
 
 from server.agent.class_agent import KNOWN_NUMBERS_KEY, InsightOutput, parse_insight
+from server.agent.model_armor import ArmorClient
 from server.agent.next_step import parse_next
 from server.agent.planner import parse_plan, parse_replan
 
@@ -66,6 +68,10 @@ LEAK_PHRASES_KEY = "leak_phrases"
 ANSWER_LEAK_KEY = "phonelab.answer_leak"
 LEAK_FALLBACK_TEXT = "その理由は、あなたの考えを書いてから、いっしょに見ていきましょう。いま、どうしてそうなったと思いますか？"
 
+ARMOR_TEXT_KEY = "armor_text"
+ARMOR_CHECKED_KEY = "armor_checked"
+ARMOR_BLOCKED_KEY = "phonelab.armor_blocked"
+ARMOR_BLOCKED_TEXT = "この文には、ラボ先生への指示や、授業に合わない言葉が含まれていたので、ラボ先生には渡しませんでした。予想を自分の言葉で書き直してください。"
 TOOL_CALLS_KEY = "tool_calls"
 TIMELINE_CALLS_KEY = "timeline_calls"
 TIMELINE_LIMIT = 3
@@ -92,9 +98,11 @@ class PolicyPlugin(BasePlugin):
         allowed_tools: tuple[str, ...] = (),
         tool_limit: int = 0,
         count_tool_followups: bool = True,
+        armor: ArmorClient | None = None,
         name: str = "phonelab_policy",
     ) -> None:
         super().__init__(name=name)
+        self._armor = armor
         # False なら、ツールの結果を読ませるためのモデル呼び出しは回数に数えない（1 回の計画 = 1 回）
         self._count_tool_followups = count_tool_followups
         self._allowed_tools = allowed_tools
@@ -120,6 +128,9 @@ class PolicyPlugin(BasePlugin):
     async def before_model_callback(
         self, *, callback_context: CallbackContext, llm_request: LlmRequest
     ) -> LlmResponse | None:
+        blocked = await self._screen(callback_context)
+        if blocked:
+            return blocked
         calls = int(callback_context.state.get(self._calls_key, 0))
         followup = _is_tool_followup(llm_request)
 
@@ -144,6 +155,24 @@ class PolicyPlugin(BasePlugin):
         base = llm_request.config or types.GenerateContentConfig()
         llm_request.config = base.model_copy(update=update)
         return None
+
+    async def _screen(self, callback_context: CallbackContext) -> LlmResponse | None:
+        """生徒の文（state の armor_text）を、この実行で最初のモデル呼び出しの前に一度だけ Model Armor に通す"""
+        state = callback_context.state
+        text = state.get(ARMOR_TEXT_KEY)
+        if self._armor is None or not text or state.get(ARMOR_CHECKED_KEY):
+            return None
+        state[ARMOR_CHECKED_KEY] = True
+        with _tracer.start_as_current_span("phonelab.model_armor") as span:
+            verdict = await self._armor.screen(str(text))
+            span.set_attribute("phonelab.armor_matched", verdict.matched)
+            span.set_attribute("phonelab.armor_filters", ",".join(verdict.filters))
+            if verdict.error:
+                span.set_attribute("phonelab.armor_error", verdict.error)
+            if not verdict.matched:
+                return None
+            span.set_attribute("phonelab.decision", "skip_model")
+        return _text_response(ARMOR_BLOCKED_TEXT, {ARMOR_BLOCKED_KEY: ",".join(verdict.filters)})
 
     async def before_tool_callback(
         self, *, tool: BaseTool, tool_args: dict[str, Any], tool_context: ToolContext

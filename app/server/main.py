@@ -25,6 +25,7 @@ from pydantic import BaseModel, Field, field_validator
 
 from server.agent.answers import MODEL_ANSWERS, phrases_for
 from server.agent.catalog import CATALOG, candidates_for, short_changes
+from server.agent.model_armor import armor_from_env
 from server.agent.planner import (
     PlanContext,
     ReplanContext,
@@ -138,7 +139,7 @@ def require_spike_agent_enabled() -> None:
 
 @lru_cache(maxsize=1)
 def get_planner_runner() -> Runner:
-    return build_runner(planner_model(), with_tools=planner_tools_enabled())
+    return build_runner(planner_model(), with_tools=planner_tools_enabled(), armor=armor_from_env())
 
 
 @app.post("/api/spike/agent", dependencies=[Depends(require_spike_agent_enabled)])
@@ -326,6 +327,7 @@ async def plan(
                     candidates=[c.id for c in candidates],
                     class_halted=halted,
                     tool_state=tool_state,
+                    armor_text=body.text,
                 ),
                 timeout=PLAN_TIMEOUT_S,
             )
@@ -342,6 +344,25 @@ async def plan(
 
     checked = check_lines(reply.fix_reasons, reply.retried, reply.self_corrected)
     fixes = {"fix_reasons": list(reply.fix_reasons), "self_corrected": reply.self_corrected}
+    if reply.armor_blocked:
+        return PlanResponse(
+            kind="rejected",
+            variant_id=first.id,
+            rejection=RejectionOut(
+                title="Model Armor が、ラボ先生への指示か授業に合わない言葉を検知",
+                reasons=[
+                    "予想の中の指示は、実験の命令としては読みません",
+                    "この文はラボ先生（Gemini）に渡していません",
+                    "自分の言葉で予想を書き直すか、代わりの実験から始められます",
+                ],
+                quoted="",
+                alternative_variant_id=first.id,
+            ),
+            planner_calls=reply.planner_calls,
+            source="policy",
+            trail=trail(read, "モデルの前の検査: Model Armor が検知 → 却下（モデルは呼ばない）"),
+            trace_id=trace_id,
+        )
     if reply.skipped:
         return PlanResponse(
             kind="plan",
@@ -614,7 +635,7 @@ class ChatResponse(BaseModel):
 
 @lru_cache(maxsize=1)
 def get_tutor_runner() -> Runner:
-    return build_tutor_runner(chat_model())
+    return build_tutor_runner(chat_model(), armor=armor_from_env())
 
 
 @lru_cache(maxsize=1)
@@ -685,6 +706,7 @@ async def chat(
                     leak_phrases=phrases_for(answer, body.situation),
                     locked=not revealed,
                     class_halted=halted,
+                    armor_text=body.message,
                 ),
                 timeout=CHAT_TIMEOUT_S,
             )
@@ -700,6 +722,7 @@ async def chat(
                 status_code=502, detail="ラボ先生につながりませんでした。少し待ってから、もう一度"
             ) from exc
         span.set_attribute("phonelab.answer_leak", reply.leaked)
+        span.set_attribute("phonelab.armor_blocked", reply.armor_blocked)
         span.set_attribute("phonelab.skipped", reply.skipped)
 
     turns_used = body.turns_used if reply.skipped else body.turns_used + 1
@@ -707,7 +730,8 @@ async def chat(
         reply=reply.text,
         revealed=revealed and not reply.skipped,
         turns_used=turns_used,
-        limit_reached=reply.skipped or turns_used >= CHAT_TURNS_PER_RECORD,
+        limit_reached=(reply.skipped and not reply.armor_blocked)
+        or turns_used >= CHAT_TURNS_PER_RECORD,
         trace_id=trace_id,
     )
 
