@@ -66,6 +66,8 @@ NEUTRAL_ADVICE = (
 NEXT_CANDIDATES_KEY = "next_candidates"
 NEXT_CALLS_KEY = "next_calls"
 NEUTRAL_QUESTION = "では、次の変数を変えたら、どうなると思う？ 予想を書いてから測ってみよう"
+# ふり返りが先のときの中立の問い（次の実験の問いに差し替えると、ふり返りの画面に「次の変数を…」と出てしまう）
+NEUTRAL_REFLECT_QUESTION = "どうして予想と違う結果になったと思う？ 自分の言葉で書いてみよう"
 PLAN_OFF_CATALOG_KEY = "phonelab.plan_off_catalog"
 PLAN_WHY_REPLACED_KEY = "phonelab.plan_why_replaced"
 PLAN_CONDITION_CHANGED_KEY = "phonelab.plan_condition_changed"
@@ -348,7 +350,8 @@ def _check_next(candidates: list[str], llm_response: LlmResponse) -> LlmResponse
         if plan.action == "reflect" and plan.experiment_id is not None:
             plan = plan.model_copy(update={"experiment_id": None})
         if RESULT_WORDS.search(plan.question):
-            plan = plan.model_copy(update={"question": NEUTRAL_QUESTION})
+            neutral = NEUTRAL_REFLECT_QUESTION if plan.action == "reflect" else NEUTRAL_QUESTION
+            plan = plan.model_copy(update={"question": neutral})
             flags[PLAN_WHY_REPLACED_KEY] = True
         if RESULT_WORDS.search(plan.why):
             plan = plan.model_copy(update={"why": NEUTRAL_WHY})
@@ -385,7 +388,8 @@ def _fill_counts(line: str, keys: dict[str, int] | None, fill: bool = True) -> s
         return None
     # 数字の前後に半角の空き（「音の高さで保留 2 人」）。行頭・句読点の前の空きは詰める
     filled = re.sub(r" +", " ", COUNT_KEY_RE.sub(put, text))
-    filled = re.sub(r" (?=[、。」）が])", "", filled).strip()
+    filled = re.sub(r" (?=[、。」）が])", "", filled)
+    filled = re.sub(r"(?<=[^\x00-\x7f]) (?=[「（])", "", filled).strip()
     return None if missing else filled
 
 

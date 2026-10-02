@@ -46,7 +46,7 @@ def store():
 def answer(**overrides) -> dict:
     base = {
         "lines": [
-            "〔音の高さ・保留〕、理由は「まわりの雑音」",
+            "〔音の高さ・保留〕、理由は 〔理由・音が小さく、まわりの雑音と区別できない〕",
             "〔音の高さ・判定済み〕、次の予想へ",
         ],
         "visit_first": ["S-01", "S-02"],
@@ -98,7 +98,7 @@ def test_reads_the_class_with_tools_and_tells_the_teacher_in_three_lines(client,
     assert data["source"] == "agent"
     # 人数はモデルが書かず、サーバが要約から埋める
     assert data["lines"] == [
-        "音の高さで保留 2 人、理由は「まわりの雑音」",
+        "音の高さで保留 2 人、理由は「音が小さく、まわりの雑音と区別できない」の子 2 人",
         "音の高さで判定済み 1 人、次の予想へ",
     ]
     assert data["visit_first"] == ["S-01", "S-02"]

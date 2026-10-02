@@ -245,14 +245,14 @@ def _first_variant(theme_id: str | None) -> str | None:
 # strict はサーバの上限そのもの: 計画 5・次の一手 3・再計画 3・会話 10 / 実験、見立ては 30 秒のキャッシュで 50 分に 100 回
 SCENARIOS: dict[str, dict[str, float]] = {
     "ふだん": {
-        "plan": 1.1,  # 評価で 1 回目が検査に落ちて作り直したのは 1 割ほど
+        "plan": 1.5,  # 理由の無い予想は問い返しのあと 2 回目を呼ぶ（評価で 30 件中 13 件）＋作り直し
         "next": 1.1,
         "replan": 0.3,  # 3 割の実験が 1 回保留して再計画を聞く
         "tutor": 3,
         "insights": 10,
         "instances": 1,
     },
-    "混雑": {"plan": 2, "next": 2, "replan": 1, "tutor": 6, "insights": 30, "instances": 2},
+    "混雑": {"plan": 2.5, "next": 2, "replan": 1, "tutor": 6, "insights": 30, "instances": 2},
     "厳密な上限": {"plan": 5, "next": 3, "replan": 3, "tutor": 10, "insights": 100, "instances": 3},
 }
 LESSON = {

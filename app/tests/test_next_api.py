@@ -113,6 +113,23 @@ def test_can_send_the_student_to_reflect_first(client, fake_llm):
     assert data["experiment_id"] is None
 
 
+def test_a_reflect_question_with_result_words_becomes_a_reflect_question_not_a_next_one(
+    client, fake_llm
+):
+    """10/2 評価: ふり返りの問いが「次の変数を変えたら…」に差し替わっていた"""
+    fake_llm.reply = next_json(
+        action="reflect", experiment_id=None, question="重いと速くなると思ったのはなぜ？", why=""
+    )
+
+    data = client.post(
+        "/api/next", json=body(consistent=False, explained=False, observed="same")
+    ).json()
+
+    assert data["action"] == "reflect"
+    assert "次の変数" not in data["question"]
+    assert "なぜ" in data["question"] or "どうして" in data["question"]
+
+
 def test_falls_back_to_the_catalog_when_the_limit_is_reached(client, fake_llm):
     data = client.post("/api/next", json=body(next_calls=3)).json()
 
