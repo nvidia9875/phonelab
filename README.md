@@ -37,7 +37,7 @@
 1. `/teacher` を開き、学級コード `DEMO-2026` と PIN `4826` を入れる → 5 秒ごとに学級の様子が出ます
 2. 上から: 予想の向きの分布（「高くなる 6 人」など）→ **いま見に行く子**（保留 → 却下の順）→ 全員の表（番号だけ）→ 選んだ子の記録の流れ
 3. 右の **「ラボ先生の見立て」→「見立てを聞く」** → ラボ先生がツールで学級の要約を読み、3 行・見に行く順・先生が選べる手を返します（見本の記録だと「音の高さで 2 人がまわりの雑音で保留」など）。操作はしません。番号を押すとその子の記録の流れ（「判断」の行も）へ
-4. 右上の **「全端末の測定を止める」** → 生徒の端末は 2 秒以内に停止画面になり、ラボ先生（Gemini）も呼ばれなくなります（`/api/plan` `/api/chat` は 409、ADK の `before_run_callback` でも止まる）。解除も同じボタン
+4. 右上の **「全端末の測定を止める」** → 測定中の生徒の端末は 2 秒ごとに学級の状態を確かめていて、次の確認で停止画面になります（ローカルの実測 2.0 秒）。停止中はサーバがエージェントを動かしません（`/api/plan` `/api/replan` `/api/next` `/api/chat` は 409、ADK の `before_run_callback` でも止まる）。端末は 409 を受けると、確認を待たずに止まります。解除も同じボタン
 5. 許可のトグル（マイク・加速度・カメラ）と「家でやる実験」の有効化も、この画面から
 
 > 審査の期間中（〜2026-12-01）は動作する状態を保ちます。学級 `DEMO-2026` は共用なので、他の人の番号の記録が見えることがあります。
@@ -63,17 +63,19 @@
 - `before_tool_callback` — 許可したツールだけ、回数の上限まで、学級にいる番号だけ。断るときはツールを走らせずに理由を返す
 - `after_model_callback` — 候補外の実験、結果の言葉、説明の漏えい、停止の勧めを検査する
 
-**検査に落ちた出力は、理由を添えて 1 回だけモデルに作り直させる**（自己修正）。作り直しも落ちたら統制層が差し替える。どちらになったかは応答の `trail`（判断の跡）に残り、生徒の画面・教員画面・Cloud Trace（`phonelab.self_correct` スパン）で同じ段が見える。生徒の文はスパンに入れない。
+**検査に落ちた出力は、理由を添えて 1 回だけモデルに作り直させる**（自己修正。Planner・Replanner・次の一手。見立ては差し替えだけ）。作り直しも落ちたら統制層が差し替える。どちらになったかは応答の `trail`（判断の跡）に残り、生徒の画面・教員画面・Cloud Trace（`phonelab.self_correct` スパン）で同じ段が見える。生徒の文はスパンに入れない。
 
 ### 数字で見る（[`docs/eval.md`](docs/eval.md)、本物の Gemini と Model Armor で 10/2 に計測）
 
 | | |
 |---|---|
-| 予想の変数の読み取り | 24 / 24（中学の 3 テーマ、予想 30 件） |
-| 応答時間（Planner） | 中央値 1.2 秒、95% 1.8 秒 |
-| 注入・禁止動作 20 件 | Model Armor で 4、決定論のパターンで 6、残り 10 件はモデルに届いたが **最終出力に結果・答えが出たのは 0 件** |
-| 次の一手の問いかけに結果の言葉 | 0 / 8 |
-| 費用 | 1 人 1 実験（計画＋次の一手）約 0.14 円、31 人の学級で 1 時間 約 15 円 |
+| 予想の変数・向きの読み取り | 25 / 25・25 / 25（中学の 3 テーマ、予想 30 件。問い返しのあとの計画で） |
+| 予想を確かめられる実験を選んだ | **25 / 25**（いつも先頭を選ぶ規則なら 16 / 25） |
+| 理由の無い予想に問い返した | 10 / 13（理由のある予想には 0 / 17。正規表現の規則は 13 / 13 だが、理由のある予想にも 3 / 17 問い返す） |
+| 応答時間（Planner、問い返しの 2 回目を含む） | 中央値 1.9 秒、95% 2.7 秒 |
+| 注入・禁止動作 20 件 | Model Armor で 4、決定論のパターンで 6、残り 10 件はモデルに届いたが **最終出力に、生徒が書いていない結果の言葉や答えが出たのは 0 件** |
+| 次の一手 | 「食い違って理由がまだなら先にふり返り、それ以外は次へ」と 8 / 8 一致、問いかけに結果の言葉 0 / 8 |
+| 費用 | 1 人 1 実験（計画＋次の一手）約 0.18 円、31 人の学級で 1 時間 約 19 円（Gemini の分だけ。会話・Model Armor・Firestore・Cloud Run は含めていない） |
 
 Model Armor は日本語の言い換えの多くを拾わなかった（英語と「開発者モード」は拾った）。だから三層（Model Armor → 決定論のパターン → 構造化出力と出力の検査）で守る。Planner にツールで候補を読ませる方式（`PHONELAB_PLANNER_TOOLS=1`）も比べたが、正答率は同じで 0.9 秒遅く、トークンが 2.4 倍だったので既定はオフ。
 
@@ -108,7 +110,7 @@ phonelab/
 │   │       ├── answers.py        先生の説明と漏えい語句（サーバだけが持つ）
 │   │       └── runner.py         Runner の組み立て、自己修正、1 リクエスト = 1 セッション
 │   ├── scripts/eval_agent.py  評価（本物の Gemini・Model Armor で数える → docs/eval.md）
-│   ├── tests/                pytest 122 件（Policy・Plugin・ツール統制・自己修正・API・学級）
+│   ├── tests/                pytest 135 件（Policy・Plugin・ツール統制・自己修正・API・学級・Web との契約）
 │   └── web/                  PWA（Vite + React + TypeScript）
 │       └── src/
 │           ├── screens/        12 画面（予想・計画・準備・測定・保留・却下・結果・チャット・記録・教員 など）
@@ -125,7 +127,7 @@ phonelab/
 └── THIRD_PARTY_LICENSES.md   使っている OSS とライセンス
 ```
 
-Web の vitest は 62 件。実験カタログの id は `web/src/catalog/themes.ts` と `server/agent/catalog.py` で同じ（テストで突き合わせ）。
+Web の vitest は 78 件。実験カタログの id と検査コードは Web と サーバで同じ（`tests/test_contract.py` が両方のソースを読んで突き合わせる）。
 
 ## 実装済みと、設計だけのもの（正直な線引き）
 
@@ -137,18 +139,25 @@ Web の vitest は 62 件。実験カタログの id は `web/src/catalog/themes
 | 記録の要約のサーバ保存と、先生の 1 画面（分布・見に行く子・見立て・記録の流れ） | 実機 3 機種での閾値の決め直し（手順書 `docs/device-check.md`） |
 | オフライン縮退（サーバにつながらないときは端末内の規則で選び、記録に「stub」と残る） | 記録の共有 URL（保護者・Classroom 用）、PDF |
 
+### 限界（正直に）
+
+- **停止は「学級に入っている端末」に効く**。学級コードを付けずに API を直接呼べば、停止の対象外（IP ごとの回数制限はかかる）。授業の端末は必ず学級コード付きで呼ぶ
+- **回数の上限**は、学級の生徒（合言葉が合う）ならサーバ（Firestore）が数える。学級に入っていない端末は端末の申告で数える
+- **測定の判定は端末**。サーバは特徴量の要約を受け取るだけで、再検証はしない。「署名」は端末で計算したハッシュ（Cloud KMS は設計だけ）
+- **実機での閾値**（速さ 0.15 m/s、音の高さ 3%、倍音の整合）は暫定。実機 3 機種の検証は `docs/device-check.md` の手順で進めている
+
 ## Google Cloud の使い方
 
 | サービス | 用途 |
 |---|---|
 | **Cloud Run**（asia-northeast1、min-instances 0） | FastAPI + ADK と PWA の配信。`gcloud run deploy --source`（Cloud Build） |
-| **Vertex AI — Gemini 3.5 Flash-Lite** | 5 つのエージェントすべて。構造化出力、thinking low。Planner の中央値 1.2 秒。3.8 Flash は 25〜50 秒かかる時間帯があり、生徒を待たせるので不採用 |
+| **Vertex AI — Gemini 3.5 Flash-Lite** | 5 つのエージェントすべて。構造化出力、thinking low。混み合い（429）は短く 2 回までやり直す。Planner の中央値 1.9 秒（問い返しの 2 回目を含む）。3.8 Flash は 25〜50 秒かかる時間帯があり、生徒を待たせるので不採用 |
 | **Agent Development Kit 2.8** | `LlmAgent` × 5、`FunctionTool` × 2（学級の見立て）、構造化出力とツールの併用、`Runner`、`BasePlugin`（統制層）、`InMemorySessionService` |
 | **Model Armor**（テンプレート `phonelab-student`、us-central1） | 生徒の文の注入・脱獄・有害表現の検査（Planner とチャットの前）。東京リージョンには多言語の検出が無いため us-central1 |
 | **Firestore**（native） | 学級 `classes/{code}`、生徒 `students/{no}`（いまの記録の要約）、`records/{id}`（履歴）。クライアント SDK は使わず API 経由だけ |
-| **Cloud Trace**（Telemetry API、OTLP） | 1 実験 = 1 トレース。`phonelab.plan → invoke_agent → call_llm → phonelab.policy` |
+| **Cloud Trace**（Telemetry API、OTLP） | 1 リクエスト = 1 トレース（計画・再計画・次の一手・会話・見立て）。`phonelab.plan → invoke_agent → phonelab.model_armor → call_llm → phonelab.policy → phonelab.self_correct`。計画のトレース id は記録に残り、教員画面から開ける |
 
-費用の考え方: Gemini は 1 実験あたり Planner 1 回（自己修正で最大 2 回）＋次の一手 1 回＋チャット最大 10 往復（Flash-Lite）。実測で 1 人 1 実験 約 0.14 円（[`docs/eval.md`](docs/eval.md)）。接続元ごとにレート制限（plan / chat 30 回 / 10 分、記録 120 回 / 10 分、PIN 10 回 / 10 分）。Cloud Run はアイドル課金なし。
+費用の考え方: Gemini は 1 実験あたり Planner 1 回（自己修正で最大 2 回）＋次の一手 1 回＋チャット最大 10 往復（Flash-Lite）。実測で 1 人 1 実験 約 0.18 円（[`docs/eval.md`](docs/eval.md)）。接続元ごとにレート制限（plan / chat 30 回 / 10 分、記録 120 回 / 10 分、PIN 10 回 / 10 分）。Cloud Run はアイドル課金なし。
 
 ## ローカルで動かす
 
@@ -158,13 +167,13 @@ cd app
 PHONELAB_CLASS_STORE=memory PHONELAB_DEMO_PIN=1234 \
 GOOGLE_GENAI_USE_VERTEXAI=true GOOGLE_CLOUD_PROJECT=<project> GOOGLE_CLOUD_LOCATION=global \
 uv run uvicorn server.main:app --port 8080
-uv run pytest -q            # 122 件（Gemini は呼ばない。FakeLlm / ScriptedLlm）
+uv run pytest -q            # 135 件（Gemini は呼ばない。FakeLlm / ScriptedLlm）
 uv run python -m scripts.eval_agent   # 評価（本物の Gemini・Model Armor を呼ぶ。env は先頭の docstring）
 
 # Web（Vite。/api は 8080 へプロキシ）
 cd app/web
 npm ci && npm run dev -- --port 5179
-npx vitest run              # 62 件
+npx vitest run              # 78 件
 ```
 
 環境変数: `PHONELAB_MODEL` / `PHONELAB_CHAT_MODEL`（既定 `gemini-3.5-flash-lite`）、`PHONELAB_CLASS_STORE`（`memory` | `firestore`。Cloud Run 上は既定で firestore）、`PHONELAB_DEMO_PIN`（起動時に学級 `DEMO-2026` を作る）、`PHONELAB_TRACE_TO_CLOUD=1`（Cloud Trace へ送る）、`PHONELAB_MODEL_ARMOR_TEMPLATE`（`projects/.../locations/us-central1/templates/...`、無ければ使わない）、`PHONELAB_DEMO_SAMPLES=1`（見本の記録 D-01〜D-06 を起動時に置く）、`PHONELAB_PLANNER_TOOLS=1`（Planner にツールで候補を読ませる。既定オフ）。

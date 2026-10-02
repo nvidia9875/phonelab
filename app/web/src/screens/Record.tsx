@@ -6,12 +6,11 @@ export interface RecordProps {
   theme: Theme;
   variant: Variant | null;
   record: StudyRecord;
-  onVerify: () => void;
   onHome: () => void;
 }
 
-/** 画面 6: 署名付き実験記録。署名はサーバ実装後。いまは端末のハッシュだけ */
-export function Record({ theme, variant, record, onVerify, onHome }: RecordProps) {
+/** 画面 6: 実験記録。いまは端末のハッシュだけ（Cloud KMS の署名と端末での再検証は設計だけ。10/2 採点で、動かないボタンを外した） */
+export function Record({ theme, variant, record, onHome }: RecordProps) {
   const title = `${theme.title}${variant ? `と${variant.changes.split("（")[0]}` : ""}`;
   const statusText: Record<StudyRecord["status"], string> = {
     open: "進行中",
@@ -46,7 +45,6 @@ export function Record({ theme, variant, record, onVerify, onHome }: RecordProps
       ) : null}
 
       <Foot row>
-        <Button sm onClick={onVerify}>端末で再検証</Button>
         <Button sm secondary onClick={onHome}>トップへ</Button>
       </Foot>
     </Screen>

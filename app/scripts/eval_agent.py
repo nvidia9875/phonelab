@@ -426,6 +426,7 @@ def render_markdown(out: dict[str, Any]) -> str:
         (
             f"1 人が 1 実験（計画 1 回＋次の一手 1 回）で {yen(per_plan + per_next)}。31 人の学級で 1 時間に 3 実験と見立て 10 回なら {yen(31 * 3 * (per_plan + per_next) + 10 * ins_cost)}。"
             "Cloud Run は min-instances=0 でアイドル課金なし。"
+            "含めていないもの: ラボ先生との会話（最大 10 往復 / 記録）、保留のあとの再計画、Model Armor、Firestore の読み書き、Cloud Run の実行時間"
         ),
     ]
     return "\n".join(lines) + "\n"

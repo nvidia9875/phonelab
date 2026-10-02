@@ -149,7 +149,7 @@ export function Result({ variant, judgement, explain, nextVariant, nextDirection
         <Button secondary={!reflect} onClick={() => { onExplain(text); onChat(); }}>ラボ先生と、なぜそうなったか話す</Button>
         <LinkRow>
           <Link icon="ribbon" onClick={() => { onExplain(text); onRecord(); }}>
-            署名付きの実験記録
+            実験記録（ハッシュ付き）
           </Link>
           <Link icon="list" onClick={() => { onExplain(text); onRecord(); }}>
             トレースを見る

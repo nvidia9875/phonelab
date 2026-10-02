@@ -123,7 +123,7 @@
       <p class="lane">Google Cloud</p>
       <div class="box teal">
         <h3>Vertex AI — Gemini 3.5 Flash-Lite</h3>
-        <p>5 つのエージェント。Planner の中央値 1.2 秒、1 人 1 実験 約 0.14 円（docs/eval.md）</p>
+        <p>5 つのエージェント。Planner の中央値 1.9 秒、1 人 1 実験 約 0.18 円（docs/eval.md）</p>
       </div>
       <div class="box">
         <h3>Model Armor（us-central1）</h3>
@@ -147,6 +147,6 @@
   <div class="foot">
     <span><b>LLM が判断すること</b>: 予想の読み取りと実験の選択、保留と結果のあとの次の一手、学級の見立て、ふり返りの問い返し</span>
     <span><b>LLM が触れないこと</b>: 安全の判定、測定の検査、判定文、停止、学級の設定の変更</span>
-    <span><b>未実装（設計のみ）</b>: サーバ側 Verifier と Cloud KMS 署名、見立ての提案を承認して反映する UI</span>
+    <span><b>未実装（設計のみ）</b>: サーバ側 Verifier と Cloud KMS 署名、見立ての提案を承認して反映する UI。<b>注</b>: 停止中も学級の見立て（読み取りだけ）は動く。自己修正は Planner・Replanner・NextStep</span>
   </div>
 </div>

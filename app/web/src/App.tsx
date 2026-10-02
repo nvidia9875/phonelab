@@ -239,7 +239,7 @@ export function App() {
       const r = recordById(route.id);
       const t = r && themeById(r.themeId);
       if (!r || !t) return <Home {...homeProps} />;
-      return <Record theme={t} variant={variantById(t, r.variantId) ?? null} record={r} onVerify={() => alert("端末で再検証: IndexedDB の生データから再計算します（実装予定）")} onHome={goHome} />;
+      return <Record theme={t} variant={variantById(t, r.variantId) ?? null} record={r} onHome={goHome} />;
     }
     case "home":
     case "gallery":
