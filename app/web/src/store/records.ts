@@ -314,6 +314,11 @@ export function addEvent(r: StudyRecord, k: string, body: string, tone?: "orange
 export function recordById(id: string): StudyRecord | undefined {
   return state.records.find((r) => r.id === id);
 }
+/** 画面に出すときはこちら。いまの番号の記録だけ（共有端末で前の人の記録の URL を開いても見せない。10/2 採点 3-2） */
+export function myRecordById(id: string): StudyRecord | undefined {
+  const r = recordById(id);
+  return r && isMine(r) ? r : undefined;
+}
 export function recordsForTheme(themeId: string, records = snapshot.records): StudyRecord[] {
   return records.filter((r) => r.themeId === themeId && isMine(r));
 }

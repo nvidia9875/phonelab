@@ -15,7 +15,7 @@ import { Settings } from "./screens/Settings";
 import { Chat } from "./screens/Chat";
 import { repeatsOf, themeById, variantById, type Theme } from "./catalog/themes";
 import { matchRoute, nav, usePath, type Route } from "./router";
-import { activeRecordForTheme, clearAll, createRecord, recordById, setClassState, setHalted, setSettings, setStudent, useStore, type ClassState, type StudyRecord } from "./store/records";
+import { activeRecordForTheme, clearAll, createRecord, myRecordById, setClassState, setHalted, setSettings, setStudent, useStore, type ClassState, type StudyRecord } from "./store/records";
 import { DEFAULT_CLASS_POLICY, detectCaps, themeStatus, type ClassPolicy, type DeviceCaps } from "./store/status";
 import { ClassError, fetchClass, joinClass, resetStudent, setClassHalt, setClassPolicyOnServer, type ClassInfo } from "./agent/classroom";
 import { startRecordSync } from "./agent/sync";
@@ -236,7 +236,7 @@ export function App() {
         />
       );
     case "record": {
-      const r = recordById(route.id);
+      const r = myRecordById(route.id);
       const t = r && themeById(r.themeId);
       if (!r || !t) return <Home {...homeProps} />;
       return <Record theme={t} variant={variantById(t, r.variantId) ?? null} record={r} onHome={goHome} />;

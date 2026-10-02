@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { activeRecordForTheme, clearAll, createRecord, recordById, setClassState, setStudent, updateRecord } from "../store/records";
+import { activeRecordForTheme, clearAll, myRecordById, createRecord, recordById, setClassState, setStudent, updateRecord } from "../store/records";
 import { startRecordSync, summarizeRecord } from "./sync";
 
 describe("summarizeRecord", () => {
@@ -90,6 +90,16 @@ describe("記録は番号ごと（10/2 採点: 番号を変えると前の人の
 
     expect(send).not.toHaveBeenCalled();
     stop();
+  });
+
+  it("a record URL only opens the current student's record", () => {
+    setStudent({ classCode: "DEMO-2026", number: "S-04", secret: "ABC234" });
+    const old = createRecord("sound");
+    expect(myRecordById(old.id)?.id).toBe(old.id);
+
+    setStudent({ classCode: "DEMO-2026", number: "S-05", secret: "XYZ789" });
+
+    expect(myRecordById(old.id)).toBeUndefined();
   });
 
   it("the theme only continues the current student's record", () => {
