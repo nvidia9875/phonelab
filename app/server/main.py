@@ -354,6 +354,8 @@ async def plan(
             if with_tools
             else None
         )
+        count = await count.reserve(store, PLANNER_CALLS_PER_EXPERIMENT)
+        planner_calls = count.start
         try:
             reply = await asyncio.wait_for(
                 run_planner(
@@ -378,7 +380,7 @@ async def plan(
         span.set_attribute("phonelab.plan_readable", reply.plan is not None)
         span.set_attribute("phonelab.policy_fixed", reply.off_catalog or reply.why_replaced)
         span.set_attribute("phonelab.self_corrected", reply.self_corrected)
-    await count.add(store, reply.planner_calls - planner_calls)
+    await count.settle(store, reply.planner_calls - planner_calls)
 
     checked = check_lines(reply.fix_reasons, reply.retried, reply.self_corrected)
     fixes = {"fix_reasons": list(reply.fix_reasons), "self_corrected": reply.self_corrected}
@@ -567,6 +569,7 @@ async def replan(
         span.set_attribute("phonelab.hold_codes", ",".join(body.hold_codes))
         span.set_attribute("phonelab.retries", body.retries)
         trace_id = format(span.get_span_context().trace_id, "032x")
+        count = await count.reserve(store, REPLAN_CALLS_PER_RECORD)
         try:
             reply = await asyncio.wait_for(
                 run_replan(
@@ -586,7 +589,7 @@ async def replan(
         span.set_attribute("phonelab.skipped", reply.skipped)
         span.set_attribute("phonelab.plan_readable", reply.plan is not None)
 
-    await count.add(store, reply.calls_used)
+    await count.settle(store, reply.calls_used)
     calls = min(count.start + reply.calls_used, REPLAN_CALLS_PER_RECORD)
     read = read_line(
         f"保留の理由 {len(body.hold_codes)} 件・同じ条件の保留 {body.retries} 回・ほかの実験 {len(others)} 件"
@@ -757,6 +760,7 @@ async def chat(
         span.set_attribute("phonelab.turns_used", count.start)
         span.set_attribute("phonelab.prompt_len", len(prompt))
         trace_id = format(span.get_span_context().trace_id, "032x")
+        count = await count.reserve(store, CHAT_TURNS_PER_RECORD)
         try:
             reply = await asyncio.wait_for(
                 run_tutor(
@@ -786,7 +790,7 @@ async def chat(
         span.set_attribute("phonelab.skipped", reply.skipped)
 
     turns_used = count.start if reply.skipped else count.start + 1
-    await count.add(store, turns_used - count.start)
+    await count.settle(store, turns_used - count.start)
     return ChatResponse(
         reply=reply.text,
         revealed=revealed and not reply.skipped,

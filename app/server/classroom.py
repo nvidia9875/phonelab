@@ -118,6 +118,9 @@ class ClassStore(Protocol):
     async def list_students(self, code: str) -> list[StudentRow]: ...
     async def get_counter(self, code: str, number: str, key: str) -> int: ...
     async def add_counter(self, code: str, number: str, key: str, n: int) -> None: ...
+    async def reserve_counter(
+        self, code: str, number: str, key: str, floor: int, limit: int
+    ) -> int | None: ...
 
 
 class MemoryClassStore:
@@ -179,6 +182,16 @@ class MemoryClassStore:
     async def add_counter(self, code: str, number: str, key: str, n: int) -> None:
         k = (normalize_code(code), number, key)
         self._counters[k] = self._counters.get(k, 0) + n
+
+    async def reserve_counter(
+        self, code: str, number: str, key: str, floor: int, limit: int
+    ) -> int | None:
+        k = (normalize_code(code), number, key)
+        current = max(self._counters.get(k, 0), floor)
+        if current >= limit:
+            return None
+        self._counters[k] = current + 1
+        return current
 
     async def list_students(self, code: str) -> list[StudentRow]:
         code = normalize_code(code)
@@ -308,6 +321,26 @@ class FirestoreClassStore:
         await self._counter(code, number, key).set(
             {"n": firestore.Increment(n), "updated_at": now_iso()}, merge=True
         )
+
+    async def reserve_counter(
+        self, code: str, number: str, key: str, floor: int, limit: int
+    ) -> int | None:
+        """枠を 1 つ、読んで確かめて書くまでをトランザクションで（同時の要求が同じ残りの枠を使わない）。
+        戻り値はこの呼び出しの前の数。上限なら None"""
+        from google.cloud import firestore
+
+        ref = self._counter(code, number, key)
+
+        @firestore.async_transactional
+        async def take(tx) -> int | None:
+            snap = await ref.get(transaction=tx)
+            current = max(int((snap.to_dict() or {}).get("n", 0)) if snap.exists else 0, floor)
+            if current >= limit:
+                return None
+            tx.set(ref, {"n": current + 1, "updated_at": now_iso()}, merge=True)
+            return current
+
+        return await take(self._client.transaction())
 
     async def list_students(self, code: str) -> list[StudentRow]:
         rows: list[StudentRow] = []

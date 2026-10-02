@@ -173,6 +173,7 @@ async def next_step(
                 candidates=remaining,
             )
         )
+        count = await count.reserve(store, NEXT_CALLS_PER_RECORD)
         try:
             reply = await asyncio.wait_for(
                 run_next(
@@ -192,7 +193,7 @@ async def next_step(
         span.set_attribute("phonelab.skipped", reply.skipped)
         span.set_attribute("phonelab.self_corrected", reply.self_corrected)
 
-    await count.add(store, reply.calls_used)
+    await count.settle(store, reply.calls_used)
     calls = min(count.start + reply.calls_used, NEXT_CALLS_PER_RECORD)
     fixes = {"fix_reasons": list(reply.fix_reasons), "self_corrected": reply.self_corrected}
     checked = check_lines(reply.fix_reasons, reply.retried, reply.self_corrected)

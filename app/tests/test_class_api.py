@@ -437,3 +437,17 @@ def test_a_record_summary_only_accepts_catalog_themes_and_known_stages(client, o
     """10/2 採点 2 回目 2-6: テーマ・段階・実験も列挙だけ受け付ける"""
     res, _ = post_record(client, summary(**overrides))
     assert res.status_code == 422
+
+
+def test_a_class_request_without_the_secret_is_refused(client):
+    """10/2 採点 2 回目 2-4: 学級と番号を付けて合言葉を省けば、端末の申告の数えに戻れた"""
+    join(client, "S-23")
+    body = {
+        "theme_id": "sound",
+        "school": "jhs",
+        "text": "強くはじくと高くなると思う。速く震えるから",
+        "class_code": "DEMO-2026",
+        "number": "S-23",
+        "planner_calls": 0,
+    }
+    assert client.post("/api/plan", json=body).status_code == 403

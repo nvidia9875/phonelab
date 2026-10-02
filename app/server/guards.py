@@ -6,7 +6,7 @@
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from functools import lru_cache
 
 from fastapi import HTTPException, Request
@@ -105,10 +105,21 @@ class CallCount:
 
     start: int
     key: tuple[str, str, str] | None = None
+    reserved: int = 0
 
-    async def add(self, store: ClassStore, used: int) -> None:
-        if self.key and used > 0:
-            await store.add_counter(*self.key, used)
+    async def reserve(self, store: ClassStore, limit: int) -> CallCount:
+        """モデルを呼ぶ前に枠を 1 つ取る。取れなければ start を上限にして返す（統制層がモデルを呼ばない）"""
+        if not self.key:
+            return self
+        before = await store.reserve_counter(*self.key, self.start, limit)
+        if before is None:
+            return replace(self, start=limit, reserved=0)
+        return replace(self, start=before, reserved=1)
+
+    async def settle(self, store: ClassStore, used: int) -> None:
+        """実際に呼んだ回数との差を足す（自己修正で 2 回なら +1、呼ばなかったら -1 で枠を返す）"""
+        if self.key and used != self.reserved:
+            await store.add_counter(*self.key, used - self.reserved)
 
 
 async def call_count(
@@ -123,8 +134,11 @@ async def call_count(
 ) -> CallCount:
     """端末の申告（claimed）とサーバの数えの大きい方から始める（10/2 採点 2-4: 回数が自己申告だった）。
     合言葉が違えば 403。学級に入っていない端末は申告のまま（IP ごとの回数制限はかかる）"""
-    if not (class_code and number and secret and record_id and COUNTER_KEY_RE.match(record_id)):
+    if not (class_code and number):
         return CallCount(start=claimed)
+    if not (secret and record_id and COUNTER_KEY_RE.match(record_id)):
+        # 学級の生徒は合言葉と記録 id が要る（省けば端末の申告に戻れた。10/2 採点 2-4）
+        raise HTTPException(status_code=403, detail="合言葉と記録 id が要ります")
     from server.routes_class import verify_student
 
     code, no = normalize_code(class_code), number.strip().upper()
