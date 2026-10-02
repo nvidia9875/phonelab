@@ -60,3 +60,20 @@ def test_a_speed_or_a_short_length_is_not_mistaken_for_a_high_place(text):
 @pytest.mark.parametrize("text", ["2m の高さから落とす", "3 メートルの台に乗る", "２ｍから見る"])
 def test_a_high_place_is_still_rejected(text):
     assert check_prediction(text).kind == "reject"
+
+
+def test_changes_condition_finds_advice_that_alters_the_variable_or_the_held_values():
+    from server.agent.catalog import CATALOG
+    from server.agent.planner import CONDITION_TERMS, changes_condition
+
+    every_variant = {v.id for t in CATALOG.values() for v in t.variants}
+    assert set(CONDITION_TERMS) == every_variant
+    assert (
+        changes_condition("放す高さを少し低くして測り直しましょう", "energy_height") == "放す高さ"
+    )
+    assert changes_condition("さっきよりも弱くして", "sound_pluck_strength") == "弱く"
+    assert changes_condition("振れ幅を小さくして、もう一度", "pendulum_length") == "振れ幅"
+    assert changes_condition("同じ高さから、そっと放そう", "energy_height") is None
+    assert changes_condition("放す高さは変えずに、包み直そう", "energy_height") is None
+    assert changes_condition("端末を少し離して、もう一度", "sound_pluck_strength") is None
+    assert changes_condition("糸の長さを短くして", "") is None

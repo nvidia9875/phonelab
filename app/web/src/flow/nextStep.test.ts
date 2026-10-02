@@ -71,12 +71,33 @@ describe("askNext（結果のあとの次の一手）", () => {
 
   it("falls back to the catalog order when the server is unreachable", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => { throw new Error("offline"); }));
-    const rec = judged();
+    const rec = judged({ explain: "輪ゴムの長さと張りが同じだから、震え方の速さは変わらなかった" });
 
     const s = await askNext(rec, sound);
 
     expect(s?.source).toBe("stub");
     expect(s?.variantId).toBe("sound_string_length");
+  });
+
+  it("asks for a reflection first when the server is unreachable and the mismatch has no reason yet", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => { throw new Error("offline"); }));
+    const rec = judged();
+
+    const s = await askNext(rec, sound);
+
+    expect(s?.action).toBe("reflect");
+    expect(s?.variantId).toBeNull();
+    expect(s?.source).toBe("stub");
+  });
+
+  it("asks for a reflection first when the server is busy, without storing it", async () => {
+    serverAnswers({ detail: "混み合っています" }, 429);
+    const rec = judged();
+
+    const s = await askNext(rec, sound);
+
+    expect(s?.action).toBe("reflect");
+    expect(recordById(rec.id)!.nextSuggestion).toBeFalsy();
   });
 
   it("the next experiment and its plan come from the suggestion", async () => {

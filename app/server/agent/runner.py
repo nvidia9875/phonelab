@@ -52,12 +52,14 @@ from server.agent.policy_plugin import (
     NEXT_CALLS_KEY,
     NEXT_CANDIDATES_KEY,
     PLAN_CANDIDATES_KEY,
+    PLAN_CONDITION_CHANGED_KEY,
     PLAN_OFF_CATALOG_KEY,
     PLAN_WHY_REPLACED_KEY,
     PLANNER_CALLS_KEY,
     REPLAN_CALLS_KEY,
     REPLAN_CALLS_PER_RECORD,
     REPLAN_CANDIDATES_KEY,
+    REPLAN_VARIANT_KEY,
     SKIP_REASON_KEY,
     STUDENT_TEXT_KEY,
     TOOL_CALLS_KEY,
@@ -91,9 +93,11 @@ SELF_CORRECT_ATTEMPTS = 1
 FIX_UNREADABLE = "unreadable"
 FIX_OFF_CATALOG = "off_catalog"
 FIX_RESULT_WORDS = "result_words"
+FIX_CONDITION = "condition_changed"
 FEEDBACK: dict[str, str] = {
     FIX_UNREADABLE: "前回の出力は決められた JSON の形ではありませんでした。形を守って出し直してください。",
     FIX_OFF_CATALOG: "前回の experiment_id は【選べる実験】にありませんでした。必ずその中の id から選んでください。",
+    FIX_CONDITION: "前回の助言は、この実験で変えてはいけない条件（放す高さ・重さ・はじく強さ・長さ・水の量 など）の値を変えさせていました。条件の値はそのままにして、測り方（置き場所・静かさ・放し方やはじき方をそろえる など）だけを一つ直す助言にしてください。",
     FIX_RESULT_WORDS: "前回の文に結果の言葉（高くなる・変わらない・速くなる など）が入っていました。結果は書かず、なぜその実験で確かめられるか・何をすればよいかだけを書いてください。",
 }
 
@@ -125,6 +129,8 @@ class ReplanReply:
     plan: ReplanOutput | None
     off_catalog: bool
     advice_replaced: bool
+    # 測り直しの助言が条件の値を変えさせていた。統制層が中立の文に差し替えた（変えさせた言葉は Trace のスパンに）
+    condition_changed: bool = False
     # モデルを呼んだ回数（作り直しを含む）
     calls_used: int = 0
     fix_reasons: tuple[str, ...] = ()
@@ -211,6 +217,7 @@ async def run_replan(
     prompt: str,
     replan_calls: int,
     candidates: list[str],
+    variant_id: str = "",
     class_halted: bool = False,
     before_retry=None,
 ) -> ReplanReply:
@@ -219,6 +226,7 @@ async def run_replan(
         state: dict[str, object] = {
             REPLAN_CALLS_KEY: calls,
             REPLAN_CANDIDATES_KEY: list(candidates),
+            REPLAN_VARIANT_KEY: variant_id,
             CLASS_HALTED_KEY: class_halted,
         }
         outcome = await _run_once(runner, SPIKE_USER_ID, text, state)
@@ -229,12 +237,17 @@ async def run_replan(
             plan=None if skipped else parse_replan(outcome.text),
             off_catalog=PLAN_OFF_CATALOG_KEY in outcome.flags,
             advice_replaced=PLAN_WHY_REPLACED_KEY in outcome.flags,
+            condition_changed=PLAN_CONDITION_CHANGED_KEY in outcome.flags,
             calls_used=0 if skipped else 1,
         )
 
     first = await attempt(prompt, replan_calls)
     reasons = _fix_reasons(
-        first.skipped, first.plan is None, first.off_catalog, first.advice_replaced
+        first.skipped,
+        first.plan is None,
+        first.off_catalog,
+        first.advice_replaced,
+        condition=first.condition_changed,
     )
     if not reasons:
         return first
@@ -244,7 +257,11 @@ async def run_replan(
     if second is None or second.skipped:
         return replace(first, fix_reasons=reasons)
     passed = not _fix_reasons(
-        False, second.plan is None, second.off_catalog, second.advice_replaced
+        False,
+        second.plan is None,
+        second.off_catalog,
+        second.advice_replaced,
+        condition=second.condition_changed,
     )
     chosen = second if second.plan is not None else first
     return replace(
@@ -472,16 +489,24 @@ async def run_planner(
 
 
 def _fix_reasons(
-    skipped: bool, unreadable: bool, off_catalog: bool, result_words: bool
+    skipped: bool,
+    unreadable: bool,
+    off_catalog: bool,
+    result_words: bool,
+    *,
+    condition: bool = False,
 ) -> tuple[str, ...]:
     """検査に落ちたところ。上限・停止でモデルを呼ばなかったときは直しようがないので空"""
     if skipped:
         return ()
     if unreadable:
         return (FIX_UNREADABLE,)
-    return tuple(
-        r for r, hit in ((FIX_OFF_CATALOG, off_catalog), (FIX_RESULT_WORDS, result_words)) if hit
+    hits = (
+        (FIX_OFF_CATALOG, off_catalog),
+        (FIX_CONDITION, condition),
+        (FIX_RESULT_WORDS, result_words),
     )
+    return tuple(r for r, hit in hits if hit)
 
 
 async def _self_correct(kind: str, reasons: tuple[str, ...], redo, before_retry=None):

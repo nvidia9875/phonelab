@@ -25,7 +25,14 @@ export function isNextStale(rec: StudyRecord): boolean {
   return !!rec.result && !rec.result.undecided && rec.nextSuggestion?.basis !== nextBasis(rec);
 }
 
-function fallback(rec: StudyRecord, theme: Theme): NextSuggestion {
+/** サーバの REFLECT_MISMATCH_WHY と同じ文 */
+export const REFLECT_MISMATCH_WHY = "予想と結果が食い違ったので、次の実験へ進む前に、なぜそうなったかを自分の言葉で書いてみよう";
+
+/** ラボ先生につながらないとき。食い違って理由がまだならふり返りが先（サーバの決まりごとと同じ。10/2 採点 4 回目） */
+export function fallback(rec: StudyRecord, theme: Theme): NextSuggestion {
+  if (rec.result?.consistent === false && !nextBasis(rec).startsWith("1")) {
+    return { action: "reflect", variantId: null, question: "", why: REFLECT_MISMATCH_WHY, source: "stub", traceId: null, trail: [] };
+  }
   const done = new Set([...doneVariantIds(theme.id), rec.variantId]);
   const nv = variantsOf(theme).find((v) => !done.has(v.id));
   if (!nv) return { action: "reflect", variantId: null, question: "", why: "このテーマの実験はひととおり終わりました", source: "stub", traceId: null, trail: [] };

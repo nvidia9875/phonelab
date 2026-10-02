@@ -34,7 +34,7 @@ from server.agent.class_agent import (
 )
 from server.agent.model_armor import ArmorClient
 from server.agent.next_step import parse_next
-from server.agent.planner import parse_plan, parse_replan
+from server.agent.planner import changes_condition, parse_plan, parse_replan
 
 PLANNER_CALLS_PER_EXPERIMENT = 5  # docs/policy.md 上限表 planner_calls_per_experiment
 PLANNER_TEMPERATURE = 0.2
@@ -56,6 +56,8 @@ PLAN_CANDIDATES_KEY = "plan_candidates"
 STUDENT_TEXT_KEY = "student_text"
 REPLAN_CANDIDATES_KEY = "replan_candidates"
 REPLAN_CALLS_KEY = "replan_calls"
+# 測り直している実験の id。助言がその条件の値（放す高さ・はじく強さ など）を変えさせていないか照らす
+REPLAN_VARIANT_KEY = "replan_variant"
 REPLAN_CALLS_PER_RECORD = 3
 NEUTRAL_ADVICE = (
     "やり方を一つだけ変えて、同じ条件でもう一度測ってみましょう。結果は測って見つけます"
@@ -65,6 +67,7 @@ NEXT_CALLS_KEY = "next_calls"
 NEUTRAL_QUESTION = "では、次の変数を変えたら、どうなると思う？ 予想を書いてから測ってみよう"
 PLAN_OFF_CATALOG_KEY = "phonelab.plan_off_catalog"
 PLAN_WHY_REPLACED_KEY = "phonelab.plan_why_replaced"
+PLAN_CONDITION_CHANGED_KEY = "phonelab.plan_condition_changed"
 # 「なぜこの実験か」に混じってはいけない、結果の言葉
 RESULT_WORDS = re.compile(
     r"速くな|遅くな|高くな|低くな|変わらな|同じにな|長くな|短くな|ほぼ同じ|ならない"
@@ -252,7 +255,9 @@ class PolicyPlugin(BasePlugin):
             return _check_next([str(c) for c in state.get(NEXT_CANDIDATES_KEY) or []], llm_response)
         if state.get(REPLAN_CANDIDATES_KEY) is not None:
             return _check_replan(
-                [str(c) for c in state.get(REPLAN_CANDIDATES_KEY) or []], llm_response
+                [str(c) for c in state.get(REPLAN_CANDIDATES_KEY) or []],
+                llm_response,
+                str(state.get(REPLAN_VARIANT_KEY) or ""),
             )
         if not state.get(ANSWER_LOCKED_KEY):
             return None
@@ -293,8 +298,11 @@ def _check_plan(
     return _text_response(plan.model_dump_json(), flags)
 
 
-def _check_replan(candidates: list[str], llm_response: LlmResponse) -> LlmResponse | None:
-    """再計画の出力: 候補外への切り替えは測り直しに、助言に混じった結果の言葉は中立の文に"""
+def _check_replan(
+    candidates: list[str], llm_response: LlmResponse, variant_id: str = ""
+) -> LlmResponse | None:
+    """再計画の出力: 候補外への切り替えは測り直しに、助言に混じった結果の言葉は中立の文に。
+    測り直しの助言が条件の値を変えさせていたら（「放す高さを低くして」）、別の実験になるので中立の文に"""
     plan = parse_replan(_response_text(llm_response))
     flags: dict[str, object] = {}
     with _tracer.start_as_current_span("phonelab.policy") as span:
@@ -310,6 +318,11 @@ def _check_replan(candidates: list[str], llm_response: LlmResponse) -> LlmRespon
         if RESULT_WORDS.search(plan.advice):
             plan = plan.model_copy(update={"advice": NEUTRAL_ADVICE})
             flags[PLAN_WHY_REPLACED_KEY] = True
+        term = changes_condition(plan.advice, variant_id) if plan.action == "retry" else None
+        if term:
+            span.set_attribute("phonelab.condition_term", term)
+            plan = plan.model_copy(update={"advice": NEUTRAL_ADVICE})
+            flags[PLAN_CONDITION_CHANGED_KEY] = term
         span.set_attribute("phonelab.decision", "fixed" if flags else "allow")
     if not flags:
         return None

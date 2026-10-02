@@ -6,12 +6,13 @@
 from __future__ import annotations
 
 from server.agent.catalog import CATALOG, short_changes
-from server.agent.runner import FIX_OFF_CATALOG, FIX_RESULT_WORDS, FIX_UNREADABLE
+from server.agent.runner import FIX_CONDITION, FIX_OFF_CATALOG, FIX_RESULT_WORDS, FIX_UNREADABLE
 
 FIX_WORDS = {
     FIX_UNREADABLE: "形が読めない",
     FIX_OFF_CATALOG: "候補にない実験",
     FIX_RESULT_WORDS: "結果の言葉が混じった",
+    FIX_CONDITION: "実験の条件を変えさせる助言",
 }
 MAX_LINES = 5
 
