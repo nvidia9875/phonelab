@@ -269,13 +269,17 @@ def test_the_planner_refuses_a_theme_whose_sensor_the_class_does_not_allow(clien
     assert fake_llm.requests == []
 
 
-def test_correct_pins_are_not_counted_against_the_attempt_limit(store, fake_llm):
-    """教員画面は 5 秒ごとに PIN 付きで更新する。正しい PIN で上限に当たってはいけない（9/18 Codex F2）"""
+def test_correct_pins_are_not_counted_and_a_session_survives_a_lockout(store, fake_llm):
+    """教員画面は 5 秒ごとに更新する。正しい PIN は数えない（9/18 Codex F2）。
+    間違いが上限に達したら正しい PIN でも 429（総当たり対策。10/2 採点 2-6）。
+    ただし PIN で入った先生のセッションの印は使い続けられる（同じ学校の IP の生徒に先生が締め出されない）"""
     app.dependency_overrides[get_class_store] = lambda: store
     limiter = SlidingWindowLimiter(limit=2, window_s=600)
     app.dependency_overrides[get_pin_limiter] = lambda: limiter
     try:
         client = TestClient(app)
+        first = client.post("/api/class/DEMO-2026/dashboard", json={"pin": PIN}).json()
+        token = first["session_token"]
         codes = [
             client.post("/api/class/DEMO-2026/dashboard", json={"pin": PIN}).status_code
             for _ in range(5)
@@ -286,13 +290,21 @@ def test_correct_pins_are_not_counted_against_the_attempt_limit(store, fake_llm)
             ).status_code
             for _ in range(3)
         ]
-        still_ok = client.post("/api/class/DEMO-2026/dashboard", json={"pin": PIN}).status_code
+        pin_after = client.post("/api/class/DEMO-2026/dashboard", json={"pin": PIN}).status_code
+        token_after = client.post(
+            "/api/class/DEMO-2026/dashboard", json={"token": token}
+        ).status_code
+        halt_with_token = client.post(
+            "/api/class/DEMO-2026/halt", json={"token": token, "halted": True}
+        ).status_code
     finally:
         app.dependency_overrides.clear()
 
     assert codes == [200] * 5
     assert wrong == [403, 403, 429]
-    assert still_ok == 200
+    assert pin_after == 429
+    assert token_after == 200
+    assert halt_with_token == 200
 
 
 def test_an_older_summary_arriving_late_does_not_replace_the_current_one(client):

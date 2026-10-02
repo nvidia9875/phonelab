@@ -12,6 +12,7 @@ from typing import Annotated, Literal
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, Field, field_validator
 
+from server import teacher_session
 from server.agent.catalog import CATALOG
 from server.agent.planner import HoldCode
 from server.classroom import (
@@ -40,6 +41,7 @@ RECORD_POSTS_PER_IP = 120 * 40
 RECORD_WINDOW_S = 600
 MAX_EVENTS = 12  # 判断の跡の行が増えたので 8 → 12（10/2）
 NOT_FOUND = "学級コードが見つかりません。先生に確認してください"
+PIN_LOCKED = "PIN の入力が多すぎます。少し待ってください（入っている教員画面はそのまま使えます）"
 
 Sensor = Literal["accelerometer", "gyroscope", "microphone", "camera"]
 
@@ -69,13 +71,18 @@ class JoinOut(BaseModel):
     secret: str | None = None
 
 
-class HaltRequest(BaseModel):
-    pin: str = Field(min_length=1, max_length=32)
+class TeacherAuth(BaseModel):
+    """PIN か、PIN で入ったときに渡したセッションの印のどちらか"""
+
+    pin: str = Field(default="", max_length=32)
+    token: str | None = Field(default=None, max_length=64)
+
+
+class HaltRequest(TeacherAuth):
     halted: bool
 
 
-class PolicyRequest(BaseModel):
-    pin: str = Field(min_length=1, max_length=32)
+class PolicyRequest(TeacherAuth):
     allowed_sensors: list[Sensor] = Field(max_length=len(SENSORS))
     teacher_enabled: list[Annotated[str, Field(max_length=60)]] = Field(
         default_factory=list, max_length=20
@@ -147,8 +154,8 @@ class RecordPost(BaseModel):
     record: RecordSummary
 
 
-class DashboardRequest(BaseModel):
-    pin: str = Field(min_length=1, max_length=32)
+class DashboardRequest(TeacherAuth):
+    pass
 
 
 class StudentOut(BaseModel):
@@ -158,6 +165,8 @@ class StudentOut(BaseModel):
 
 
 class DashboardOut(BaseModel):
+    # PIN で入ったら、以後はこの印で（授業中に PIN のロックアウトに巻き込まれない）
+    session_token: str | None = None
     class_code: str
     halted: bool
     allowed_sensors: list[str]
@@ -218,15 +227,26 @@ def _client_ip(request: Request) -> str:
 
 
 async def authorize_teacher(
-    store: ClassStore, limiter: SlidingWindowLimiter, request: Request, code: str, pin: str
+    store: ClassStore,
+    limiter: SlidingWindowLimiter,
+    request: Request,
+    code: str,
+    pin: str,
+    token: str | None = None,
 ) -> ClassRecord:
-    """PIN を確かめる。総当たりを防ぐため、**間違えた回数**を学級 × 接続元で数える。
-    正しい PIN は数えない（教員画面の 5 秒ごとの更新で上限を食いつぶさないように。9/18 Codex F2）"""
+    """先生を確かめる。セッションの印が有効ならそれで通す。PIN は学級 × 接続元で**間違えた回数**を数え、
+    上限に達したら、その間は正しい PIN でも 429（上限のあとに正しい候補だけ通ると総当たりできた。10/2 採点 2-6）。
+    正しい PIN は数えない（教員画面の 5 秒ごとの更新で上限を食いつぶさない。9/18 Codex F2）"""
     record = await _load(store, code)
-    if record.verify(pin):
+    if teacher_session.verify(record, token):
         return record
-    if not limiter.allow(f"{record.policy.class_code}|{_client_ip(request)}"):
-        raise HTTPException(status_code=429, detail="PIN の入力が多すぎます。少し待ってください")
+    key = f"{record.policy.class_code}|{_client_ip(request)}"
+    if limiter.exceeded(key):
+        raise HTTPException(status_code=429, detail=PIN_LOCKED)
+    if pin and record.verify(pin):
+        return record
+    if not limiter.allow(key):
+        raise HTTPException(status_code=429, detail=PIN_LOCKED)
     raise HTTPException(status_code=403, detail="PIN が違います")
 
 
@@ -281,7 +301,7 @@ async def reset_student(
     limiter: Annotated[SlidingWindowLimiter, Depends(get_pin_limiter)],
 ) -> dict[str, bool]:
     """先生が番号の合言葉を消す（端末を替えた・合言葉をなくした子のため）。次の入場で新しい合言葉が出る"""
-    record = await authorize_teacher(store, limiter, request, code, body.pin)
+    record = await authorize_teacher(store, limiter, request, code, body.pin, body.token)
     if not re.match(NUMBER_RE, number):
         raise HTTPException(status_code=404, detail="番号の形が違います")
     await store.set_student_auth(record.policy.class_code, number.upper(), None)
@@ -299,7 +319,7 @@ async def halt(
     limiter: Annotated[SlidingWindowLimiter, Depends(get_pin_limiter)],
 ) -> ClassOut:
     """全端末の測定を止める／解除する。止めるのは人だけ（ClassAgent の提案にこの種類は無い）"""
-    record = await authorize_teacher(store, limiter, request, code, body.pin)
+    record = await authorize_teacher(store, limiter, request, code, body.pin, body.token)
     policy = await store.update_policy(record.policy.class_code, halted=body.halted)
     if policy is None:
         raise HTTPException(status_code=404, detail=NOT_FOUND)
@@ -316,7 +336,7 @@ async def set_policy(
     limiter: Annotated[SlidingWindowLimiter, Depends(get_pin_limiter)],
 ) -> ClassOut:
     """許可するセンサーと、先生が有効化する実験（家でやる振り子など）"""
-    record = await authorize_teacher(store, limiter, request, code, body.pin)
+    record = await authorize_teacher(store, limiter, request, code, body.pin, body.token)
     # 停止（halted）には触れない。許可と有効化の 2 項目だけを書く
     policy = await store.update_policy(
         record.policy.class_code,
@@ -338,10 +358,13 @@ async def dashboard(
     limiter: Annotated[SlidingWindowLimiter, Depends(get_pin_limiter)],
 ) -> DashboardOut:
     """先生の 1 画面の元データ: 生徒ごとの「いまの記録」の要約。番号だけで名前は無い"""
-    record = await authorize_teacher(store, limiter, request, code, body.pin)
+    record = await authorize_teacher(store, limiter, request, code, body.pin, body.token)
     rows = await store.list_students(record.policy.class_code)
     response.headers["Cache-Control"] = "no-store"
     return DashboardOut(
+        session_token=body.token
+        if teacher_session.verify(record, body.token)
+        else teacher_session.issue(record),
         class_code=record.policy.class_code,
         halted=record.policy.halted,
         allowed_sensors=list(record.policy.allowed_sensors),

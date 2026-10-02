@@ -88,7 +88,7 @@ async def insight(
     runner: Annotated[Runner, Depends(get_insight_runner)],
 ) -> InsightResponse:
     """ラボ先生が学級の様子を読み、先生に 3 行で伝える。操作はしない"""
-    record = await authorize_teacher(store, pin_limiter, request, code, body.pin)
+    record = await authorize_teacher(store, pin_limiter, request, code, body.pin, body.token)
     class_code = record.policy.class_code
     response.headers["Cache-Control"] = "no-store"
     hit = _cache.get(class_code)

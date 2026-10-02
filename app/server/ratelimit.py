@@ -48,6 +48,17 @@ class SlidingWindowLimiter:
             hits.append(now)
             return True
 
+    def exceeded(self, key: str) -> bool:
+        """数えずに、上限に達しているかだけを見る（PIN のロックアウト）"""
+        now = self._clock()
+        with self._lock:
+            hits = self._hits.get(key)
+            if not hits:
+                return False
+            while hits and now - hits[0] >= self._window_s:
+                hits.popleft()
+            return len(hits) >= self._limit
+
     def _sweep(self, now: float) -> None:
         stale = [k for k, h in self._hits.items() if not h or now - h[-1] >= self._window_s]
         for k in stale:

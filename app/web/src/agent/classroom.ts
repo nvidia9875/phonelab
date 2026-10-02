@@ -59,6 +59,16 @@ async function call(path: string, init: RequestInit = {}): Promise<ClassInfo> {
 
 const enc = (code: string) => encodeURIComponent(code.trim().toUpperCase());
 
+/**
+ * 先生のセッションの印。PIN で入ったときに教員画面の元データと一緒に届き、以後の呼び出しに付ける。
+ * PIN の総当たりで学級がロックされても、入っている先生の画面は止まらない（10/2 採点 2-6）
+ */
+const teacherTokens = new Map<string, string>();
+function teacherAuth(classCode: string, pin: string): { pin: string; token?: string } {
+  const token = teacherTokens.get(classCode.trim().toUpperCase());
+  return token ? { pin, token } : { pin };
+}
+
 export interface JoinInfo extends ClassInfo {
   number: string;
   /** 最初の入場でだけ返る合言葉。2 台目（家のスマホ）は同じ番号にこれを添える */
@@ -75,7 +85,7 @@ export async function joinClass(classCode: string, number: string, secret?: stri
 
 /** 先生が番号の合言葉を消す（端末を替えた子のため） */
 export async function resetStudent(classCode: string, pin: string, number: string): Promise<void> {
-  const res = await fetch(`/api/class/${enc(classCode)}/students/${encodeURIComponent(number)}/reset`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pin }) });
+  const res = await fetch(`/api/class/${enc(classCode)}/students/${encodeURIComponent(number)}/reset`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(teacherAuth(classCode, pin)) });
   if (!res.ok) throw new ClassError(`リセットに失敗しました（${res.status}）`, res.status);
 }
 
@@ -84,11 +94,11 @@ export function fetchClass(classCode: string): Promise<ClassInfo> {
 }
 
 export function setClassHalt(classCode: string, pin: string, halted: boolean): Promise<ClassInfo> {
-  return call(`/api/class/${enc(classCode)}/halt`, { method: "POST", body: JSON.stringify({ pin, halted }) });
+  return call(`/api/class/${enc(classCode)}/halt`, { method: "POST", body: JSON.stringify({ ...teacherAuth(classCode, pin), halted }) });
 }
 
 export function setClassPolicyOnServer(classCode: string, pin: string, allowedSensors: Sensor[], teacherEnabled: string[]): Promise<ClassInfo> {
-  return call(`/api/class/${enc(classCode)}/policy`, { method: "PUT", body: JSON.stringify({ pin, allowed_sensors: allowedSensors, teacher_enabled: teacherEnabled }) });
+  return call(`/api/class/${enc(classCode)}/policy`, { method: "PUT", body: JSON.stringify({ ...teacherAuth(classCode, pin), allowed_sensors: allowedSensors, teacher_enabled: teacherEnabled }) });
 }
 
 /* ---------- 記録の要約と、先生の 1 画面 ---------- */
@@ -119,6 +129,8 @@ export interface StudentRow {
 }
 
 export interface DashboardInfo {
+  /** PIN で入ったときにサーバが渡すセッションの印（8 時間） */
+  session_token?: string | null;
   class_code: string;
   halted: boolean;
   allowed_sensors: string[];
@@ -137,7 +149,7 @@ export async function fetchDashboard(classCode: string, pin: string): Promise<Da
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
   let res: Response;
   try {
-    res = await fetch(`/api/class/${enc(classCode)}/dashboard`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pin }), signal: controller.signal, cache: "no-store" });
+    res = await fetch(`/api/class/${enc(classCode)}/dashboard`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(teacherAuth(classCode, pin)), signal: controller.signal, cache: "no-store" });
   } catch {
     throw new ClassError("学級につながりませんでした", 0);
   } finally {
@@ -152,7 +164,9 @@ export async function fetchDashboard(classCode: string, pin: string): Promise<Da
     }
     throw new ClassError(detail || `学級の情報を取れませんでした（${res.status}）`, res.status);
   }
-  return (await res.json()) as DashboardInfo;
+  const data = (await res.json()) as DashboardInfo;
+  if (data.session_token) teacherTokens.set(classCode.trim().toUpperCase(), data.session_token);
+  return data;
 }
 
 /** 学級の見立て（POST /api/class/{code}/insight）。ラボ先生が読み取り専用のツールで学級を読み、先生に 3 行で伝える */
@@ -178,7 +192,7 @@ export async function fetchInsight(classCode: string, pin: string): Promise<Insi
   const timer = setTimeout(() => controller.abort(), INSIGHT_TIMEOUT_MS);
   let res: Response;
   try {
-    res = await fetch(`/api/class/${enc(classCode)}/insight`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pin }), signal: controller.signal, cache: "no-store" });
+    res = await fetch(`/api/class/${enc(classCode)}/insight`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(teacherAuth(classCode, pin)), signal: controller.signal, cache: "no-store" });
   } catch {
     throw new ClassError("ラボ先生につながりませんでした", 0);
   } finally {
