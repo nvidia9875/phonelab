@@ -1,0 +1,245 @@
+{
+  "source": "web/src/agent/stub.ts choosePlan / readClaim",
+  "rows": [
+    {
+      "text": "強くはじくとゴムが速く震えるから、音が高くなると思う",
+      "question": false,
+      "variant": "sound_pluck_strength",
+      "variable": "strength",
+      "claim_variable": "strength",
+      "claim_direction": "faster"
+    },
+    {
+      "text": "強くはじいても、音の高さは変わらないと思う。大きさが変わるだけだから",
+      "question": false,
+      "variant": "sound_pluck_strength",
+      "variable": "strength",
+      "claim_variable": "strength",
+      "claim_direction": "same"
+    },
+    {
+      "text": "強くはじくと低くなる",
+      "question": true,
+      "variant": "sound_pluck_strength",
+      "variable": "strength",
+      "claim_variable": "strength",
+      "claim_direction": "slower"
+    },
+    {
+      "text": "震える長さを短くすると、ギターみたいに高い音になると思う",
+      "question": true,
+      "variant": "sound_string_length",
+      "variable": "length",
+      "claim_variable": "length",
+      "claim_direction": "faster"
+    },
+    {
+      "text": "長さを短くしても変わらない",
+      "question": true,
+      "variant": "sound_string_length",
+      "variable": "length",
+      "claim_variable": "length",
+      "claim_direction": "same"
+    },
+    {
+      "text": "ゴムを短くすると音が低くなる気がする。短いと重くなるから",
+      "question": false,
+      "variant": "sound_string_length",
+      "variable": "length",
+      "claim_variable": "length",
+      "claim_direction": "slower"
+    },
+    {
+      "text": "なんとなく高くなる",
+      "question": true,
+      "variant": "sound_pluck_strength",
+      "variable": "strength",
+      "claim_variable": "unknown",
+      "claim_direction": "faster"
+    },
+    {
+      "text": "輪ゴムの色を変えたら音が変わると思う",
+      "question": true,
+      "variant": "sound_pluck_strength",
+      "variable": "strength",
+      "claim_variable": "unknown",
+      "claim_direction": "unknown"
+    },
+    {
+      "text": "強くすると高くなって、短くしても高くなると思う。どちらも震えが速くなるから",
+      "question": false,
+      "variant": "sound_pluck_strength",
+      "variable": "strength",
+      "claim_variable": "strength",
+      "claim_direction": "faster"
+    },
+    {
+      "text": "はじく力が強いほど振動数が上がるので高音になる",
+      "question": false,
+      "variant": "sound_pluck_strength",
+      "variable": "strength",
+      "claim_variable": "strength",
+      "claim_direction": "faster"
+    },
+    {
+      "text": "高いところから放すほど、いちばん下で速くなると思う。勢いがつくから",
+      "question": false,
+      "variant": "energy_height",
+      "variable": "height",
+      "claim_variable": "height",
+      "claim_direction": "faster"
+    },
+    {
+      "text": "高さを2倍にすると速さも2倍になる",
+      "question": true,
+      "variant": "energy_height",
+      "variable": "height",
+      "claim_variable": "height",
+      "claim_direction": "faster"
+    },
+    {
+      "text": "高さを変えても速さは変わらないと思う",
+      "question": true,
+      "variant": "energy_height",
+      "variable": "height",
+      "claim_variable": "height",
+      "claim_direction": "same"
+    },
+    {
+      "text": "重いほうが速く落ちるから、いちばん下での速さも速くなると思う",
+      "question": false,
+      "variant": "energy_mass",
+      "variable": "mass",
+      "claim_variable": "mass",
+      "claim_direction": "faster"
+    },
+    {
+      "text": "重さを増やしても速さは同じ。ガリレオの話を聞いたことがある",
+      "question": false,
+      "variant": "energy_mass",
+      "variable": "mass",
+      "claim_variable": "mass",
+      "claim_direction": "same"
+    },
+    {
+      "text": "重いと遅くなる",
+      "question": true,
+      "variant": "energy_mass",
+      "variable": "mass",
+      "claim_variable": "mass",
+      "claim_direction": "slower"
+    },
+    {
+      "text": "消しゴムを足すと空気の抵抗が増えて遅くなると思う",
+      "question": true,
+      "variant": "energy_height",
+      "variable": "height",
+      "claim_variable": "unknown",
+      "claim_direction": "slower"
+    },
+    {
+      "text": "振り子は不思議",
+      "question": true,
+      "variant": "energy_height",
+      "variable": "height",
+      "claim_variable": "unknown",
+      "claim_direction": "unknown"
+    },
+    {
+      "text": "放す位置を上げたら、下を通るときもっと速い。位置エネルギーが大きいので",
+      "question": false,
+      "variant": "energy_height",
+      "variable": "height",
+      "claim_variable": "unknown",
+      "claim_direction": "faster"
+    },
+    {
+      "text": "糸を長くしたら速くなると思う",
+      "question": true,
+      "variant": "energy_height",
+      "variable": "height",
+      "claim_variable": "unknown",
+      "claim_direction": "faster"
+    },
+    {
+      "text": "水を入れると音が高くなると思う。空気の部分が短くなるから",
+      "question": false,
+      "variant": "bottle_water",
+      "variable": "water",
+      "claim_variable": "water",
+      "claim_direction": "faster"
+    },
+    {
+      "text": "水を増やすと低くなる",
+      "question": true,
+      "variant": "bottle_water",
+      "variable": "water",
+      "claim_variable": "water",
+      "claim_direction": "slower"
+    },
+    {
+      "text": "水の量では音は変わらないと思う。ボトルは同じだから",
+      "question": false,
+      "variant": "bottle_water",
+      "variable": "water",
+      "claim_variable": "water",
+      "claim_direction": "same"
+    },
+    {
+      "text": "水を半分にすると、ボーという低い音になるはず",
+      "question": true,
+      "variant": "bottle_water",
+      "variable": "water",
+      "claim_variable": "water",
+      "claim_direction": "slower"
+    },
+    {
+      "text": "ボトルをたたく強さで高さが変わる",
+      "question": true,
+      "variant": "bottle_water",
+      "variable": "water",
+      "claim_variable": "unknown",
+      "claim_direction": "unknown"
+    },
+    {
+      "text": "たぶん高くなるけど自信はない。強くはじいたら",
+      "question": true,
+      "variant": "sound_pluck_strength",
+      "variable": "strength",
+      "claim_variable": "strength",
+      "claim_direction": "faster"
+    },
+    {
+      "text": "I think a shorter band makes a higher sound because it vibrates faster",
+      "question": true,
+      "variant": "sound_pluck_strength",
+      "variable": "strength",
+      "claim_variable": "unknown",
+      "claim_direction": "unknown"
+    },
+    {
+      "text": "高さ10cmと20cmでは、20cmのほうが1.4倍くらい速いと思う。√2だから",
+      "question": false,
+      "variant": "energy_height",
+      "variable": "height",
+      "claim_variable": "height",
+      "claim_direction": "faster"
+    },
+    {
+      "text": "水を足すほど空気が減るから音は高くなると思う",
+      "question": false,
+      "variant": "bottle_water",
+      "variable": "water",
+      "claim_variable": "water",
+      "claim_direction": "faster"
+    },
+    {
+      "text": "長さを半分にしたら1オクターブ上がると思う。弦楽器と同じだから",
+      "question": false,
+      "variant": "sound_string_length",
+      "variable": "length",
+      "claim_variable": "length",
+      "claim_direction": "same"
+    }
+  ]
+}

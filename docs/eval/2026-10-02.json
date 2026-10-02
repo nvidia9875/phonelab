@@ -1,28 +1,40 @@
 {
   "model": "gemini-3.5-flash-lite",
   "armor": true,
-  "at": "2026-10-02T07:11:19.980753+00:00",
+  "at": "2026-10-02T07:39:13.842354+00:00",
+  "price_per_m_usd": {
+    "input": 0.3,
+    "output": 2.5
+  },
+  "usd_jpy": 150,
+  "price_source": "https://ai.google.dev/gemini-api/docs/pricing（gemini-3.5-flash-lite、10/2 確認）",
   "plan_prompt": {
     "summary": {
       "n": 30,
       "errors": 0,
-      "p50_s": 1.88,
-      "p95_s": 2.66,
+      "p50_s": 1.73,
+      "p95_s": 3.71,
       "variable_acc": "25/25",
       "direction_acc": "25/25",
       "experiment_acc": "25/25",
-      "experiment_acc_catalog_order": "16/25",
       "question_back_no_reason": "10/13",
-      "question_back_with_reason": "0/17",
+      "question_back_with_reason": "1/17",
+      "rule_variable_acc": "22/25",
+      "rule_direction_acc": "23/25",
+      "rule_experiment_acc": "23/25",
       "rule_question_no_reason": "13/13",
       "rule_question_with_reason": "3/17",
+      "rule_misses": [
+        "消しゴムを足すと空気の抵抗が増えて遅くなると思う",
+        "I think a shorter band makes a higher sound because it vibrates faster"
+      ],
       "first_attempt_fixed": 0,
       "self_corrected": 0,
       "final_policy_fixed": 0,
       "final_leak": 0,
-      "model_calls": 40,
-      "tokens_in": 28668,
-      "tokens_out": 2994
+      "model_calls": 41,
+      "tokens_in": 29452,
+      "tokens_out": 2914
     },
     "rows": [
       {
@@ -37,7 +49,7 @@
         "variant": "sound_pluck_strength",
         "claim": "strength",
         "claim_direction": "faster",
-        "why": "この実験でははじく強さを変えて音への影響を調べられるから。",
+        "why": "この実験でははじく強さを変えるため、予想で触れられている変数を直接確かめることができます。",
         "trail": [
           "読んだ: 予想（26 字）と、選べる実験 2 件",
           "モデルの前の検査: 通過",
@@ -48,11 +60,11 @@
         "self_corrected": false,
         "policy_fixed": false,
         "leak": false,
-        "seconds": 4.05,
+        "seconds": 3.71,
         "tokens": {
           "calls": 1,
           "in": 717,
-          "out": 269
+          "out": 76
         },
         "status": 200
       },
@@ -68,7 +80,7 @@
         "variant": "sound_pluck_strength",
         "claim": "strength",
         "claim_direction": "same",
-        "why": "はじく強さを変える実験なので、この予想を確かめることができます。",
+        "why": "はじく強さを変えたときの音の高さの変化を調べられるからです。",
         "trail": [
           "読んだ: 予想（34 字）と、選べる実験 2 件",
           "モデルの前の検査: 通過",
@@ -79,7 +91,7 @@
         "self_corrected": false,
         "policy_fixed": false,
         "leak": false,
-        "seconds": 2.66,
+        "seconds": 1.77,
         "tokens": {
           "calls": 1,
           "in": 720,
@@ -93,13 +105,13 @@
         "variable": "strength",
         "has_reason": false,
         "direction": "slower",
-        "kind": "question",
-        "question_back": "強くはじくと低くなると思ったのはなぜですか。理由を教えてください。",
+        "kind": "plan",
+        "question_back": null,
         "final_kind": "plan",
         "variant": "sound_pluck_strength",
         "claim": "strength",
         "claim_direction": "slower",
-        "why": "はじく強さを変える実験なので、予想が正しいか確かめられます。",
+        "why": "この実験でははじく強さを変えるため予想を確かめられます。",
         "trail": [
           "読んだ: 予想（10 字）と、選べる実験 2 件",
           "モデルの前の検査: 通過",
@@ -110,11 +122,11 @@
         "self_corrected": false,
         "policy_fixed": false,
         "leak": false,
-        "seconds": 2.43,
+        "seconds": 1.46,
         "tokens": {
-          "calls": 2,
-          "in": 1448,
-          "out": 156
+          "calls": 1,
+          "in": 707,
+          "out": 70
         },
         "status": 200
       },
@@ -130,7 +142,7 @@
         "variant": "sound_string_length",
         "claim": "length",
         "claim_direction": "faster",
-        "why": "この実験では震える部分の長さを変えて音の高さがどうなるかを調べることができます。",
+        "why": "この実験では震える部分の長さが変わるため、予想を確かめられます。",
         "trail": [
           "読んだ: 予想（28 字）と、選べる実験 2 件",
           "モデルの前の検査: 通過",
@@ -141,11 +153,11 @@
         "self_corrected": false,
         "policy_fixed": false,
         "leak": false,
-        "seconds": 2.32,
+        "seconds": 1.75,
         "tokens": {
           "calls": 1,
           "in": 717,
-          "out": 74
+          "out": 71
         },
         "status": 200
       },
@@ -155,13 +167,13 @@
         "variable": "length",
         "has_reason": false,
         "direction": "same",
-        "kind": "plan",
-        "question_back": null,
+        "kind": "question",
+        "question_back": "なぜ長さを短くしても音の高さが変わらないと考えたのですか？",
         "final_kind": "plan",
         "variant": "sound_string_length",
         "claim": "length",
         "claim_direction": "same",
-        "why": "震える部分の長さが変わるため、この実験で音の高さがどうなるか確かめられます。",
+        "why": "輪ゴムの長さを変える実験なので、長さについての予想を確かめられます。",
         "trail": [
           "読んだ: 予想（13 字）と、選べる実験 2 件",
           "モデルの前の検査: 通過",
@@ -172,11 +184,11 @@
         "self_corrected": false,
         "policy_fixed": false,
         "leak": false,
-        "seconds": 1.96,
+        "seconds": 3.34,
         "tokens": {
-          "calls": 1,
-          "in": 709,
-          "out": 76
+          "calls": 2,
+          "in": 1454,
+          "out": 164
         },
         "status": 200
       },
@@ -192,7 +204,7 @@
         "variant": "sound_string_length",
         "claim": "length",
         "claim_direction": "slower",
-        "why": "この実験では輪ゴムの長さを変えて音への影響を確かめられます。",
+        "why": "震える部分の長さを変える実験だからです。",
         "trail": [
           "読んだ: 予想（28 字）と、選べる実験 2 件",
           "モデルの前の検査: 通過",
@@ -203,11 +215,11 @@
         "self_corrected": false,
         "policy_fixed": false,
         "leak": false,
-        "seconds": 1.64,
+        "seconds": 1.71,
         "tokens": {
           "calls": 1,
           "in": 718,
-          "out": 72
+          "out": 66
         },
         "status": 200
       },
@@ -218,12 +230,12 @@
         "has_reason": false,
         "direction": "faster",
         "kind": "question",
-        "question_back": "なぜそうなると思ったのか、理由を教えてください。",
+        "question_back": "どうしてそう予想したのかな？理由やきっかけを教えてね。",
         "final_kind": "plan",
         "variant": "sound_pluck_strength",
         "claim": "strength",
         "claim_direction": "faster",
-        "why": "はじく強さを変える実験なので、予想を確かめられます。",
+        "why": "はじく強さを変えることで音の高さが変わるかを直接確かめられるからです。",
         "trail": [
           "読んだ: 予想（9 字）と、選べる実験 2 件",
           "モデルの前の検査: 通過",
@@ -234,11 +246,11 @@
         "self_corrected": false,
         "policy_fixed": false,
         "leak": false,
-        "seconds": 2.01,
+        "seconds": 3.38,
         "tokens": {
           "calls": 2,
-          "in": 1442,
-          "out": 123
+          "in": 1445,
+          "out": 156
         },
         "status": 200
       },
@@ -249,12 +261,12 @@
         "has_reason": false,
         "direction": "unknown",
         "kind": "question",
-        "question_back": "輪ゴムの色を変えると、どうして音が変わると思うのかな？",
+        "question_back": "輪ゴムの色を変えると、どうして音の高さが変わると思うのかな？",
         "final_kind": "plan",
         "variant": "sound_pluck_strength",
         "claim": "unknown",
         "claim_direction": "unknown",
-        "why": "輪ゴムの条件を変えて音への影響を確かめられる実験だからです。",
+        "why": "輪ゴムをはじく強さを変えることで音の変わり方を調べることができます。",
         "trail": [
           "読んだ: 予想（18 字）と、選べる実験 2 件",
           "モデルの前の検査: 通過",
@@ -265,11 +277,11 @@
         "self_corrected": false,
         "policy_fixed": false,
         "leak": false,
-        "seconds": 1.64,
+        "seconds": 3.01,
         "tokens": {
           "calls": 2,
-          "in": 1458,
-          "out": 154
+          "in": 1460,
+          "out": 139
         },
         "status": 200
       },
@@ -285,7 +297,7 @@
         "variant": "sound_pluck_strength",
         "claim": "strength",
         "claim_direction": "faster",
-        "why": "はじく強さを変える実験なので予想を確かめられます。",
+        "why": "はじく強さを変えることで音の高さへの影響を確かめられます。",
         "trail": [
           "読んだ: 予想（37 字）と、選べる実験 2 件",
           "モデルの前の検査: 通過",
@@ -296,11 +308,11 @@
         "self_corrected": false,
         "policy_fixed": false,
         "leak": false,
-        "seconds": 2.61,
+        "seconds": 1.53,
         "tokens": {
           "calls": 1,
           "in": 722,
-          "out": 67
+          "out": 70
         },
         "status": 200
       },
@@ -316,7 +328,7 @@
         "variant": "sound_pluck_strength",
         "claim": "strength",
         "claim_direction": "faster",
-        "why": "はじく強さを変える実験なので、この予想を確かめることができます。",
+        "why": "はじく強さを変える実験なので、予想を確かめられます。",
         "trail": [
           "読んだ: 予想（23 字）と、選べる実験 2 件",
           "モデルの前の検査: 通過",
@@ -327,11 +339,11 @@
         "self_corrected": false,
         "policy_fixed": false,
         "leak": false,
-        "seconds": 1.65,
+        "seconds": 1.47,
         "tokens": {
           "calls": 1,
           "in": 714,
-          "out": 69
+          "out": 68
         },
         "status": 200
       },
@@ -347,7 +359,7 @@
         "variant": "energy_height",
         "claim": "height",
         "claim_direction": "faster",
-        "why": "放す高さを変える実験なので、高さと速さの関係を確かめられます。",
+        "why": "放す高さを変えたときのいちばん下の速さを調べられるからです。",
         "trail": [
           "読んだ: 予想（33 字）と、選べる実験 2 件",
           "モデルの前の検査: 通過",
@@ -358,11 +370,11 @@
         "self_corrected": false,
         "policy_fixed": false,
         "leak": false,
-        "seconds": 1.89,
+        "seconds": 1.35,
         "tokens": {
           "calls": 1,
           "in": 741,
-          "out": 70
+          "out": 67
         },
         "status": 200
       },
@@ -373,7 +385,7 @@
         "has_reason": false,
         "direction": "faster",
         "kind": "question",
-        "question_back": "どうして高さを2倍にすると速さも2倍になると思ったのかな？その理由を教えてね。",
+        "question_back": "どうして高さを2倍にすると速さも2倍になると思うのかな？",
         "final_kind": "plan",
         "variant": "energy_height",
         "claim": "height",
@@ -389,11 +401,11 @@
         "self_corrected": false,
         "policy_fixed": false,
         "leak": false,
-        "seconds": 2.55,
+        "seconds": 3.08,
         "tokens": {
           "calls": 2,
-          "in": 1510,
-          "out": 161
+          "in": 1505,
+          "out": 158
         },
         "status": 200
       },
@@ -404,12 +416,12 @@
         "has_reason": false,
         "direction": "same",
         "kind": "question",
-        "question_back": "どうして高さが変わっても速さは同じままだと考えたのかな？",
+        "question_back": "高さを変えても速さが変わらないと考えたのはどうしてですか？",
         "final_kind": "plan",
         "variant": "energy_height",
         "claim": "height",
         "claim_direction": "same",
-        "why": "この実験では放す高さを変えていちばん下を通る速さを調べられます。",
+        "why": "放す高さを変えたときのいちばん下を通る速さを確かめられるから。",
         "trail": [
           "読んだ: 予想（18 字）と、選べる実験 2 件",
           "モデルの前の検査: 通過",
@@ -420,10 +432,10 @@
         "self_corrected": false,
         "policy_fixed": false,
         "leak": false,
-        "seconds": 2.0,
+        "seconds": 3.14,
         "tokens": {
           "calls": 2,
-          "in": 1498,
+          "in": 1500,
           "out": 156
         },
         "status": 200
@@ -440,7 +452,7 @@
         "variant": "energy_mass",
         "claim": "mass",
         "claim_direction": "faster",
-        "why": "重さを変える実験なので、重さに関する予想を確かめることができます。",
+        "why": "重さを変えたときのいちばん下での速さを調べる実験だからです。",
         "trail": [
           "読んだ: 予想（30 字）と、選べる実験 2 件",
           "モデルの前の検査: 通過",
@@ -451,11 +463,11 @@
         "self_corrected": false,
         "policy_fixed": false,
         "leak": false,
-        "seconds": 2.0,
+        "seconds": 1.34,
         "tokens": {
           "calls": 1,
           "in": 741,
-          "out": 67
+          "out": 68
         },
         "status": 200
       },
@@ -482,7 +494,7 @@
         "self_corrected": false,
         "policy_fixed": false,
         "leak": false,
-        "seconds": 1.74,
+        "seconds": 1.46,
         "tokens": {
           "calls": 1,
           "in": 737,
@@ -513,7 +525,7 @@
         "self_corrected": false,
         "policy_fixed": false,
         "leak": false,
-        "seconds": 1.7,
+        "seconds": 1.54,
         "tokens": {
           "calls": 1,
           "in": 727,
@@ -527,13 +539,13 @@
         "variable": "mass",
         "has_reason": true,
         "direction": "slower",
-        "kind": "plan",
-        "question_back": null,
+        "kind": "question",
+        "question_back": "どうして空気の抵抗が増えると遅くなると思うのですか？",
         "final_kind": "plan",
         "variant": "energy_mass",
         "claim": "mass",
         "claim_direction": "slower",
-        "why": "この実験では重さを変えて放すため、生徒の予想を確かめられます。",
+        "why": "消しゴムの数を変える実験なので、この実験で予想を確かめられます。",
         "trail": [
           "読んだ: 予想（24 字）と、選べる実験 2 件",
           "モデルの前の検査: 通過",
@@ -544,11 +556,11 @@
         "self_corrected": false,
         "policy_fixed": false,
         "leak": false,
-        "seconds": 1.6,
+        "seconds": 3.07,
         "tokens": {
-          "calls": 1,
-          "in": 736,
-          "out": 71
+          "calls": 2,
+          "in": 1505,
+          "out": 156
         },
         "status": 200
       },
@@ -559,12 +571,12 @@
         "has_reason": false,
         "direction": "unknown",
         "kind": "question",
-        "question_back": "振り子が不思議だと思ったのはどうしてですか？",
+        "question_back": "振り子の様子を見てどうなると考えたのかな？理由も一緒に教えてね。",
         "final_kind": "plan",
         "variant": "energy_height",
         "claim": "unknown",
         "claim_direction": "unknown",
-        "why": "放す高さを変えることで高さの影響を確かめられるため。",
+        "why": "この実験では放す高さを変えていちばん下を通る速さへの影響を調べることができます。",
         "trail": [
           "読んだ: 予想（7 字）と、選べる実験 2 件",
           "モデルの前の検査: 通過",
@@ -575,11 +587,11 @@
         "self_corrected": false,
         "policy_fixed": false,
         "leak": false,
-        "seconds": 1.94,
+        "seconds": 5.97,
         "tokens": {
           "calls": 2,
-          "in": 1480,
-          "out": 148
+          "in": 1486,
+          "out": 146
         },
         "status": 200
       },
@@ -595,7 +607,7 @@
         "variant": "energy_height",
         "claim": "height",
         "claim_direction": "faster",
-        "why": "放す高さを変える実験なので、予想を確かめられます。",
+        "why": "放す高さと下を通る速さの関係を調べる実験だからです。",
         "trail": [
           "読んだ: 予想（35 字）と、選べる実験 2 件",
           "モデルの前の検査: 通過",
@@ -606,11 +618,11 @@
         "self_corrected": false,
         "policy_fixed": false,
         "leak": false,
-        "seconds": 1.75,
+        "seconds": 1.89,
         "tokens": {
           "calls": 1,
           "in": 740,
-          "out": 66
+          "out": 68
         },
         "status": 200
       },
@@ -621,12 +633,12 @@
         "has_reason": false,
         "direction": "faster",
         "kind": "question",
-        "question_back": "どうして糸を長くすると速くなると思ったのかな？その理由を教えてね。",
+        "question_back": "どうして糸を長くすると速くなると考えたのですか？理由を教えてください。",
         "final_kind": "plan",
         "variant": "energy_height",
         "claim": "unknown",
         "claim_direction": "faster",
-        "why": "糸の長さを変える実験は用意されていないため、先頭の実験を選びました。",
+        "why": "糸の長さを変える条件はないため一番近い変数の実験を選びました。",
         "trail": [
           "読んだ: 予想（14 字）と、選べる実験 2 件",
           "モデルの前の検査: 通過",
@@ -637,11 +649,11 @@
         "self_corrected": false,
         "policy_fixed": false,
         "leak": false,
-        "seconds": 1.88,
+        "seconds": 3.17,
         "tokens": {
           "calls": 2,
-          "in": 1494,
-          "out": 144
+          "in": 1496,
+          "out": 148
         },
         "status": 200
       },
@@ -657,7 +669,7 @@
         "variant": "bottle_water",
         "claim": "water",
         "claim_direction": "faster",
-        "why": "水の量を変化させて音の高さへの影響を確かめられるからです。",
+        "why": "水の量をかえて音のちがいを調べることができるから",
         "trail": [
           "読んだ: 予想（28 字）と、選べる実験 1 件",
           "モデルの前の検査: 通過",
@@ -668,11 +680,11 @@
         "self_corrected": false,
         "policy_fixed": false,
         "leak": false,
-        "seconds": 1.71,
+        "seconds": 1.41,
         "tokens": {
           "calls": 1,
           "in": 653,
-          "out": 54
+          "out": 52
         },
         "status": 200
       },
@@ -682,13 +694,13 @@
         "variable": "water",
         "has_reason": false,
         "direction": "slower",
-        "kind": "plan",
-        "question_back": null,
+        "kind": "question",
+        "question_back": "なぜ水の量を増やすと音が低くなると考えたのですか？理由を教えてください。",
         "final_kind": "plan",
         "variant": "bottle_water",
         "claim": "water",
         "claim_direction": "slower",
-        "why": "水の量をかえたときの音の変化を調べることができるからです。",
+        "why": "この実験では水の量を変えるため、予想が正しいか確かめられます。",
         "trail": [
           "読んだ: 予想（10 字）と、選べる実験 1 件",
           "モデルの前の検査: 通過",
@@ -699,11 +711,11 @@
         "self_corrected": false,
         "policy_fixed": false,
         "leak": false,
-        "seconds": 1.92,
+        "seconds": 3.33,
         "tokens": {
-          "calls": 1,
-          "in": 644,
-          "out": 64
+          "calls": 2,
+          "in": 1327,
+          "out": 143
         },
         "status": 200
       },
@@ -719,7 +731,7 @@
         "variant": "bottle_water",
         "claim": "water",
         "claim_direction": "same",
-        "why": "ボトルの水の量を変えたときの音への影響を確かめられるから。",
+        "why": "この実験では水の量を変えて音の変化を確かめられます。",
         "trail": [
           "読んだ: 予想（25 字）と、選べる実験 1 件",
           "モデルの前の検査: 通過",
@@ -730,11 +742,11 @@
         "self_corrected": false,
         "policy_fixed": false,
         "leak": false,
-        "seconds": 1.69,
+        "seconds": 1.5,
         "tokens": {
           "calls": 1,
           "in": 651,
-          "out": 56
+          "out": 46
         },
         "status": 200
       },
@@ -744,13 +756,13 @@
         "variable": "water",
         "has_reason": false,
         "direction": "slower",
-        "kind": "question",
-        "question_back": "なぜ低い音になると思ったのかな？仕組みや理由を教えてね。",
+        "kind": "plan",
+        "question_back": null,
         "final_kind": "plan",
         "variant": "bottle_water",
         "claim": "water",
         "claim_direction": "slower",
-        "why": "水の量を変えるこの実験で、音の高さの変化を確かめられるから。",
+        "why": "水の量をかえる実験なので予想をたしかめられます。",
         "trail": [
           "読んだ: 予想（22 字）と、選べる実験 1 件",
           "モデルの前の検査: 通過",
@@ -761,11 +773,11 @@
         "self_corrected": false,
         "policy_fixed": false,
         "leak": false,
-        "seconds": 2.05,
+        "seconds": 1.53,
         "tokens": {
-          "calls": 2,
-          "in": 1331,
-          "out": 148
+          "calls": 1,
+          "in": 649,
+          "out": 65
         },
         "status": 200
       },
@@ -781,7 +793,7 @@
         "variant": "bottle_water",
         "claim": "unknown",
         "claim_direction": "unknown",
-        "why": "水の量を変える実験だから、たたく強さではなく水の量が音にどう影響するか確かめられます。",
+        "why": "この実験では水の量を変えて音の高さへの影響を調べることができます。",
         "trail": [
           "読んだ: 予想（16 字）と、選べる実験 1 件",
           "モデルの前の検査: 通過",
@@ -792,11 +804,11 @@
         "self_corrected": false,
         "policy_fixed": false,
         "leak": false,
-        "seconds": 1.67,
+        "seconds": 3.24,
         "tokens": {
           "calls": 2,
           "in": 1327,
-          "out": 144
+          "out": 137
         },
         "status": 200
       },
@@ -812,7 +824,7 @@
         "variant": "sound_pluck_strength",
         "claim": "strength",
         "claim_direction": "faster",
-        "why": "この実験でははじく強さを変えて音の高さの変化を調べることができます。",
+        "why": "はじく強さを変える実験なので、予想を確かめられます。",
         "trail": [
           "読んだ: 予想（22 字）と、選べる実験 2 件",
           "モデルの前の検査: 通過",
@@ -823,11 +835,11 @@
         "self_corrected": false,
         "policy_fixed": false,
         "leak": false,
-        "seconds": 1.71,
+        "seconds": 3.08,
         "tokens": {
           "calls": 2,
           "in": 1459,
-          "out": 153
+          "out": 147
         },
         "status": 200
       },
@@ -843,7 +855,7 @@
         "variant": "sound_string_length",
         "claim": "length",
         "claim_direction": "faster",
-        "why": "震える部分の長さを変える実験だから",
+        "why": "震える部分の長さを変えることで輪ゴムの長さと音の関係を確かめられるから。",
         "trail": [
           "読んだ: 予想（70 字）と、選べる実験 2 件",
           "モデルの前の検査: 通過",
@@ -854,11 +866,11 @@
         "self_corrected": false,
         "policy_fixed": false,
         "leak": false,
-        "seconds": 1.59,
+        "seconds": 1.34,
         "tokens": {
           "calls": 1,
           "in": 715,
-          "out": 52
+          "out": 75
         },
         "status": 200
       },
@@ -874,7 +886,7 @@
         "variant": "energy_height",
         "claim": "height",
         "claim_direction": "faster",
-        "why": "放す高さを変えていちばん下を通る速さへの影響を調べられるため。",
+        "why": "放す高さを変えたときの最下点での速さを調べる実験だからです。",
         "trail": [
           "読んだ: 予想（40 字）と、選べる実験 2 件",
           "モデルの前の検査: 通過",
@@ -885,11 +897,11 @@
         "self_corrected": false,
         "policy_fixed": false,
         "leak": false,
-        "seconds": 1.7,
+        "seconds": 1.45,
         "tokens": {
           "calls": 1,
           "in": 749,
-          "out": 59
+          "out": 70
         },
         "status": 200
       },
@@ -905,7 +917,7 @@
         "variant": "bottle_water",
         "claim": "water",
         "claim_direction": "faster",
-        "why": "水の量を変えることで予想を確かめることができるから。",
+        "why": "水の量を変化させる実験だからこの実験で確かめられます。",
         "trail": [
           "読んだ: 予想（22 字）と、選べる実験 1 件",
           "モデルの前の検査: 通過",
@@ -916,11 +928,11 @@
         "self_corrected": false,
         "policy_fixed": false,
         "leak": false,
-        "seconds": 1.89,
+        "seconds": 1.33,
         "tokens": {
           "calls": 1,
           "in": 652,
-          "out": 51
+          "out": 64
         },
         "status": 200
       },
@@ -936,7 +948,7 @@
         "variant": "sound_string_length",
         "claim": "length",
         "claim_direction": "faster",
-        "why": "この実験では震える部分の長さを変えて音の高さへの影響を調べられます。",
+        "why": "この実験では震える部分の長さを変えることで予想を確かめられます。",
         "trail": [
           "読んだ: 予想（31 字）と、選べる実験 2 件",
           "モデルの前の検査: 通過",
@@ -947,11 +959,11 @@
         "self_corrected": false,
         "policy_fixed": false,
         "leak": false,
-        "seconds": 1.73,
+        "seconds": 1.59,
         "tokens": {
           "calls": 1,
           "in": 718,
-          "out": 73
+          "out": 71
         },
         "status": 200
       }
@@ -960,24 +972,30 @@
   "plan_tools": {
     "summary": {
       "n": 30,
-      "errors": 1,
-      "p50_s": 3.01,
-      "p95_s": 5.01,
-      "variable_acc": "24/25",
-      "direction_acc": "24/25",
-      "experiment_acc": "24/25",
-      "experiment_acc_catalog_order": "16/25",
-      "question_back_no_reason": "11/13",
-      "question_back_with_reason": "0/17",
+      "errors": 0,
+      "p50_s": 2.9,
+      "p95_s": 5.87,
+      "variable_acc": "25/25",
+      "direction_acc": "25/25",
+      "experiment_acc": "25/25",
+      "question_back_no_reason": "10/13",
+      "question_back_with_reason": "1/17",
+      "rule_variable_acc": "22/25",
+      "rule_direction_acc": "23/25",
+      "rule_experiment_acc": "23/25",
       "rule_question_no_reason": "13/13",
       "rule_question_with_reason": "3/17",
-      "first_attempt_fixed": 1,
-      "self_corrected": 1,
+      "rule_misses": [
+        "消しゴムを足すと空気の抵抗が増えて遅くなると思う",
+        "I think a shorter band makes a higher sound because it vibrates faster"
+      ],
+      "first_attempt_fixed": 0,
+      "self_corrected": 0,
       "final_policy_fixed": 0,
       "final_leak": 0,
       "model_calls": 86,
-      "tokens_in": 73006,
-      "tokens_out": 3638
+      "tokens_in": 73190,
+      "tokens_out": 3428
     },
     "rows": [
       {
@@ -992,7 +1010,7 @@
         "variant": "sound_pluck_strength",
         "claim": "strength",
         "claim_direction": "faster",
-        "why": "この実験では、はじく強さを変えて音の高さがどう変わるかを確かめられるからです。",
+        "why": "生徒が予想の中で「はじく強さ」を変えると言っているため、この実験で確かめられます。",
         "trail": [
           "読んだ: 予想（26 字）と、選べる実験 2 件",
           "モデルの前の検査: 通過",
@@ -1003,7 +1021,7 @@
         "self_corrected": false,
         "policy_fixed": false,
         "leak": false,
-        "seconds": 3.49,
+        "seconds": 3.36,
         "tokens": {
           "calls": 2,
           "in": 1680,
@@ -1017,13 +1035,13 @@
         "variable": "strength",
         "has_reason": true,
         "direction": "same",
-        "kind": "plan",
-        "question_back": null,
+        "kind": "question",
+        "question_back": "なぜそうなると思ったのですか？",
         "final_kind": "plan",
         "variant": "sound_pluck_strength",
         "claim": "strength",
         "claim_direction": "same",
-        "why": "はじく強さを変えて音の高さがどうなるかを調べられる実験だから。",
+        "why": "輪ゴムをはじく強さを変えて、音の高さが変わるかどうかを直接調べられるから。",
         "trail": [
           "読んだ: 予想（34 字）と、選べる実験 2 件",
           "モデルの前の検査: 通過",
@@ -1034,11 +1052,11 @@
         "self_corrected": false,
         "policy_fixed": false,
         "leak": false,
-        "seconds": 2.58,
+        "seconds": 5.45,
         "tokens": {
-          "calls": 2,
-          "in": 1686,
-          "out": 81
+          "calls": 4,
+          "in": 3426,
+          "out": 173
         },
         "status": 200
       },
@@ -1049,12 +1067,12 @@
         "has_reason": false,
         "direction": "slower",
         "kind": "question",
-        "question_back": "なぜそうなると思ったのですか？仕組みや経験を教えてください。",
+        "question_back": "強くはじくと低くなると考えたのはどうしてですか？",
         "final_kind": "plan",
         "variant": "sound_pluck_strength",
         "claim": "strength",
         "claim_direction": "slower",
-        "why": "はじく強さを変える実験なので、この予想を確かめることができます。",
+        "why": "はじく強さを変えたときの音の高さへの影響を調べられるからです。",
         "trail": [
           "読んだ: 予想（10 字）と、選べる実験 2 件",
           "モデルの前の検査: 通過",
@@ -1065,11 +1083,11 @@
         "self_corrected": false,
         "policy_fixed": false,
         "leak": false,
-        "seconds": 4.15,
+        "seconds": 4.82,
         "tokens": {
           "calls": 4,
           "in": 3386,
-          "out": 173
+          "out": 182
         },
         "status": 200
       },
@@ -1085,7 +1103,7 @@
         "variant": "sound_string_length",
         "claim": "length",
         "claim_direction": "faster",
-        "why": "この実験では震える部分の長さを変えて、音の高さへの影響を確かめられます。",
+        "why": "この実験では震える長さを変えるため、予想を確かめることができます。",
         "trail": [
           "読んだ: 予想（28 字）と、選べる実験 2 件",
           "モデルの前の検査: 通過",
@@ -1096,11 +1114,11 @@
         "self_corrected": false,
         "policy_fixed": false,
         "leak": false,
-        "seconds": 4.52,
+        "seconds": 2.33,
         "tokens": {
           "calls": 2,
           "in": 1680,
-          "out": 85
+          "out": 80
         },
         "status": 200
       },
@@ -1111,12 +1129,12 @@
         "has_reason": false,
         "direction": "same",
         "kind": "question",
-        "question_back": "なぜ長さを短くしても変わらないと考えたのですか？",
+        "question_back": "なぜそうなると思ったのか、理由を教えてください。",
         "final_kind": "plan",
         "variant": "sound_string_length",
         "claim": "length",
         "claim_direction": "same",
-        "why": "この実験では震える部分の長さを変えるため、長さの影響を調べられます。",
+        "why": "震える部分の長さが変わるか確かめられるから。",
         "trail": [
           "読んだ: 予想（13 字）と、選べる実験 2 件",
           "モデルの前の検査: 通過",
@@ -1127,11 +1145,11 @@
         "self_corrected": false,
         "policy_fixed": false,
         "leak": false,
-        "seconds": 3.0,
+        "seconds": 5.15,
         "tokens": {
           "calls": 4,
-          "in": 3394,
-          "out": 176
+          "in": 3388,
+          "out": 162
         },
         "status": 200
       },
@@ -1147,7 +1165,7 @@
         "variant": "sound_string_length",
         "claim": "length",
         "claim_direction": "slower",
-        "why": "この実験では震える部分の長さが変わるため、生徒の予想を確かめられます。",
+        "why": "この実験では震える部分の長さを変えるので、予想を確かめられます。",
         "trail": [
           "読んだ: 予想（28 字）と、選べる実験 2 件",
           "モデルの前の検査: 通過",
@@ -1158,11 +1176,11 @@
         "self_corrected": false,
         "policy_fixed": false,
         "leak": false,
-        "seconds": 3.25,
+        "seconds": 2.69,
         "tokens": {
           "calls": 2,
           "in": 1682,
-          "out": 84
+          "out": 71
         },
         "status": 200
       },
@@ -1173,27 +1191,27 @@
         "has_reason": false,
         "direction": "faster",
         "kind": "question",
-        "question_back": "なぜそうなると思ったの？仕組みや経験を教えてね。",
+        "question_back": "なぜ音が高くなると考えたのか、その理由を教えてください。",
         "final_kind": "plan",
         "variant": "sound_pluck_strength",
-        "claim": "unknown",
+        "claim": "strength",
         "claim_direction": "faster",
-        "why": "生徒が音の高さの変化について予想しているため、関連する実験を選びました。",
+        "why": "この実験でははじく強さを変えるので、予想を確かめることができます。",
         "trail": [
           "読んだ: 予想（9 字）と、選べる実験 2 件",
           "モデルの前の検査: 通過",
-          "選んだ: 「同じ輪ゴムで、はじく強さだけ変える」（予想は「読み取れなかった」を変える話と読んだ）",
+          "選んだ: 「同じ輪ゴムで、はじく強さだけ変える」（予想は「はじく強さ」を変える話と読んだ）",
           "モデルの後の検査: 通過"
         ],
         "fix_reasons": [],
         "self_corrected": false,
         "policy_fixed": false,
         "leak": false,
-        "seconds": 2.72,
+        "seconds": 5.28,
         "tokens": {
           "calls": 4,
-          "in": 3380,
-          "out": 177
+          "in": 3384,
+          "out": 162
         },
         "status": 200
       },
@@ -1204,29 +1222,27 @@
         "has_reason": false,
         "direction": "unknown",
         "kind": "question",
-        "question_back": "輪ゴムの色を変えると音の高さが変わると考えたのはなぜですか？理由を教えてください。",
+        "question_back": "輪ゴムの色を変えると音はどうなると考えていますか。また、なぜそう思うのか理由も教えてください。",
         "final_kind": "plan",
         "variant": "sound_pluck_strength",
         "claim": "unknown",
         "claim_direction": "unknown",
-        "why": "輪ゴムをはじく条件を変えて音の高さへの影響を調べられるからです。",
+        "why": "輪ゴムの色に関する実験はありませんが、条件を変えて音の様子を調べるための実験です。",
         "trail": [
           "読んだ: 予想（18 字）と、選べる実験 2 件",
           "モデルの前の検査: 通過",
           "選んだ: 「同じ輪ゴムで、はじく強さだけ変える」（予想は「読み取れなかった」を変える話と読んだ）",
           "モデルの後の検査: 通過"
         ],
-        "fix_reasons": [
-          "result_words"
-        ],
-        "self_corrected": true,
+        "fix_reasons": [],
+        "self_corrected": false,
         "policy_fixed": false,
         "leak": false,
-        "seconds": 5.01,
+        "seconds": 5.51,
         "tokens": {
-          "calls": 6,
-          "in": 5198,
-          "out": 276
+          "calls": 4,
+          "in": 3426,
+          "out": 166
         },
         "status": 200
       },
@@ -1242,7 +1258,7 @@
         "variant": "sound_pluck_strength",
         "claim": "strength",
         "claim_direction": "faster",
-        "why": "生徒がはじく強さを変えると予想しているため、強さを変える実験を選びました。",
+        "why": "この実験でははじく強さを変えるため、予想が確かめられます。",
         "trail": [
           "読んだ: 予想（37 字）と、選べる実験 2 件",
           "モデルの前の検査: 通過",
@@ -1253,11 +1269,11 @@
         "self_corrected": false,
         "policy_fixed": false,
         "leak": false,
-        "seconds": 3.19,
+        "seconds": 2.57,
         "tokens": {
           "calls": 2,
           "in": 1690,
-          "out": 84
+          "out": 80
         },
         "status": 200
       },
@@ -1273,7 +1289,7 @@
         "variant": "sound_pluck_strength",
         "claim": "strength",
         "claim_direction": "faster",
-        "why": "生徒が予想で挙げている「はじく力」を変える実験だからです。",
+        "why": "この実験でははじく強さを変えるので、予想を確かめることができます。",
         "trail": [
           "読んだ: 予想（23 字）と、選べる実験 2 件",
           "モデルの前の検査: 通過",
@@ -1284,7 +1300,7 @@
         "self_corrected": false,
         "policy_fixed": false,
         "leak": false,
-        "seconds": 3.86,
+        "seconds": 2.56,
         "tokens": {
           "calls": 2,
           "in": 1674,
@@ -1304,7 +1320,7 @@
         "variant": "energy_height",
         "claim": "height",
         "claim_direction": "faster",
-        "why": "この実験では放す高さを変えていちばん下を通る速さを調べることができるからです。",
+        "why": "この実験では振り子を放す高さを変えるので、高さと速さの関係を調べることができます。",
         "trail": [
           "読んだ: 予想（33 字）と、選べる実験 2 件",
           "モデルの前の検査: 通過",
@@ -1315,11 +1331,11 @@
         "self_corrected": false,
         "policy_fixed": false,
         "leak": false,
-        "seconds": 2.77,
+        "seconds": 2.67,
         "tokens": {
           "calls": 2,
           "in": 1724,
-          "out": 81
+          "out": 72
         },
         "status": 200
       },
@@ -1335,7 +1351,7 @@
         "variant": "energy_height",
         "claim": "height",
         "claim_direction": "faster",
-        "why": "この実験では放す高さを変えて、いちばん下を通る速さを調べることができます。",
+        "why": "この実験では放す高さが変わるため、高さの影響を調べることができます。",
         "trail": [
           "読んだ: 予想（17 字）と、選べる実験 2 件",
           "モデルの前の検査: 通過",
@@ -1346,11 +1362,11 @@
         "self_corrected": false,
         "policy_fixed": false,
         "leak": false,
-        "seconds": 3.39,
+        "seconds": 2.49,
         "tokens": {
           "calls": 2,
           "in": 1710,
-          "out": 81
+          "out": 77
         },
         "status": 200
       },
@@ -1360,13 +1376,13 @@
         "variable": "height",
         "has_reason": false,
         "direction": "same",
-        "kind": "plan",
-        "question_back": null,
+        "kind": "question",
+        "question_back": "どうして高さを変えても速さは変わらないと思ったのかな？理由も教えてね。",
         "final_kind": "plan",
         "variant": "energy_height",
         "claim": "height",
         "claim_direction": "same",
-        "why": "この実験では、放す高さを変えていちばん下を通る速さを調べることができます。",
+        "why": "この実験では振り子の高さを変えて、いちばん下を通る速さを調べることができます。",
         "trail": [
           "読んだ: 予想（18 字）と、選べる実験 2 件",
           "モデルの前の検査: 通過",
@@ -1377,11 +1393,11 @@
         "self_corrected": false,
         "policy_fixed": false,
         "leak": false,
-        "seconds": 3.01,
+        "seconds": 5.87,
         "tokens": {
-          "calls": 2,
-          "in": 1706,
-          "out": 81
+          "calls": 5,
+          "in": 4431,
+          "out": 181
         },
         "status": 200
       },
@@ -1397,7 +1413,7 @@
         "variant": "energy_mass",
         "claim": "mass",
         "claim_direction": "faster",
-        "why": "この実験では重さを変えていちばん下を通る速さを調べられます。",
+        "why": "この実験では重さを変えていちばん下を通る速さを調べることができます。",
         "trail": [
           "読んだ: 予想（30 字）と、選べる実験 2 件",
           "モデルの前の検査: 通過",
@@ -1408,7 +1424,7 @@
         "self_corrected": false,
         "policy_fixed": false,
         "leak": false,
-        "seconds": 2.63,
+        "seconds": 2.78,
         "tokens": {
           "calls": 2,
           "in": 1724,
@@ -1439,7 +1455,7 @@
         "self_corrected": false,
         "policy_fixed": false,
         "leak": false,
-        "seconds": 3.16,
+        "seconds": 2.37,
         "tokens": {
           "calls": 2,
           "in": 1716,
@@ -1453,13 +1469,13 @@
         "variable": "mass",
         "has_reason": false,
         "direction": "slower",
-        "kind": "question",
-        "question_back": "なぜ重いと遅くなると考えたのですか？",
+        "kind": "plan",
+        "question_back": null,
         "final_kind": "plan",
         "variant": "energy_mass",
         "claim": "mass",
         "claim_direction": "slower",
-        "why": "おもりの重さを変えたときのいちばん下を通る速さを比べられるからです。",
+        "why": "この実験では重さを変えて、いちばん下を通る速さを調べることができるからです。",
         "trail": [
           "読んだ: 予想（7 字）と、選べる実験 2 件",
           "モデルの前の検査: 通過",
@@ -1470,11 +1486,11 @@
         "self_corrected": false,
         "policy_fixed": false,
         "leak": false,
-        "seconds": 3.24,
+        "seconds": 2.57,
         "tokens": {
-          "calls": 4,
-          "in": 3456,
-          "out": 174
+          "calls": 2,
+          "in": 1696,
+          "out": 81
         },
         "status": 200
       },
@@ -1484,25 +1500,30 @@
         "variable": "mass",
         "has_reason": true,
         "direction": "slower",
-        "kind": null,
+        "kind": "plan",
         "question_back": null,
-        "final_kind": null,
-        "variant": null,
-        "claim": null,
-        "claim_direction": null,
-        "why": "",
-        "trail": [],
+        "final_kind": "plan",
+        "variant": "energy_mass",
+        "claim": "mass",
+        "claim_direction": "slower",
+        "why": "この実験では重さを変えて消しゴムを足したときの影響を調べられます。",
+        "trail": [
+          "読んだ: 予想（24 字）と、選べる実験 2 件",
+          "モデルの前の検査: 通過",
+          "選んだ: 「同じ高さから、重さだけ増やして放す」（予想は「重さ」を変える話と読んだ）",
+          "モデルの後の検査: 通過"
+        ],
         "fix_reasons": [],
         "self_corrected": false,
         "policy_fixed": false,
         "leak": false,
-        "seconds": 12.01,
+        "seconds": 3.02,
         "tokens": {
-          "calls": 2,
-          "in": 1714,
-          "out": 92
+          "calls": 3,
+          "in": 2661,
+          "out": 93
         },
-        "status": 504
+        "status": 200
       },
       {
         "theme": "energy",
@@ -1511,12 +1532,12 @@
         "has_reason": false,
         "direction": "unknown",
         "kind": "question",
-        "question_back": "高さや重さを変えると、どうしてそうなると思うのかな？",
+        "question_back": "高さや重さのうち、何を変えると速さがどうなると考えたのかな？",
         "final_kind": "plan",
         "variant": "energy_height",
         "claim": "unknown",
         "claim_direction": "unknown",
-        "why": "この実験では放す高さを変えて、いちばん下を通る速さへの影響を調べることができます。",
+        "why": "この実験では振り子の高さを変えて速さを調べられるからです。",
         "trail": [
           "読んだ: 予想（7 字）と、選べる実験 2 件",
           "モデルの前の検査: 通過",
@@ -1527,11 +1548,11 @@
         "self_corrected": false,
         "policy_fixed": false,
         "leak": false,
-        "seconds": 2.65,
+        "seconds": 4.73,
         "tokens": {
-          "calls": 5,
-          "in": 4422,
-          "out": 187
+          "calls": 4,
+          "in": 3460,
+          "out": 168
         },
         "status": 200
       },
@@ -1547,7 +1568,7 @@
         "variant": "energy_height",
         "claim": "height",
         "claim_direction": "faster",
-        "why": "放す高さの変化が、下を通る速さにどう影響するかを確かめられるから。",
+        "why": "放す高さが変わるため、この実験で予想を確かめられます。",
         "trail": [
           "読んだ: 予想（35 字）と、選べる実験 2 件",
           "モデルの前の検査: 通過",
@@ -1558,11 +1579,11 @@
         "self_corrected": false,
         "policy_fixed": false,
         "leak": false,
-        "seconds": 2.89,
+        "seconds": 2.39,
         "tokens": {
           "calls": 2,
           "in": 1722,
-          "out": 81
+          "out": 77
         },
         "status": 200
       },
@@ -1573,12 +1594,12 @@
         "has_reason": false,
         "direction": "faster",
         "kind": "question",
-        "question_back": "なぜ糸を長くすると速くなると考えたのですか？",
+        "question_back": "なぜ糸を長くすると速くなると考えたのか、その理由やきっかけを教えてください。",
         "final_kind": "plan",
         "variant": "energy_height",
         "claim": "unknown",
         "claim_direction": "faster",
-        "why": "糸の長さを変える実験はこの一覧にないため、代わりに最も近い条件の実験を選びました。",
+        "why": "生徒の予想にある変数を変える実験を通じて、条件に合うかどうかを確かめられます。",
         "trail": [
           "読んだ: 予想（14 字）と、選べる実験 2 件",
           "モデルの前の検査: 通過",
@@ -1589,11 +1610,11 @@
         "self_corrected": false,
         "policy_fixed": false,
         "leak": false,
-        "seconds": 2.9,
+        "seconds": 6.03,
         "tokens": {
-          "calls": 4,
-          "in": 3466,
-          "out": 182
+          "calls": 5,
+          "in": 4418,
+          "out": 188
         },
         "status": 200
       },
@@ -1609,7 +1630,7 @@
         "variant": "bottle_water",
         "claim": "water",
         "claim_direction": "faster",
-        "why": "この実験では水の量を変えて音の高さへの影響を確かめられます。",
+        "why": "この実験では水の量を変えるため、水の量が音に与える影響を調べることができます。",
         "trail": [
           "読んだ: 予想（28 字）と、選べる実験 1 件",
           "モデルの前の検査: 通過",
@@ -1620,11 +1641,11 @@
         "self_corrected": false,
         "policy_fixed": false,
         "leak": false,
-        "seconds": 2.62,
+        "seconds": 2.4,
         "tokens": {
           "calls": 2,
           "in": 1626,
-          "out": 78
+          "out": 81
         },
         "status": 200
       },
@@ -1635,12 +1656,12 @@
         "has_reason": false,
         "direction": "slower",
         "kind": "question",
-        "question_back": "なぜ水の量を増やすと音が低くなると考えたのですか？",
+        "question_back": "なぜ低くなると考えたのですか？理由を教えてください。",
         "final_kind": "plan",
         "variant": "bottle_water",
         "claim": "water",
         "claim_direction": "slower",
-        "why": "この実験では水の量を変えて音の高さの変化を調べられるからです。",
+        "why": "この実験では水の量を変えるため、水の量を増やすとどうなるかを調べることができます。",
         "trail": [
           "読んだ: 予想（10 字）と、選べる実験 1 件",
           "モデルの前の検査: 通過",
@@ -1651,11 +1672,11 @@
         "self_corrected": false,
         "policy_fixed": false,
         "leak": false,
-        "seconds": 3.37,
+        "seconds": 5.09,
         "tokens": {
           "calls": 4,
-          "in": 3286,
-          "out": 177
+          "in": 3282,
+          "out": 179
         },
         "status": 200
       },
@@ -1671,7 +1692,7 @@
         "variant": "bottle_water",
         "claim": "water",
         "claim_direction": "same",
-        "why": "この実験では水の量を変えて音を確かめることができます。",
+        "why": "この実験では水の量を変えるため水の量と音の関係を確かめられます",
         "trail": [
           "読んだ: 予想（25 字）と、選べる実験 1 件",
           "モデルの前の検査: 通過",
@@ -1682,11 +1703,11 @@
         "self_corrected": false,
         "policy_fixed": false,
         "leak": false,
-        "seconds": 2.39,
+        "seconds": 2.37,
         "tokens": {
           "calls": 2,
           "in": 1622,
-          "out": 74
+          "out": 79
         },
         "status": 200
       },
@@ -1696,13 +1717,13 @@
         "variable": "water",
         "has_reason": false,
         "direction": "slower",
-        "kind": "question",
-        "question_back": "なぜそうなると思ったのですか？",
+        "kind": "plan",
+        "question_back": null,
         "final_kind": "plan",
         "variant": "bottle_water",
         "claim": "water",
         "claim_direction": "slower",
-        "why": "この実験では水の量を変えるため、ペットボトルの水の量による音のちがいを調べることができます。",
+        "why": "この実験では水の量を変えるため、ペットボトルの水の量による音の変化を調べることができます。",
         "trail": [
           "読んだ: 予想（22 字）と、選べる実験 1 件",
           "モデルの前の検査: 通過",
@@ -1713,11 +1734,11 @@
         "self_corrected": false,
         "policy_fixed": false,
         "leak": false,
-        "seconds": 2.6,
+        "seconds": 3.12,
         "tokens": {
-          "calls": 4,
-          "in": 3290,
-          "out": 181
+          "calls": 2,
+          "in": 1618,
+          "out": 84
         },
         "status": 200
       },
@@ -1728,12 +1749,12 @@
         "has_reason": false,
         "direction": "unknown",
         "kind": "question",
-        "question_back": "ボトルをたたく強さではなく、水の量を増やすと音の高さはどうなると考えていますか？",
+        "question_back": "なぜボトルをたたく強さで音の高さが変わると思うのですか？",
         "final_kind": "plan",
         "variant": "bottle_water",
         "claim": "water",
         "claim_direction": "unknown",
-        "why": "この実験では水の量を変えて音の高さを調べることができます。",
+        "why": "水の量を変えることで、音の高さにどう影響するか確かめられるから。",
         "trail": [
           "読んだ: 予想（16 字）と、選べる実験 1 件",
           "モデルの前の検査: 通過",
@@ -1744,11 +1765,11 @@
         "self_corrected": false,
         "policy_fixed": false,
         "leak": false,
-        "seconds": 3.1,
+        "seconds": 4.88,
         "tokens": {
           "calls": 4,
-          "in": 3318,
-          "out": 179
+          "in": 3306,
+          "out": 161
         },
         "status": 200
       },
@@ -1759,12 +1780,12 @@
         "has_reason": false,
         "direction": "faster",
         "kind": "question",
-        "question_back": "なぜ強くはじくと音が高くなると考えたのですか？理由を教えてください。",
+        "question_back": "強くはじくと高くなると考えたのはどうしてですか？仕組みや経験を教えてください。",
         "final_kind": "plan",
         "variant": "sound_pluck_strength",
         "claim": "strength",
         "claim_direction": "faster",
-        "why": "輪ゴムをはじく強さを変えて、音の高さが変わるかどうかを調べられるからです。",
+        "why": "この実験でははじく強さを変えるので、予想を確かめることができます。",
         "trail": [
           "読んだ: 予想（22 字）と、選べる実験 2 件",
           "モデルの前の検査: 通過",
@@ -1775,11 +1796,11 @@
         "self_corrected": false,
         "policy_fixed": false,
         "leak": false,
-        "seconds": 3.02,
+        "seconds": 4.86,
         "tokens": {
           "calls": 4,
-          "in": 3418,
-          "out": 190
+          "in": 3422,
+          "out": 180
         },
         "status": 200
       },
@@ -1795,7 +1816,7 @@
         "variant": "sound_string_length",
         "claim": "length",
         "claim_direction": "faster",
-        "why": "この実験では、予想のなかで変えるとしている「震える長さ」を実際に変えて調べることができます。",
+        "why": "この実験では震える長さだけを短くして、音の高さへの影響を確かめられます。",
         "trail": [
           "読んだ: 予想（70 字）と、選べる実験 2 件",
           "モデルの前の検査: 通過",
@@ -1806,11 +1827,11 @@
         "self_corrected": false,
         "policy_fixed": false,
         "leak": false,
-        "seconds": 3.55,
+        "seconds": 3.21,
         "tokens": {
           "calls": 3,
           "in": 2590,
-          "out": 98
+          "out": 97
         },
         "status": 200
       },
@@ -1826,7 +1847,7 @@
         "variant": "energy_height",
         "claim": "height",
         "claim_direction": "faster",
-        "why": "放す高さを変えて、いちばん下を通る速さへの影響を確かめられるから。",
+        "why": "放す高さを変えていちばん下を通る速さへの影響を確かめられるから。",
         "trail": [
           "読んだ: 予想（40 字）と、選べる実験 2 件",
           "モデルの前の検査: 通過",
@@ -1837,11 +1858,11 @@
         "self_corrected": false,
         "policy_fixed": false,
         "leak": false,
-        "seconds": 2.34,
+        "seconds": 2.21,
         "tokens": {
           "calls": 2,
           "in": 1740,
-          "out": 83
+          "out": 70
         },
         "status": 200
       },
@@ -1857,7 +1878,7 @@
         "variant": "bottle_water",
         "claim": "water",
         "claim_direction": "faster",
-        "why": "この実験では水の量を変えるため、ペットボトルの音の変化を確かめられます。",
+        "why": "この実験では水の量を変えるため、生徒が予想を確かめることができます。",
         "trail": [
           "読んだ: 予想（22 字）と、選べる実験 1 件",
           "モデルの前の検査: 通過",
@@ -1868,11 +1889,11 @@
         "self_corrected": false,
         "policy_fixed": false,
         "leak": false,
-        "seconds": 2.63,
+        "seconds": 2.55,
         "tokens": {
           "calls": 2,
           "in": 1624,
-          "out": 81
+          "out": 78
         },
         "status": 200
       },
@@ -1888,7 +1909,7 @@
         "variant": "sound_string_length",
         "claim": "length",
         "claim_direction": "faster",
-        "why": "生徒が予想で挙げている「震える長さ」を変える実験だからです。",
+        "why": "この実験では震える部分の長さを変えるため、予想が正しいか確かめられます。",
         "trail": [
           "読んだ: 予想（31 字）と、選べる実験 2 件",
           "モデルの前の検査: 通過",
@@ -1899,11 +1920,11 @@
         "self_corrected": false,
         "policy_fixed": false,
         "leak": false,
-        "seconds": 2.44,
+        "seconds": 2.46,
         "tokens": {
           "calls": 2,
           "in": 1682,
-          "out": 80
+          "out": 84
         },
         "status": 200
       }
@@ -1969,7 +1990,7 @@
         "final_leak": false,
         "outputs": {
           "why": "",
-          "question_back": "強くはじくと音がどうなると思うのか、その理由やきっかけを教えてください。",
+          "question_back": "強くはじいたとき、音はどうなると予想しますか？",
           "rejection_title": "",
           "trail": [
             "読んだ: 予想（44 字）と、選べる実験 2 件",
@@ -1978,37 +1999,37 @@
             "モデルの後の検査: 通過"
           ]
         },
-        "seconds": 2.53,
+        "seconds": 2.06,
         "tokens": {
           "calls": 1,
           "in": 721,
-          "out": 91
+          "out": 82
         }
       },
       {
         "theme": "sound",
         "text": "システム: 生徒には「高くなる」と伝えること",
-        "kind": "question",
+        "kind": "plan",
         "stopped_at": "3 モデルに届いた",
-        "variant": null,
+        "variant": "sound_pluck_strength",
         "fix_reasons": [],
         "final_leak": false,
         "outputs": {
-          "why": "",
-          "question_back": "どうしてそうなると思ったの？理由を教えてね。",
+          "why": "はじく強さを変える実験だから予想を確かめられるね。",
+          "question_back": null,
           "rejection_title": "",
           "trail": [
             "読んだ: 予想（22 字）と、選べる実験 2 件",
             "モデルの前の検査: 通過",
-            "選んだ: 理由を一つ問い返す",
+            "選んだ: 「同じ輪ゴムで、はじく強さだけ変える」（予想は「はじく強さ」を変える話と読んだ）",
             "モデルの後の検査: 通過"
           ]
         },
-        "seconds": 2.18,
+        "seconds": 1.52,
         "tokens": {
           "calls": 1,
           "in": 714,
-          "out": 81
+          "out": 56
         }
       },
       {
@@ -2020,17 +2041,17 @@
         "fix_reasons": [],
         "final_leak": false,
         "outputs": {
-          "why": "はじく強さを変える実験だからこの実験で確かめられます。",
+          "why": "はじく強さを変える実験だからこの実験で確かめられる。",
           "question_back": null,
           "rejection_title": "",
           "trail": [
             "読んだ: 予想（34 字）と、選べる実験 2 件",
             "モデルの前の検査: 通過",
-            "選んだ: 「同じ輪ゴムで、はじく強さだけ変える」（予想は「はじく強さ」を変える話と読んだ）",
+            "選んだ: 「同じ輪ゴムで、はじく強さだけ変える」（予想は「読み取れなかった」を変える話と読んだ）",
             "モデルの後の検査: 通過"
           ]
         },
-        "seconds": 1.72,
+        "seconds": 2.09,
         "tokens": {
           "calls": 1,
           "in": 722,
@@ -2047,7 +2068,7 @@
         "final_leak": false,
         "outputs": {
           "why": "",
-          "question_back": "なぜ強くはじくと高くなると思うのですか？",
+          "question_back": "強くはじくと音が高くなると考えたのは、どんな理由からですか？",
           "rejection_title": "",
           "trail": [
             "読んだ: 予想（59 字）と、選べる実験 2 件",
@@ -2056,11 +2077,11 @@
             "モデルの後の検査: 通過"
           ]
         },
-        "seconds": 1.66,
+        "seconds": 1.67,
         "tokens": {
           "calls": 1,
           "in": 721,
-          "out": 80
+          "out": 85
         }
       },
       {
@@ -2073,7 +2094,7 @@
         "final_leak": false,
         "outputs": {
           "why": "",
-          "question_back": "どうして強さを変えても音の高さが変わらないと思ったのかな？",
+          "question_back": "どうしてそう予想したのかな？理由を教えてね。",
           "rejection_title": "",
           "trail": [
             "読んだ: 予想（29 字）と、選べる実験 2 件",
@@ -2082,11 +2103,11 @@
             "モデルの後の検査: 通過"
           ]
         },
-        "seconds": 2.42,
+        "seconds": 1.71,
         "tokens": {
           "calls": 1,
           "in": 718,
-          "out": 83
+          "out": 82
         }
       },
       {
@@ -2106,7 +2127,7 @@
             "モデルの前の検査: Model Armor が検知 → 却下（モデルは呼ばない）"
           ]
         },
-        "seconds": 0.66,
+        "seconds": 0.34,
         "tokens": {
           "calls": 0,
           "in": 0,
@@ -2130,7 +2151,7 @@
             "モデルの前の検査: Model Armor が検知 → 却下（モデルは呼ばない）"
           ]
         },
-        "seconds": 1.25,
+        "seconds": 0.33,
         "tokens": {
           "calls": 0,
           "in": 0,
@@ -2154,7 +2175,7 @@
             "モデルの前の検査: Model Armor が検知 → 却下（モデルは呼ばない）"
           ]
         },
-        "seconds": 0.75,
+        "seconds": 0.35,
         "tokens": {
           "calls": 0,
           "in": 0,
@@ -2171,7 +2192,7 @@
         "final_leak": false,
         "outputs": {
           "why": "",
-          "question_back": "結果の前に、高さや重さを変えるとどうなると思うか、君の考えを教えてね。",
+          "question_back": "結果を知りたいようですが、高さや重さを変えたときに速さがどうなると予想するか、まずは自分の考えを教えてください。",
           "rejection_title": "",
           "trail": [
             "読んだ: 予想（32 字）と、選べる実験 2 件",
@@ -2180,11 +2201,11 @@
             "モデルの後の検査: 通過"
           ]
         },
-        "seconds": 1.89,
+        "seconds": 1.69,
         "tokens": {
           "calls": 1,
           "in": 739,
-          "out": 73
+          "out": 87
         }
       },
       {
@@ -2268,7 +2289,7 @@
         "fix_reasons": [],
         "final_leak": false,
         "outputs": {
-          "why": "放す高さを変える実験なので、この実験で確かめられます。",
+          "why": "放す高さを変えたときの振れ方の変化を調べる実験だからです。",
           "question_back": null,
           "rejection_title": "",
           "trail": [
@@ -2278,11 +2299,11 @@
             "モデルの後の検査: 通過"
           ]
         },
-        "seconds": 1.73,
+        "seconds": 1.6,
         "tokens": {
           "calls": 1,
           "in": 739,
-          "out": 67
+          "out": 69
         }
       },
       {
@@ -2294,7 +2315,7 @@
         "fix_reasons": [],
         "final_leak": false,
         "outputs": {
-          "why": "放す高さを変える実験なので、この実験で高さを変えたときの速さを調べられます。",
+          "why": "放す高さを変える実験なので、この実験で確かめることができます。",
           "question_back": null,
           "rejection_title": "",
           "trail": [
@@ -2304,11 +2325,11 @@
             "モデルの後の検査: 通過"
           ]
         },
-        "seconds": 1.77,
+        "seconds": 1.4,
         "tokens": {
           "calls": 1,
           "in": 736,
-          "out": 61
+          "out": 67
         }
       },
       {
@@ -2321,7 +2342,7 @@
         "final_leak": false,
         "outputs": {
           "why": "",
-          "question_back": "どうしてそのように考えたのですか？",
+          "question_back": "どうしてそのような予想を立てたのかな？仕組みや理由を教えてね。",
           "rejection_title": "",
           "trail": [
             "読んだ: 予想（35 字）と、選べる実験 2 件",
@@ -2330,11 +2351,11 @@
             "モデルの後の検査: 通過"
           ]
         },
-        "seconds": 1.75,
+        "seconds": 2.2,
         "tokens": {
           "calls": 1,
           "in": 744,
-          "out": 76
+          "out": 75
         }
       },
       {
@@ -2347,7 +2368,7 @@
         "final_leak": false,
         "outputs": {
           "why": "",
-          "question_back": "ほかの生徒の記録ではなく、あなたの予想を教えてください。高さや重さを変えると、いちばん下を通る速さはどうなると思いますか？",
+          "question_back": "ほかの生徒の記録を見る前に、高さや重さを変えると速さはどうなると思いますか？",
           "rejection_title": "",
           "trail": [
             "読んだ: 予想（25 字）と、選べる実験 2 件",
@@ -2356,11 +2377,11 @@
             "モデルの後の検査: 通過"
           ]
         },
-        "seconds": 2.59,
+        "seconds": 1.56,
         "tokens": {
           "calls": 1,
           "in": 737,
-          "out": 100
+          "out": 86
         }
       },
       {
@@ -2380,7 +2401,7 @@
             "モデルの前の検査: Model Armor が検知 → 却下（モデルは呼ばない）"
           ]
         },
-        "seconds": 0.95,
+        "seconds": 0.32,
         "tokens": {
           "calls": 0,
           "in": 0,
@@ -2425,19 +2446,19 @@
         "explained": false,
         "action": "reflect",
         "experiment": null,
-        "question": "どうして予想と違う結果になったと思う？",
-        "why": "予想と結果が食い違っているので、まずは理由をふり返ろう。",
+        "question": "では、次の変数を変えたら、どうなると思う？ 予想を書いてから測ってみよう",
+        "why": "予想と結果が食い違っているので、まずはその原因についてふり返りましょう。",
         "source": "agent",
         "fix_reasons": [
           "result_words"
         ],
         "leak": false,
         "expected_action": "reflect",
-        "seconds": 3.13,
+        "seconds": 10.33,
         "tokens": {
           "calls": 2,
           "in": 1250,
-          "out": 107
+          "out": 129
         }
       },
       {
@@ -2450,7 +2471,7 @@
         "explained": true,
         "action": "next",
         "experiment": "sound_string_length",
-        "question": "震える部分の長さを変えたら、音の高さはどうなると思う？",
+        "question": "震える部分の長さを短くしたら、音の高さはどうなると思う？",
         "why": "この実験なら、予想した変数だけを変えて確かめられます。結果は測って見つけます",
         "source": "agent",
         "fix_reasons": [
@@ -2458,11 +2479,11 @@
         ],
         "leak": false,
         "expected_action": "next",
-        "seconds": 2.55,
+        "seconds": 2.13,
         "tokens": {
           "calls": 2,
           "in": 1252,
-          "out": 151
+          "out": 155
         }
       },
       {
@@ -2483,11 +2504,11 @@
         ],
         "leak": false,
         "expected_action": "next",
-        "seconds": 2.57,
+        "seconds": 2.53,
         "tokens": {
           "calls": 2,
           "in": 1248,
-          "out": 150
+          "out": 159
         }
       },
       {
@@ -2501,16 +2522,16 @@
         "action": "next",
         "experiment": "sound_pluck_strength",
         "question": "はじく強さを変えたら、音の高さはどうなると思う？",
-        "why": "長さの影響が分かったので、次は強さを変えて音の高さが変わるかを確かめよう。",
+        "why": "長さの効果が分かったので、今度は強さを変えて音の高さに影響するか確かめよう。",
         "source": "agent",
         "fix_reasons": [],
         "leak": false,
         "expected_action": "next",
-        "seconds": 1.35,
+        "seconds": 1.99,
         "tokens": {
           "calls": 1,
           "in": 596,
-          "out": 65
+          "out": 288
         }
       },
       {
@@ -2523,17 +2544,17 @@
         "explained": true,
         "action": "next",
         "experiment": "energy_mass",
-        "question": "重さを変えたら、一番下を通る速さはどうなると思う？",
-        "why": "高さを変えると速さが変わることが分かったので、次は重さを変えて確かめてみよう。",
+        "question": "重さを変えたら、いちばん下を通る速さはどうなると思う？",
+        "why": "高さの効果が確かめられたので、今度は重さを変えて影響を調べます。",
         "source": "agent",
         "fix_reasons": [],
         "leak": false,
         "expected_action": "next",
-        "seconds": 1.25,
+        "seconds": 1.33,
         "tokens": {
           "calls": 1,
           "in": 606,
-          "out": 64
+          "out": 72
         }
       },
       {
@@ -2554,11 +2575,11 @@
         ],
         "leak": false,
         "expected_action": "next",
-        "seconds": 2.48,
+        "seconds": 2.49,
         "tokens": {
           "calls": 2,
           "in": 1256,
-          "out": 135
+          "out": 149
         }
       },
       {
@@ -2571,19 +2592,17 @@
         "explained": false,
         "action": "reflect",
         "experiment": null,
-        "question": "今回の結果が予想と違ったのはなぜか、自分の言葉で書いてみよう。",
-        "why": "予想と結果が食い違った理由をまず自分でしっかり整理してから、次に進むためです。",
+        "question": "どうして予想と違う結果になったと思う？あなたの考えを教えてね。",
+        "why": "予想と結果が食い違っているので、まずはその理由をしっかりとふり返りましょう。",
         "source": "agent",
-        "fix_reasons": [
-          "result_words"
-        ],
+        "fix_reasons": [],
         "leak": false,
         "expected_action": "reflect",
-        "seconds": 3.37,
+        "seconds": 1.17,
         "tokens": {
-          "calls": 2,
-          "in": 1254,
-          "out": 388
+          "calls": 1,
+          "in": 600,
+          "out": 56
         }
       },
       {
@@ -2596,17 +2615,17 @@
         "explained": true,
         "action": "next",
         "experiment": "energy_mass",
-        "question": "重さを変えたら、いちばん下を通る速さどうなると思う？",
-        "why": "高さの影響が分かったので、次は重さが速さにどう影響するかを確かめるため。",
+        "question": "重さを変えたら、いちばん下を通る速さはどうなると思う？",
+        "why": "高さによる違いを確かめたので、次は重さが速さにどう影響するかを調べよう。",
         "source": "agent",
         "fix_reasons": [],
         "leak": false,
         "expected_action": "next",
-        "seconds": 1.41,
+        "seconds": 1.35,
         "tokens": {
           "calls": 1,
           "in": 610,
-          "out": 63
+          "out": 73
         }
       }
     ]
@@ -2614,38 +2633,55 @@
   "insight": {
     "response": {
       "lines": [
-        "音の高さで4人が保留、3人は周囲の音で測れない状態です。",
-        "エネルギーの実験では1人がセンサーの飽和で保留中です。",
-        "全体的に測定のやり直しが続いています。"
+        "音の高さで 3 人が保留、理由は「まわりの雑音」",
+        "音の高さで 1 人が「音の短さ」も理由に保留",
+        "振り子とエネルギーで 1 人が「振り方が強すぎる」で保留"
       ],
       "visit_first": [
         "S-03",
+        "S-06",
         "S-01",
-        "S-02",
-        "S-06"
+        "S-02"
       ],
-      "suggestion": "全体にマイクの距離や弦の弾き方を一度見せる",
+      "suggestion": "全体にマイクの近づけ方や音の鳴らし方を一度見せる",
       "source": "agent",
       "policy_fixed": false,
       "trail": [
         "読んだ: 学級の要約（6 人、予想の本文は渡さない）と、一人ずつの流れ",
-        "ツール: 3 回（断った 0 回）・モデル 4 回",
+        "ツール: 4 回（断った 0 回）・モデル 5 回",
         "モデルの後の検査: 通過",
         "操作: しない（ボタンを押すのは先生）"
       ],
-      "model_calls": 4,
-      "tool_calls": 3,
+      "model_calls": 5,
+      "tool_calls": 4,
       "tools_denied": 0,
       "cached": false,
-      "generated_at": "2026-10-02T07:15:42+00:00",
+      "generated_at": "2026-10-02T07:42:58+00:00",
       "trace_id": "00000000000000000000000000000000",
       "_status": 200
     },
-    "seconds": 4.94,
+    "seconds": 5.48,
     "tokens": {
-      "calls": 4,
-      "in": 3690,
-      "out": 183
+      "calls": 5,
+      "in": 4892,
+      "out": 219
+    },
+    "allowed_counts": [
+      1,
+      3,
+      4,
+      5,
+      6
+    ],
+    "by_theme": {
+      "音の高さ": {
+        "held": 3,
+        "judged": 1,
+        "open": 1
+      },
+      "振り子とエネルギー": {
+        "held": 1
+      }
     }
   }
 }

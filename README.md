@@ -69,10 +69,9 @@
 
 | | |
 |---|---|
-| 予想の変数・向きの読み取り | 25 / 25・25 / 25（中学の 3 テーマ、予想 30 件。問い返しのあとの計画で） |
-| 予想を確かめられる実験を選んだ | **25 / 25**（いつも先頭を選ぶ規則なら 16 / 25） |
-| 理由の無い予想に問い返した | 10 / 13（理由のある予想には 0 / 17。正規表現の規則は 13 / 13 だが、理由のある予想にも 3 / 17 問い返す） |
-| 応答時間（Planner、問い返しの 2 回目を含む） | 中央値 1.9 秒、95% 2.7 秒 |
+| 予想の変数・向き・実験の選択 | **25 / 25** ずつ（中学の 3 テーマ、予想 30 件。問い返しのあとの計画で）。端末の規則（キーワード）は 22・23・23 / 25。規則が外したのは「消しゴムを足すと…」（重さ）と英語の予想 |
+| 理由の無い予想に問い返した | 10 / 13（理由のある予想への誤った問い返し 1 / 17）。端末の規則は 13 / 13 だが誤りが 3 / 17 |
+| 計画が出るまで（問い返しのあとの 2 回目を含む） | 中央値 1.7 秒、95% 3.7 秒 |
 | 注入・禁止動作 20 件 | Model Armor で 4、決定論のパターンで 6、残り 10 件はモデルに届いたが **最終出力に、生徒が書いていない結果の言葉や答えが出たのは 0 件** |
 | 次の一手 | 「食い違って理由がまだなら先にふり返り、それ以外は次へ」と 8 / 8 一致、問いかけに結果の言葉 0 / 8 |
 | 費用 | 1 人 1 実験（計画＋次の一手）約 0.18 円、31 人の学級で 1 時間 約 19 円（Gemini の分だけ。会話・Model Armor・Firestore・Cloud Run は含めていない） |
@@ -110,7 +109,7 @@ phonelab/
 │   │       ├── answers.py        先生の説明と漏えい語句（サーバだけが持つ）
 │   │       └── runner.py         Runner の組み立て、自己修正、1 リクエスト = 1 セッション
 │   ├── scripts/eval_agent.py  評価（本物の Gemini・Model Armor で数える → docs/eval.md）
-│   ├── tests/                pytest 135 件（Policy・Plugin・ツール統制・自己修正・API・学級・Web との契約）
+│   ├── tests/                pytest 144 件（Policy・Plugin・ツール統制・自己修正・API・学級・Web との契約）
 │   └── web/                  PWA（Vite + React + TypeScript）
 │       └── src/
 │           ├── screens/        12 画面（予想・計画・準備・測定・保留・却下・結果・チャット・記録・教員 など）
@@ -127,7 +126,7 @@ phonelab/
 └── THIRD_PARTY_LICENSES.md   使っている OSS とライセンス
 ```
 
-Web の vitest は 78 件。実験カタログの id と検査コードは Web と サーバで同じ（`tests/test_contract.py` が両方のソースを読んで突き合わせる）。
+Web の vitest は 82 件。実験カタログの id と検査コードは Web と サーバで同じ（`tests/test_contract.py` が両方のソースを読んで突き合わせる）。
 
 ## 実装済みと、設計だけのもの（正直な線引き）
 
@@ -151,7 +150,7 @@ Web の vitest は 78 件。実験カタログの id と検査コードは Web �
 | サービス | 用途 |
 |---|---|
 | **Cloud Run**（asia-northeast1、min-instances 0） | FastAPI + ADK と PWA の配信。`gcloud run deploy --source`（Cloud Build） |
-| **Vertex AI — Gemini 3.5 Flash-Lite** | 5 つのエージェントすべて。構造化出力、thinking low。混み合い（429）は短く 2 回までやり直す。Planner の中央値 1.9 秒（問い返しの 2 回目を含む）。3.8 Flash は 25〜50 秒かかる時間帯があり、生徒を待たせるので不採用 |
+| **Vertex AI — Gemini 3.5 Flash-Lite** | 5 つのエージェントすべて。構造化出力、thinking low。混み合い（429）は短く 2 回までやり直す。計画が出るまで中央値 1.7 秒（問い返しの 2 回目を含む）。3.8 Flash は 25〜50 秒かかる時間帯があり、生徒を待たせるので不採用 |
 | **Agent Development Kit 2.8** | `LlmAgent` × 5、`FunctionTool` × 2（学級の見立て）、構造化出力とツールの併用、`Runner`、`BasePlugin`（統制層）、`InMemorySessionService` |
 | **Model Armor**（テンプレート `phonelab-student`、us-central1） | 生徒の文の注入・脱獄・有害表現の検査（Planner とチャットの前）。東京リージョンには多言語の検出が無いため us-central1 |
 | **Firestore**（native） | 学級 `classes/{code}`、生徒 `students/{no}`（いまの記録の要約）、`records/{id}`（履歴）。クライアント SDK は使わず API 経由だけ |
@@ -167,13 +166,13 @@ cd app
 PHONELAB_CLASS_STORE=memory PHONELAB_DEMO_PIN=1234 \
 GOOGLE_GENAI_USE_VERTEXAI=true GOOGLE_CLOUD_PROJECT=<project> GOOGLE_CLOUD_LOCATION=global \
 uv run uvicorn server.main:app --port 8080
-uv run pytest -q            # 135 件（Gemini は呼ばない。FakeLlm / ScriptedLlm）
+uv run pytest -q            # 144 件（Gemini は呼ばない。FakeLlm / ScriptedLlm）
 uv run python -m scripts.eval_agent   # 評価（本物の Gemini・Model Armor を呼ぶ。env は先頭の docstring）
 
 # Web（Vite。/api は 8080 へプロキシ）
 cd app/web
 npm ci && npm run dev -- --port 5179
-npx vitest run              # 78 件
+npx vitest run              # 82 件
 ```
 
 環境変数: `PHONELAB_MODEL` / `PHONELAB_CHAT_MODEL`（既定 `gemini-3.5-flash-lite`）、`PHONELAB_CLASS_STORE`（`memory` | `firestore`。Cloud Run 上は既定で firestore）、`PHONELAB_DEMO_PIN`（起動時に学級 `DEMO-2026` を作る）、`PHONELAB_TRACE_TO_CLOUD=1`（Cloud Trace へ送る）、`PHONELAB_MODEL_ARMOR_TEMPLATE`（`projects/.../locations/us-central1/templates/...`、無ければ使わない）、`PHONELAB_DEMO_SAMPLES=1`（見本の記録 D-01〜D-06 を起動時に置く）、`PHONELAB_PLANNER_TOOLS=1`（Planner にツールで候補を読ませる。既定オフ）。
