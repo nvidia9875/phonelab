@@ -15,7 +15,9 @@ const MIN_EXPLAIN_CHARS = 8;
 /** 次の一手が何を見て選ばれたか。これが変わったら、前の提案は古い */
 export function nextBasis(rec: StudyRecord): string {
   const r = rec.result;
-  const explained = rec.explain.trim().length >= MIN_EXPLAIN_CHARS ? 1 : 0;
+  // 結果画面の「なぜ」でも、ラボ先生との会話で書いた自分の考えでも、書いたことにする（10/2 採点 2-1）
+  const wrote = Math.max(rec.explain.trim().length, rec.chat?.thinking.trim().length ?? 0);
+  const explained = wrote >= MIN_EXPLAIN_CHARS ? 1 : 0;
   return r ? `${explained}|${r.observed}|${r.consistent}|${r.a.toPrecision(4)}|${r.b.toPrecision(4)}` : `${explained}|-`;
 }
 
@@ -78,6 +80,8 @@ export async function askNext(rec: StudyRecord, theme: Theme): Promise<NextSugge
       markHalted();
       return null;
     }
+    // 回数の上限・混み合い（429）は、カタログの順を見せるが記録には残さない（あとで聞き直せるように）
+    if (e instanceof NextError && e.status === 429) return { ...fallback(rec, theme), basis: "busy" };
     suggestion = { ...fallback(rec, theme), basis };
   }
   // 待っている間に、同じものを見た次の一手が入っていたら、そちらを使う

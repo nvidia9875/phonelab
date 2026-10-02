@@ -32,7 +32,11 @@ export interface ReplanInput {
 
 const TIMEOUT_MS = 13_000;
 
-export class ReplanError extends Error {}
+export class ReplanError extends Error {
+  constructor(message: string, readonly status?: number) {
+    super(message);
+  }
+}
 
 export async function requestReplan(input: ReplanInput): Promise<ReplanReply> {
   const controller = new AbortController();
@@ -63,7 +67,7 @@ export async function requestReplan(input: ReplanInput): Promise<ReplanReply> {
   } finally {
     clearTimeout(timer);
   }
-  if (!res.ok) throw new ReplanError(`ラボ先生が答えられませんでした（${res.status}）`);
+  if (!res.ok) throw new ReplanError(`ラボ先生が答えられませんでした（${res.status}）`, res.status);
   const data = (await res.json()) as ReplanReply;
   if (typeof data.advice !== "string" || (data.action !== "retry" && data.action !== "switch")) throw new ReplanError("返事を読み取れませんでした");
   return data;

@@ -120,6 +120,16 @@ describe("聞き直し（10/2 採点 2-1）", () => {
     expect(recordById(rec.id)!.events.filter((e) => e.k === "次の一手").at(-1)?.body).toContain("聞き直した");
   });
 
+  it("a reason written in the chat with the lab teacher also counts", async () => {
+    serverAnswers({ ...NEXT, action: "reflect", experiment_id: null, question: "" });
+    const rec = judged();
+    await askNext(rec, sound);
+
+    updateRecord(rec.id, (r) => ({ ...r, chat: { thinking: "強くしても震える速さは同じだと思ったから", messages: [], revealed: false, turnsUsed: 0, limitReached: false } }));
+
+    expect(isNextStale(recordById(rec.id)!)).toBe(true);
+  });
+
   it("asks again when re-measuring changes the result", async () => {
     serverAnswers(NEXT);
     const rec = judged();

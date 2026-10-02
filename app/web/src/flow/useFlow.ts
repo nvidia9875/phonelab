@@ -5,7 +5,7 @@
  */
 import type { ChatReply } from "../agent/chat";
 import { PlanError, requestPlan, type PlanReply } from "../agent/plan";
-import { requestReplan } from "../agent/replan";
+import { ReplanError, requestReplan } from "../agent/replan";
 import { checkPolicy, choosePlan, judge, readClaim } from "../agent/stub";
 import { QUANTITY, formatQuantity, type Unit } from "../catalog/quantity";
 import { SENSOR_LABEL, repeatsOf, themeById, variantById, variantsOf, type Theme } from "../catalog/themes";
@@ -221,7 +221,9 @@ export async function askHoldAdvice(rec: StudyRecord, theme: Theme): Promise<Hol
       return trail ? addEvent(n, "判断", trail) : n;
     });
     return advice;
-  } catch {
+  } catch (e: unknown) {
+    // 先生の停止は端末も止める。それ以外（上限・通信）は画面の定型の提案で続ける
+    if (e instanceof ReplanError && e.status === 409) markHalted();
     return null;
   }
 }
