@@ -46,8 +46,8 @@ def store():
 def answer(**overrides) -> dict:
     base = {
         "lines": [
-            "音の高さで〔音の高さ・保留〕が保留、理由は「まわりの雑音」",
-            "〔音の高さ・判定済み〕は判定まで進んだ",
+            "〔音の高さ・保留〕、理由は「まわりの雑音」",
+            "〔音の高さ・判定済み〕、次の予想へ",
         ],
         "visit_first": ["S-01", "S-02"],
         "suggestion": "班の間隔を空けて、測る班のまわりは静かにしてもらう",
@@ -98,8 +98,8 @@ def test_reads_the_class_with_tools_and_tells_the_teacher_in_three_lines(client,
     assert data["source"] == "agent"
     # 人数はモデルが書かず、サーバが要約から埋める
     assert data["lines"] == [
-        "音の高さで 2 人が保留、理由は「まわりの雑音」",
-        "1 人は判定まで進んだ",
+        "音の高さで保留 2 人、理由は「まわりの雑音」",
+        "音の高さで判定済み 1 人、次の予想へ",
     ]
     assert data["visit_first"] == ["S-01", "S-02"]
     assert data["tool_calls"] == 2
@@ -135,7 +135,7 @@ def test_only_three_students_can_be_read_one_by_one(client, scripted_llm):
 def test_never_suggests_halting_the_class(client, scripted_llm):
     scripted_llm.script = [
         answer(
-            lines=["保留が多いので全員を止めるべき", "〔全体・保留〕が保留"],
+            lines=["保留が多いので全員を止めるべき", "〔全体・保留〕"],
             suggestion="全端末を停止してください",
             visit_first=["S-01", "S-77"],
         )
@@ -143,7 +143,7 @@ def test_never_suggests_halting_the_class(client, scripted_llm):
 
     data = ask(client).json()
 
-    assert data["lines"] == ["2 人が保留"]
+    assert data["lines"] == ["学級全体で保留 2 人"]
     assert data["suggestion"] == ""
     assert data["visit_first"] == ["S-01"]
     assert data["policy_fixed"] is True
@@ -208,15 +208,17 @@ def test_head_counts_are_filled_by_the_server_and_self_written_numbers_are_dropp
         answer(
             lines=[
                 "音の高さで 4 人が保留",
-                "〔音の高さ・保留〕が保留、理由は雑音",
-                "〔振り子・保留〕が保留",
+                "〔音の高さ・保留〕、理由は雑音",
+                "〔振り子・保留〕",
+                "振り子の周期で〔音の高さ・保留〕",
             ]
         )
     ]
 
     data = ask(client).json()
 
-    assert data["lines"] == ["2 人が保留、理由は雑音"]
+    # 数だけでなく「何の」まで言う。ほかのテーマの名前に別のテーマの数を付けた行は落とす（10/2 採点 4 回目）
+    assert data["lines"] == ["音の高さで保留 2 人、理由は雑音"]
     assert data["policy_fixed"] is True
 
 

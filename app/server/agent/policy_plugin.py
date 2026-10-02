@@ -26,6 +26,7 @@ from google.adk.tools import BaseTool, ToolContext
 from google.genai import types
 from opentelemetry import trace
 
+from server.agent.catalog import CATALOG
 from server.agent.class_agent import (
     COUNT_KEYS_KEY,
     KNOWN_NUMBERS_KEY,
@@ -378,12 +379,33 @@ def _fill_counts(line: str, keys: dict[str, int] | None, fill: bool = True) -> s
         if key not in keys:
             missing = True
             return ""
-        return f" {keys[key]} 人" if fill else m.group(0)
+        return f" {count_phrase(key, keys[key])}" if fill else m.group(0)
 
-    # 数字の前後に半角の空き（「音の高さで 2 人が保留」）。行頭・句読点の前の空きは詰める
+    if _names_another_theme(COUNT_KEY_RE.sub("", text), COUNT_KEY_RE.findall(text), keys):
+        return None
+    # 数字の前後に半角の空き（「音の高さで保留 2 人」）。行頭・句読点の前の空きは詰める
     filled = re.sub(r" +", " ", COUNT_KEY_RE.sub(put, text))
-    filled = re.sub(r" (?=[、。」）])", "", filled).strip()
+    filled = re.sub(r" (?=[、。」）が])", "", filled).strip()
     return None if missing else filled
+
+
+def count_phrase(key: str, n: int) -> str:
+    """〔キー〕を「何の・何人」まで言う句にする。数だけ埋めると、文がほかのテーマの話でも 3 人に見える（10/2 採点 4 回目）"""
+    subject, _, status = key.partition("・")
+    if subject == "理由":
+        return f"理由が「{status}」の子 {n} 人"
+    if subject == "全体":
+        return f"学級全体で{status} {n} 人" if status else f"学級全体 {n} 人"
+    return f"{subject}で{status} {n} 人" if status else f"{subject} {n} 人"
+
+
+def _names_another_theme(outside: str, used: list[str], keys: dict[str, int]) -> bool:
+    """〔キー〕の外にテーマ名を書き、そのテーマの〔キー〕を使っていない行（「振り子で〔音の高さ・保留〕」）"""
+    themes = {t.title for t in CATALOG.values()} | {
+        k for k in keys if "・" not in k and k != "全体"
+    }
+    used_themes = {u.strip().partition("・")[0] for u in used}
+    return any(t in outside and t not in used_themes for t in themes) and bool(used)
 
 
 def sanitize_insight(
