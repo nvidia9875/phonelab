@@ -29,6 +29,7 @@ from server.guards import trace_id_of
 from server.ratelimit import SlidingWindowLimiter
 from server.routes_class import (
     DashboardRequest,
+    audit,
     authorize_teacher,
     get_class_store,
 )
@@ -96,6 +97,8 @@ async def insight(
         raise HTTPException(
             status_code=429, detail="見立てを聞く回数が多すぎます。少し待ってください"
         )
+    # エージェントを動かしたのが誰かを残す（キャッシュから返したときは動かしていないので残さない）
+    await audit(store, record, request, body.token, "ラボ先生に見立てを聞いた")
 
     rows = await store.list_students(class_code)
     snapshot, timelines = build_snapshot(

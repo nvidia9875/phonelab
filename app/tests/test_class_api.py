@@ -599,3 +599,30 @@ def test_a_summary_refuses_unknown_trace_stages_and_check_codes(client):
     res, secret = post_record(client, bad_stage)
     assert res.status_code == 422
     assert post_record(client, bad_code, secret=secret)[0].status_code == 422
+
+
+def test_teacher_actions_are_kept_in_an_append_only_audit_log(client):
+    """10/9 ガバナンス: 誰が（PIN か印か・接続元のハッシュ）いつ何を止めた・変えたかを残し、教員画面に出す"""
+    token = client.post("/api/class/DEMO-2026/dashboard", json={"pin": PIN}).json()["session_token"]
+    client.post("/api/class/DEMO-2026/halt", json={"token": token, "halted": True})
+    client.post("/api/class/DEMO-2026/halt", json={"pin": PIN, "halted": False})
+    client.put(
+        "/api/class/DEMO-2026/policy",
+        json={"token": token, "allowed_sensors": ["microphone"], "teacher_enabled": []},
+    )
+
+    log = client.post("/api/class/DEMO-2026/dashboard", json={"token": token}).json()["audit"]
+
+    assert [e["action"] for e in log] == ["許可を変えた", "停止を解除した", "全端末の測定を止めた"]
+    assert [e["via"] for e in log] == ["セッションの印", "PIN", "セッションの印"]
+    assert "microphone" in log[0]["detail"]
+    assert all(len(e["who"]) == 6 for e in log)
+
+
+def test_reaching_the_pin_limit_shows_up_in_the_audit_log(client):
+    for _ in range(PIN_ATTEMPTS_PER_WINDOW):
+        wrong_pin(client)
+
+    log = client.post("/api/class/DEMO-2026/dashboard", json={"pin": PIN}).json()["audit"]
+
+    assert log[0]["action"] == "PIN の間違いが上限に達した"

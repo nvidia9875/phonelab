@@ -24,8 +24,10 @@ from server.classroom import (
     ClassStore,
     StudentRow,
     auth_for,
+    failure_key,
     new_secret,
     normalize_code,
+    now_iso,
     store_from_env,
 )
 from server.ratelimit import SlidingWindowLimiter
@@ -214,6 +216,8 @@ class DashboardOut(BaseModel):
     teacher_enabled: list[str]
     students: list[StudentOut]
     fetched_at: str
+    # 先生の操作の記録（新しい順。止めた・許可を変えた・合言葉をリセット・見立てを聞いた・PIN のロック）
+    audit: list[AuditOut] = []
 
 
 class ClassOut(BaseModel):
@@ -298,9 +302,54 @@ async def authorize_teacher(
     logger.warning(
         "先生の PIN の間違い class=%s 接続元の回数=%d 学級の回数=%d", code, mine, everyone
     )
+    if mine == PIN_ATTEMPTS_PER_WINDOW or everyone == CLASS_PIN_ATTEMPTS_PER_WINDOW:
+        # 上限に届いた 1 回だけ残す（先生が画面で「誰かが PIN を試している」と気づける）
+        await audit(
+            store,
+            record,
+            request,
+            None,
+            "PIN の間違いが上限に達した",
+            f"接続元 {mine} 回・学級 {everyone} 回",
+        )
     if mine > PIN_ATTEMPTS_PER_WINDOW or everyone > CLASS_PIN_ATTEMPTS_PER_WINDOW:
         raise HTTPException(status_code=429, detail=PIN_LOCKED)
     raise HTTPException(status_code=403, detail="PIN が違います")
+
+
+AUDIT_SHOWN = 10
+
+
+class AuditOut(BaseModel):
+    at: str
+    action: str
+    detail: str = ""
+    via: str = ""
+    who: str = ""
+
+
+async def audit(
+    store: ClassStore,
+    record: ClassRecord,
+    request: Request,
+    token: str | None,
+    action: str,
+    detail: str = "",
+) -> None:
+    """先生の操作を学級の監査記録に残す（誰が・いつ・何を）。名前は持たないので、接続元のハッシュの頭で見分ける"""
+    entry = {
+        "at": now_iso(),
+        "action": action,
+        "detail": detail[:200],
+        "via": "セッションの印" if teacher_session.verify(record, token) else "PIN",
+        "who": failure_key(_client_ip(request))[:6],
+    }
+    try:
+        await store.add_audit(record.policy.class_code, entry)
+    except Exception:  # 監査を書けなくても操作は止めない。理由はログに残す
+        logger.exception(
+            "監査記録を書けなかった class=%s action=%s", record.policy.class_code, action
+        )
 
 
 @router.get("/{code}")
@@ -357,6 +406,7 @@ async def reset_student(
     if not re.match(NUMBER_RE, number):
         raise HTTPException(status_code=404, detail="番号の形が違います")
     await store.set_student_auth(record.policy.class_code, number.upper(), None)
+    await audit(store, record, request, body.token, "合言葉をリセット", number.upper())
     response.headers["Cache-Control"] = "no-store"
     return {"ok": True}
 
@@ -374,6 +424,13 @@ async def halt(
     policy = await store.update_policy(record.policy.class_code, halted=body.halted)
     if policy is None:
         raise HTTPException(status_code=404, detail=NOT_FOUND)
+    await audit(
+        store,
+        record,
+        request,
+        body.token,
+        "全端末の測定を止めた" if body.halted else "停止を解除した",
+    )
     return _out(policy, response)
 
 
@@ -395,6 +452,14 @@ async def set_policy(
     )
     if policy is None:
         raise HTTPException(status_code=404, detail=NOT_FOUND)
+    await audit(
+        store,
+        record,
+        request,
+        body.token,
+        "許可を変えた",
+        f"センサー: {'・'.join(policy.allowed_sensors) or 'なし'}／家でやる実験: {'・'.join(policy.teacher_enabled) or 'なし'}",
+    )
     return _out(policy, response)
 
 
@@ -420,6 +485,9 @@ async def dashboard(
         teacher_enabled=list(record.policy.teacher_enabled),
         students=[_student_out(r) for r in rows],
         fetched_at=_now(),
+        audit=[
+            AuditOut(**e) for e in await store.list_audit(record.policy.class_code, AUDIT_SHOWN)
+        ],
     )
 
 

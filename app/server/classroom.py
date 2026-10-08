@@ -123,6 +123,8 @@ class ClassStore(Protocol):
     ) -> int | None: ...
     async def pin_failures(self, code: str, key: str, window_s: float, now: float) -> int: ...
     async def add_pin_failure(self, code: str, key: str, window_s: float, now: float) -> int: ...
+    async def add_audit(self, code: str, entry: dict[str, str]) -> None: ...
+    async def list_audit(self, code: str, limit: int) -> list[dict[str, str]]: ...
 
 
 def failure_key(key: str) -> str:
@@ -145,6 +147,7 @@ class MemoryClassStore:
         self._auth: dict[str, dict[str, StudentAuth]] = {}
         self._counters: dict[tuple[str, str, str], int] = {}
         self._pin_failures: dict[tuple[str, str], list[float]] = {}
+        self._audit: dict[str, list[dict[str, str]]] = {}
 
     def seed(self, record: ClassRecord) -> None:
         self._classes[record.policy.class_code] = record
@@ -214,6 +217,13 @@ class MemoryClassStore:
         times = [*_within(self._pin_failures.get(k, []), window_s, now), now]
         self._pin_failures[k] = times
         return len(times)
+
+    async def add_audit(self, code: str, entry: dict[str, str]) -> None:
+        code = normalize_code(code)
+        self._audit[code] = [*self._audit.get(code, []), dict(entry)]
+
+    async def list_audit(self, code: str, limit: int) -> list[dict[str, str]]:
+        return list(reversed(self._audit.get(normalize_code(code), [])))[:limit]
 
     async def list_students(self, code: str) -> list[StudentRow]:
         code = normalize_code(code)
@@ -398,6 +408,21 @@ class FirestoreClassStore:
             return len(times)
 
         return await add(self._client.transaction())
+
+    async def add_audit(self, code: str, entry: dict[str, str]) -> None:
+        """先生の操作の記録。消さない・書き換えない（追記だけ）"""
+        await self._doc(code).collection("audit").add(dict(entry))
+
+    async def list_audit(self, code: str, limit: int) -> list[dict[str, str]]:
+        from google.cloud import firestore
+
+        query = (
+            self._doc(code)
+            .collection("audit")
+            .order_by("at", direction=firestore.Query.DESCENDING)
+            .limit(limit)
+        )
+        return [snap.to_dict() or {} async for snap in query.stream()]
 
     async def list_students(self, code: str) -> list[StudentRow]:
         rows: list[StudentRow] = []

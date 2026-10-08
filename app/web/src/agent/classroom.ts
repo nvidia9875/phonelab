@@ -146,6 +146,18 @@ export interface DashboardInfo {
   teacher_enabled: string[];
   students: StudentRow[];
   fetched_at: string;
+  /** 先生の操作の記録（新しい順。止めた・許可を変えた・合言葉をリセット・見立てを聞いた・PIN のロック）。消せない */
+  audit?: AuditEntry[];
+}
+
+export interface AuditEntry {
+  at: string;
+  action: string;
+  detail: string;
+  /** PIN か、セッションの印か */
+  via: string;
+  /** 接続元のハッシュの頭 6 桁（名前や IP は持たない） */
+  who: string;
 }
 
 export async function postRecordSummary(classCode: string, number: string, secret: string, record: RecordSummary): Promise<void> {
