@@ -56,11 +56,27 @@ class ClassRecord:
     salt: str
 
     def verify(self, pin: str) -> bool:
+        if self.pin_hash.startswith(SCRYPT_PREFIX):
+            return hmac.compare_digest(hash_teacher_pin(pin, self.salt), self.pin_hash)
+        # 10/9 より前に作った学級（DEMO-2026 など）の形
         return hmac.compare_digest(hash_pin(pin, self.salt), self.pin_hash)
 
 
 def hash_pin(pin: str, salt: str) -> str:
+    """生徒の合言葉（32 文字から 6 つの乱数）用。記録の送信ごとに確かめるので速いハッシュ"""
     return hashlib.sha256(f"{salt}:{pin}".encode()).hexdigest()
+
+
+# 先生の PIN は数字だけで短いので、保存は遅いハッシュ（DB を読まれても総当たりに時間がかかる。10/9 Codex #8）
+SCRYPT_PREFIX = "scrypt$"
+SCRYPT_N, SCRYPT_R, SCRYPT_P = 2**14, 8, 1
+
+
+def hash_teacher_pin(pin: str, salt: str) -> str:
+    digest = hashlib.scrypt(
+        pin.encode(), salt=salt.encode(), n=SCRYPT_N, r=SCRYPT_R, p=SCRYPT_P, dklen=32
+    )
+    return SCRYPT_PREFIX + digest.hex()
 
 
 def normalize_code(code: str) -> str:
@@ -92,7 +108,7 @@ def auth_for(secret: str) -> StudentAuth:
 def new_class(code: str, school: str, pin: str) -> ClassRecord:
     salt = secrets.token_hex(8)
     policy = ClassPolicy(class_code=normalize_code(code), school=school, updated_at=now_iso())
-    return ClassRecord(policy=policy, pin_hash=hash_pin(pin, salt), salt=salt)
+    return ClassRecord(policy=policy, pin_hash=hash_teacher_pin(pin, salt), salt=salt)
 
 
 # 生徒の端末が送る記録の要約（生データ無し）。教員画面はこれだけを見る。中身の形は routes_class.RecordSummary
@@ -110,9 +126,11 @@ class ClassStore(Protocol):
     async def get(self, code: str) -> ClassRecord | None: ...
     async def put(self, record: ClassRecord) -> None: ...
     async def update_policy(self, code: str, **fields: object) -> ClassPolicy | None: ...
+    async def set_pin(self, code: str, pin_hash: str, salt: str) -> None: ...
     async def touch_student(self, code: str, number: str) -> None: ...
     async def get_student_auth(self, code: str, number: str) -> StudentAuth | None: ...
     async def set_student_auth(self, code: str, number: str, auth: StudentAuth | None) -> None: ...
+    async def claim_student(self, code: str, number: str, auth: StudentAuth) -> bool: ...
     async def put_record(self, code: str, number: str, summary: Summary) -> None: ...
     async def get_current(self, code: str, number: str) -> Summary | None: ...
     async def list_students(self, code: str) -> list[StudentRow]: ...
@@ -166,6 +184,10 @@ class MemoryClassStore:
         self._classes[policy.class_code] = replace(record, policy=policy)
         return policy
 
+    async def set_pin(self, code: str, pin_hash: str, salt: str) -> None:
+        record = self._classes[normalize_code(code)]
+        self._classes[record.policy.class_code] = replace(record, pin_hash=pin_hash, salt=salt)
+
     async def touch_student(self, code: str, number: str) -> None:
         self.students.setdefault(normalize_code(code), {})[number] = now_iso()
 
@@ -187,6 +209,13 @@ class MemoryClassStore:
             bucket.pop(number, None)
         else:
             bucket[number] = auth
+
+    async def claim_student(self, code: str, number: str, auth: StudentAuth) -> bool:
+        bucket = self._auth.setdefault(normalize_code(code), {})
+        if number in bucket:
+            return False
+        bucket[number] = auth
+        return True
 
     async def get_current(self, code: str, number: str) -> Summary | None:
         return self._current.get(normalize_code(code), {}).get(number)
@@ -294,6 +323,10 @@ class FirestoreClassStore:
         record = await self.get(code)
         return record.policy if record else None
 
+    async def set_pin(self, code: str, pin_hash: str, salt: str) -> None:
+        """PIN の 2 項目だけを書く（停止・許可には触れない）"""
+        await self._doc(code).update({"pin_hash": pin_hash, "salt": salt, "updated_at": now_iso()})
+
     async def touch_student(self, code: str, number: str) -> None:
         await (
             self._doc(code)
@@ -339,6 +372,30 @@ class FirestoreClassStore:
             "secret_salt": auth.salt if auth else None,
         }
         await student.set({**fields, "last_seen_at": now_iso()}, merge=True)
+
+    async def claim_student(self, code: str, number: str, auth: StudentAuth) -> bool:
+        """まだ合言葉の無い番号に、合言葉を 1 つだけ付ける（同時の入場で 2 つ出ないようにトランザクションで。10/9 Codex #7）"""
+        from google.cloud import firestore
+
+        ref = self._doc(code).collection("students").document(number)
+
+        @firestore.async_transactional
+        async def claim(tx) -> bool:
+            snap = await ref.get(transaction=tx)
+            if snap.exists and (snap.to_dict() or {}).get("secret_hash"):
+                return False
+            tx.set(
+                ref,
+                {
+                    "secret_hash": auth.secret_hash,
+                    "secret_salt": auth.salt,
+                    "last_seen_at": now_iso(),
+                },
+                merge=True,
+            )
+            return True
+
+        return await claim(self._client.transaction())
 
     async def get_current(self, code: str, number: str) -> Summary | None:
         snap = await self._doc(code).collection("students").document(number).get()

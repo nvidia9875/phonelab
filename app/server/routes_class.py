@@ -8,6 +8,7 @@ from __future__ import annotations
 import logging
 import re
 import time
+from datetime import UTC, datetime, timedelta
 from functools import lru_cache
 from typing import Annotated, Literal
 
@@ -43,6 +44,9 @@ PIN_WINDOW_S = 600
 # 学級全体の間違いの上限（接続元を変えながら試すのを止める。先生が数人で間違えても届かない数）
 CLASS_PIN_ATTEMPTS_PER_WINDOW = 30
 CLASS_WIDE_KEY = "*"
+MAX_STUDENTS_PER_CLASS = 60
+# 端末の時計のずれとして許す分
+FUTURE_SKEW_MIN = 10
 # 記録の送信は、合言葉の合った生徒ごとに数える（1 人 10 分 120 回）。
 # 学校は全員が同じ外向き IP なので、IP の上限は 40 人分の余裕を持たせる（10/2 の採点で 31 人の学級が止まると指摘）
 RECORD_POSTS_PER_STUDENT = 120
@@ -172,6 +176,20 @@ class RecordSummary(BaseModel):
     chat_turns: int = Field(default=0, ge=0, le=50)
     events: list[EventIn] = Field(default_factory=list, max_length=MAX_EVENTS)
     updated_at: str = Field(max_length=40)
+
+    @field_validator("updated_at")
+    @classmethod
+    def not_in_the_future(cls, value: str) -> str:
+        """未来の時刻を送ると、そのあとの普通の記録を「古い」とみなさせられた（10/9 Codex #11）"""
+        try:
+            at = datetime.fromisoformat(value)
+        except ValueError as exc:
+            raise ValueError("時刻の形が違います") from exc
+        if at.tzinfo is None:
+            at = at.replace(tzinfo=UTC)
+        if at > datetime.now(UTC) + timedelta(minutes=FUTURE_SKEW_MIN):
+            raise ValueError("端末の時計が進みすぎています")
+        return value
 
     @field_validator("theme_id")
     @classmethod
@@ -377,8 +395,15 @@ async def join(
     existing = await store.get_student_auth(record.policy.class_code, number)
     issued: str | None = None
     if existing is None:
+        # 学級の番号の数に上限（学級コードを知る人が番号を大量に作れないように。10/9 Codex #7）
+        if len(await store.list_students(record.policy.class_code)) >= MAX_STUDENTS_PER_CLASS:
+            raise HTTPException(
+                status_code=403, detail="この学級の番号はいっぱいです。先生に聞いてください"
+            )
         issued = new_secret()
-        await store.set_student_auth(record.policy.class_code, number, auth_for(issued))
+        if not await store.claim_student(record.policy.class_code, number, auth_for(issued)):
+            # 同じ番号を同時に使い始めた。先に入った方だけが合言葉を持つ
+            raise HTTPException(status_code=409, detail=NUMBER_TAKEN)
     elif body.secret is None:
         raise HTTPException(status_code=409, detail=NUMBER_TAKEN)
     elif not existing.verify(body.secret):

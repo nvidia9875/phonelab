@@ -430,7 +430,7 @@ def render_markdown(out: dict[str, Any]) -> str:
         "| 今回 | 予想と測定 | 「なぜ」を書いた | 選んだ手 | 問いかけ |",
         "|---|---|---|---|---|",
         *[
-            f"| {r['variant']} | {'合った' if r['consistent'] else '食い違い'} | {'はい' if r['explained'] else 'まだ'} | {r['action'] or f"エラー（{r.get('status')}）"} {r['experiment'] or ''} | {(r['question'] or r['why'] or '')[:50]} |"
+            f"| {r['variant']} | {'合った' if r['consistent'] else '食い違い'} | {'はい' if r['explained'] else 'まだ'} | {r['action'] or f'エラー（{r.get("status")}）'} {r['experiment'] or ''} | {(r['question'] or r['why'] or '')[:50]} |"
             for r in nxt
         ],
         (

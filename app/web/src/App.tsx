@@ -15,7 +15,7 @@ import { Settings } from "./screens/Settings";
 import { Chat } from "./screens/Chat";
 import { repeatsOf, themeById, variantById, type Theme } from "./catalog/themes";
 import { matchRoute, nav, usePath, type Route } from "./router";
-import { activeRecordForTheme, clearAll, createRecord, getState, myRecordById, setClassState, setHalted, setSettings, setStudent, useStore, type ClassState, type StudyRecord } from "./store/records";
+import { activeRecordForTheme, createRecord, getState, wipeDevice, myRecordById, setClassState, setHalted, setSettings, setStudent, useStore, type ClassState, type StudyRecord } from "./store/records";
 import { DEFAULT_CLASS_POLICY, detectCaps, themeStatus, type ClassPolicy, type DeviceCaps } from "./store/status";
 import { ClassError, fetchClass, joinClass, resetStudent, setClassHalt, setClassPolicyOnServer, type ClassInfo } from "./agent/classroom";
 import { startRecordSync } from "./agent/sync";
@@ -250,7 +250,7 @@ export function App() {
             // 初めての入場なら、Me が合言葉の画面を出してからトップへ戻す
             return { secret: fresh };
           }}
-          onClear={() => clearAll()}
+          onClear={() => wipeDevice()}
           onHome={goHome}
         />
       );

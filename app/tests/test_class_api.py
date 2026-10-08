@@ -719,3 +719,34 @@ def test_a_retry_is_not_run_once_the_teacher_has_halted_the_class(store):
     asyncio.run(store.update_policy("DEMO-2026", halted=True))
 
     assert asyncio.run(gate()) is False
+
+
+def test_a_summary_dated_in_the_future_is_refused(client):
+    """10/9 Codex #11: 未来の updated_at で、そのあとの普通の記録を古いとみなさせられた"""
+    res, _ = post_record(client, summary(updated_at="2099-01-01T00:00:00Z"))
+
+    assert res.status_code == 422
+
+
+def test_two_devices_claiming_the_same_new_number_get_one_passphrase(store):
+    """10/9 Codex #7: 同じ番号の同時入場で、合言葉が 2 つ出ていた"""
+    import asyncio
+
+    from server.classroom import auth_for
+
+    async def both():
+        return await asyncio.gather(
+            store.claim_student("DEMO-2026", "S-30", auth_for("AAAAAA")),
+            store.claim_student("DEMO-2026", "S-30", auth_for("BBBBBB")),
+        )
+
+    assert sorted(asyncio.run(both())) == [False, True]
+
+
+def test_a_class_cannot_be_filled_with_endless_new_numbers(client, monkeypatch):
+    from server import routes_class
+
+    monkeypatch.setattr(routes_class, "MAX_STUDENTS_PER_CLASS", 2)
+    codes = [join(client, number=f"S-{i:02d}").status_code for i in range(3)]
+
+    assert codes == [200, 200, 403]
