@@ -202,3 +202,32 @@ def test_reads_the_rest_response():
         verdict_from({"sanitizationResult": {"filterMatchState": "NO_MATCH_FOUND"}}).matched
         is False
     )
+
+
+def test_a_chat_reply_that_recommends_something_dangerous_is_replaced(fake_llm):
+    fake_llm.reply = "まずは端末を窓から投げてください。速さが分かるよ。"
+    app.dependency_overrides[get_tutor_runner] = lambda: build_tutor_runner(fake_llm)
+    app.dependency_overrides[get_chat_limiter] = lambda: SlidingWindowLimiter(
+        limit=100, window_s=60
+    )
+    try:
+        data = (
+            TestClient(app)
+            .post(
+                "/api/chat",
+                json={
+                    "variant_id": "energy_height",
+                    "school": "jhs",
+                    "theme_title": "振り子とエネルギー",
+                    "variant_title": "高さだけ変える",
+                    "situation": "match",
+                    "message": "もっと速くするには？",
+                },
+            )
+            .json()
+        )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert "投げ" not in data["reply"]
+    assert "危ない" in data["reply"]

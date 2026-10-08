@@ -77,3 +77,14 @@ def test_changes_condition_finds_advice_that_alters_the_variable_or_the_held_val
     assert changes_condition("放す高さは変えずに、包み直そう", "energy_height") is None
     assert changes_condition("端末を少し離して、もう一度", "sound_pluck_strength") is None
     assert changes_condition("糸の長さを短くして", "") is None
+
+
+def test_unsafe_instruction_catches_advice_but_not_warnings():
+    from server.agent.policy import unsafe_instruction
+
+    assert unsafe_instruction("端末を窓から投げてください。") == "端末の落下・投擲"
+    assert unsafe_instruction("窓から投げてみない？") == "端末の落下・投擲"
+    assert unsafe_instruction("電子レンジで温めてみよう") == "火・電気・分解"
+    assert unsafe_instruction("端末を落とさないように袋を結ぼう。") is None
+    assert unsafe_instruction("窓から投げるのは危ないのでやめよう。") is None
+    assert unsafe_instruction("1.98 m/s だったね。同じ高さから放そう") is None

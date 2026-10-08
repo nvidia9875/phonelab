@@ -36,6 +36,7 @@ from server.agent.class_agent import (
 from server.agent.model_armor import ArmorClient
 from server.agent.next_step import parse_next
 from server.agent.planner import changes_condition, parse_plan, parse_replan
+from server.agent.policy import unsafe_instruction
 
 PLANNER_CALLS_PER_EXPERIMENT = 5  # docs/policy.md 上限表 planner_calls_per_experiment
 PLANNER_TEMPERATURE = 0.2
@@ -71,6 +72,9 @@ NEUTRAL_REFLECT_QUESTION = "どうして予想と違う結果になったと思�
 PLAN_OFF_CATALOG_KEY = "phonelab.plan_off_catalog"
 PLAN_WHY_REPLACED_KEY = "phonelab.plan_why_replaced"
 PLAN_CONDITION_CHANGED_KEY = "phonelab.plan_condition_changed"
+# ラボ先生の文が危ない動作（落とす・高い所・水・火や電気 など）を勧めていた。安全な文に差し替えた（10/9 Codex #5）
+UNSAFE_OUTPUT_KEY = "phonelab.unsafe_output"
+UNSAFE_FALLBACK_TEXT = "その方法は危ないので、ラボ先生からはすすめられません。実験の手順書のとおり、安全なやり方で確かめよう。"
 # 「なぜこの実験か」に混じってはいけない、結果の言葉
 RESULT_WORDS = re.compile(
     r"速くな|遅くな|高くな|低くな|変わらな|同じにな|長くな|短くな|ほぼ同じ|ならない"
@@ -274,9 +278,15 @@ class PolicyPlugin(BasePlugin):
                 llm_response,
                 str(state.get(REPLAN_VARIANT_KEY) or ""),
             )
+        raw = _response_text(llm_response)
+        unsafe = unsafe_instruction(raw)
+        with _tracer.start_as_current_span("phonelab.safety_check") as span:
+            span.set_attribute("phonelab.unsafe", unsafe or "")
+        if unsafe:
+            return _text_response(UNSAFE_FALLBACK_TEXT, {UNSAFE_OUTPUT_KEY: unsafe})
         if not state.get(ANSWER_LOCKED_KEY):
             return None
-        text = _squash(_response_text(llm_response))
+        text = _squash(raw)
         phrases = [_squash(p) for p in state.get(LEAK_PHRASES_KEY, []) if p]
         leaked = any(p and p in text for p in phrases)
         with _tracer.start_as_current_span("phonelab.leak_check") as span:
@@ -307,6 +317,12 @@ def _check_plan(
             # 問い返しも出口で検査する（「高くなると思う？」のように結果を誘導しない。10/2 採点 2-6）
             plan = plan.model_copy(update={"question_back": NEUTRAL_QUESTION_BACK})
             flags[PLAN_WHY_REPLACED_KEY] = True
+        if unsafe_instruction(plan.why_this):
+            plan = plan.model_copy(update={"why_this": NEUTRAL_WHY})
+            flags[UNSAFE_OUTPUT_KEY] = True
+        if plan.question_back and unsafe_instruction(plan.question_back):
+            plan = plan.model_copy(update={"question_back": NEUTRAL_QUESTION_BACK})
+            flags[UNSAFE_OUTPUT_KEY] = True
         span.set_attribute("phonelab.decision", "fixed" if flags else "allow")
     if not flags:
         return None
@@ -333,6 +349,9 @@ def _check_replan(
         if RESULT_WORDS.search(plan.advice):
             plan = plan.model_copy(update={"advice": NEUTRAL_ADVICE})
             flags[PLAN_WHY_REPLACED_KEY] = True
+        if unsafe_instruction(plan.advice):
+            plan = plan.model_copy(update={"advice": NEUTRAL_ADVICE})
+            flags[UNSAFE_OUTPUT_KEY] = True
         term = changes_condition(plan.advice, variant_id) if plan.action == "retry" else None
         if term:
             span.set_attribute("phonelab.condition_term", term)
@@ -368,6 +387,10 @@ def _check_next(candidates: list[str], llm_response: LlmResponse) -> LlmResponse
         if RESULT_WORDS.search(plan.why):
             plan = plan.model_copy(update={"why": NEUTRAL_WHY})
             flags[PLAN_WHY_REPLACED_KEY] = True
+        if unsafe_instruction(f"{plan.question}。{plan.why}"):
+            neutral = NEUTRAL_REFLECT_QUESTION if plan.action == "reflect" else NEUTRAL_QUESTION
+            plan = plan.model_copy(update={"question": neutral, "why": NEUTRAL_WHY})
+            flags[UNSAFE_OUTPUT_KEY] = True
         span.set_attribute("phonelab.decision", "fixed" if flags else "allow")
     if not flags:
         return None
@@ -431,13 +454,17 @@ def sanitize_insight(
     学級にいない番号を除き、長さと件数を切る"""
     lines: list[str] = []
     for line in out.lines:
-        if not line or HALT_WORDS.search(line):
+        if not line or HALT_WORDS.search(line) or unsafe_instruction(line):
             continue
         filled = _fill_counts(line, keys, fill)
         if filled:
             lines.append(filled[:MAX_INSIGHT_CHARS])
     visit = list(dict.fromkeys(n for n in out.visit_first if n in known))
-    suggestion = "" if HALT_WORDS.search(out.suggestion) else out.suggestion[:MAX_INSIGHT_CHARS]
+    suggestion = (
+        ""
+        if HALT_WORDS.search(out.suggestion) or unsafe_instruction(out.suggestion)
+        else out.suggestion[:MAX_INSIGHT_CHARS]
+    )
     fixed = InsightOutput(lines=lines[:3], visit_first=visit[:5], suggestion=suggestion)
     # 〔キー〕を埋めただけは「直した」に数えない
     dropped = (
