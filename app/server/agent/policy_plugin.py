@@ -86,6 +86,10 @@ LEAK_FALLBACK_TEXT = "その理由は、あなたの考えを書いてから、�
 ARMOR_TEXT_KEY = "armor_text"
 ARMOR_CHECKED_KEY = "armor_checked"
 ARMOR_BLOCKED_KEY = "phonelab.armor_blocked"
+# Model Armor が検査できなかった（届かない・一部のフィルタが失敗）。生徒の文はモデルに渡さない
+ARMOR_UNSCREENED_KEY = "phonelab.armor_unscreened"
+SKIP_REASON_ARMOR_UNAVAILABLE = "armor_unavailable"
+ARMOR_UNSCREENED_TEXT = "いまは安全のチェックが使えないので、ラボ先生には渡さずに決まりごとで進めます。少し待ってから、もう一度聞いてね。"
 ARMOR_BLOCKED_TEXT = "この文には、ラボ先生への指示や、授業に合わない言葉が含まれていたので、ラボ先生には渡しませんでした。予想を自分の言葉で書き直してください。"
 TOOL_CALLS_KEY = "tool_calls"
 # 断った呼び出しも含めた試行の数。上限はこちらで数える（断られた呼び出しを繰り返してモデルの回数を使い切らないように。10/2 本番で起きた）
@@ -197,8 +201,16 @@ class PolicyPlugin(BasePlugin):
             verdict = await self._armor.screen(str(text))
             span.set_attribute("phonelab.armor_matched", verdict.matched)
             span.set_attribute("phonelab.armor_filters", ",".join(verdict.filters))
-            if verdict.error:
+            if verdict.error and not verdict.matched:
                 span.set_attribute("phonelab.armor_error", verdict.error)
+                span.set_attribute("phonelab.decision", "skip_model_unscreened")
+                return _text_response(
+                    ARMOR_UNSCREENED_TEXT,
+                    {
+                        SKIP_REASON_KEY: SKIP_REASON_ARMOR_UNAVAILABLE,
+                        ARMOR_UNSCREENED_KEY: verdict.error,
+                    },
+                )
             if not verdict.matched:
                 return None
             span.set_attribute("phonelab.decision", "skip_model")

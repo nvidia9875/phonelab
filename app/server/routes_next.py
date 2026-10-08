@@ -16,6 +16,7 @@ from opentelemetry import trace
 from pydantic import BaseModel, Field, field_validator
 
 from server.agent.catalog import CATALOG, variant_by_id
+from server.agent.model_armor import armor_from_env
 from server.agent.models import gemini
 from server.agent.next_step import (
     NEXT_CALLS_PER_RECORD,
@@ -40,6 +41,7 @@ from server.guards import (
     RetryGate,
     call_count,
     check_limits,
+    class_denies_theme,
     class_is_halted,
     get_student_limiter,
     trace_id_of,
@@ -106,9 +108,13 @@ class NextResponse(BaseModel):
     trace_id: str
 
 
+def skip_line(reply) -> str:
+    return policy_before_line("armor_unavailable" if reply.armor_unscreened else "limit")
+
+
 @lru_cache(maxsize=1)
 def get_next_runner() -> Runner:
-    return build_next_runner(gemini(planner_model()))
+    return build_next_runner(gemini(planner_model()), armor=armor_from_env())
 
 
 @lru_cache(maxsize=1)
@@ -135,6 +141,10 @@ async def next_step(
     halted = await class_is_halted(store, body.class_code)
     if halted:
         raise HTTPException(status_code=409, detail=HALTED_DETAIL)
+    # 学級の許可は次の一手でも効かせる（10/9 Codex セキュリティ #3）
+    denied = await class_denies_theme(store, body.class_code, theme)
+    if denied:
+        raise HTTPException(status_code=403, detail=denied)
     count = await call_count(
         store,
         kind="next",
@@ -188,6 +198,7 @@ async def next_step(
                     candidates=[v.id for v in remaining],
                     class_halted=halted,
                     before_retry=gate,
+                    armor_text=body.prediction or None,
                 ),
                 timeout=NEXT_TIMEOUT_S,
             )
@@ -213,7 +224,7 @@ async def next_step(
                 next_calls=calls,
                 trail=trail(
                     read,
-                    policy_before_line("limit") if reply.skipped else checked,
+                    skip_line(reply) if reply.skipped else checked,
                     chose_line("ふり返りへ（食い違いの理由がまだ。決まりごと）"),
                 ),
                 trace_id=trace_id,
@@ -230,7 +241,7 @@ async def next_step(
             next_calls=calls,
             trail=trail(
                 read,
-                policy_before_line("limit") if reply.skipped else checked,
+                skip_line(reply) if reply.skipped else checked,
                 chose_line(f"{experiment_words(first.id)}（カタログの順）"),
             ),
             trace_id=trace_id,

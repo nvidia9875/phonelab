@@ -626,3 +626,41 @@ def test_reaching_the_pin_limit_shows_up_in_the_audit_log(client):
     log = client.post("/api/class/DEMO-2026/dashboard", json={"pin": PIN}).json()["audit"]
 
     assert log[0]["action"] == "PIN の間違いが上限に達した"
+
+
+def test_replan_and_next_also_obey_the_class_permissions(client, fake_llm):
+    """10/9 Codex セキュリティ #3: マイクを許していない学級で、計画だけでなく再計画・次の一手も 403"""
+    client.put(
+        "/api/class/DEMO-2026/policy",
+        json={"pin": PIN, "allowed_sensors": ["accelerometer"], "teacher_enabled": []},
+    )
+    secret = join(client).json()["secret"]
+    ident = {"class_code": "DEMO-2026", "number": "S-04", "secret": secret, "record_id": "r1"}
+
+    replan = client.post(
+        "/api/replan",
+        json={
+            "theme_id": "sound",
+            "variant_id": "sound_pluck_strength",
+            "condition": "A",
+            "hold_codes": ["low_snr"],
+            "retries": 0,
+            "prediction": "高くなる",
+            **ident,
+        },
+    )
+    nxt = client.post(
+        "/api/next",
+        json={
+            "theme_id": "sound",
+            "variant_id": "sound_pluck_strength",
+            "school": "jhs",
+            "observed": "same",
+            "consistent": False,
+            **ident,
+        },
+    )
+
+    assert replan.status_code == 403
+    assert nxt.status_code == 403
+    assert fake_llm.requests == []

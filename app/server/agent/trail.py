@@ -28,6 +28,7 @@ def policy_before_line(kind: str) -> str:
         "reject": "AI に渡す前のチェック: 危ない実験・メモの中の命令 → 止めた（AI は呼ばない）",
         "class_policy": "AI に渡す前のチェック: 学級で許されていない → 止めた（AI は呼ばない）",
         "limit": "聞ける回数の上限 → AI を呼ばずにリストの順",
+        "armor_unavailable": "AI に渡す前のチェック（Model Armor）: いまは検査できない → 生徒の文は AI に渡さず決まりごとで",
     }[kind]
 
 

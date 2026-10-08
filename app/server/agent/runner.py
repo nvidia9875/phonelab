@@ -46,6 +46,7 @@ from server.agent.policy_plugin import (
     ANSWER_LOCKED_KEY,
     ARMOR_BLOCKED_KEY,
     ARMOR_TEXT_KEY,
+    ARMOR_UNSCREENED_KEY,
     CLASS_HALTED_KEY,
     INSIGHT_FIXED_KEY,
     LEAK_PHRASES_KEY,
@@ -115,6 +116,8 @@ class PlannerReply:
     halted: bool = False
     # Model Armor が検知した（モデルは呼んでいない）
     armor_blocked: bool = False
+    # Model Armor が検査できなかったので、生徒の文をモデルに渡さなかった（fail-closed）
+    armor_unscreened: bool = False
     # 1 回目が検査に落ちた理由（FIX_*）と、作り直しが検査を通ったか
     fix_reasons: tuple[str, ...] = ()
     # 作り直しを実際に走らせたか（上限・停止で走らなかったら False）
@@ -132,6 +135,7 @@ class ReplanReply:
     # 測り直しの助言が条件の値を変えさせていた。統制層が中立の文に差し替えた（変えさせた言葉は Trace のスパンに）
     condition_changed: bool = False
     # モデルを呼んだ回数（作り直しを含む）
+    armor_unscreened: bool = False
     calls_used: int = 0
     fix_reasons: tuple[str, ...] = ()
     # 作り直しを実際に走らせたか（上限・停止で走らなかったら False）
@@ -146,6 +150,7 @@ class NextReply:
     plan: NextOutput | None
     off_catalog: bool
     words_replaced: bool
+    armor_unscreened: bool = False
     calls_used: int = 0
     fix_reasons: tuple[str, ...] = ()
     # 作り直しを実際に走らせたか（上限・停止で走らなかったら False）
@@ -160,6 +165,7 @@ class TutorReply:
     leaked: bool
     halted: bool = False
     armor_blocked: bool = False
+    armor_unscreened: bool = False
 
 
 @dataclass(frozen=True)
@@ -197,7 +203,7 @@ def build_runner(
     )
 
 
-def build_replan_runner(model: str | BaseLlm) -> Runner:
+def build_replan_runner(model: str | BaseLlm, armor: ArmorClient | None = None) -> Runner:
     return _runner(
         build_replanner(model),
         [
@@ -206,6 +212,7 @@ def build_replan_runner(model: str | BaseLlm) -> Runner:
                 call_limit=REPLAN_CALLS_PER_RECORD,
                 limit_text="この記録で提案できる回数の上限です。定型の提案で進めます。",
                 thinking_level=PLANNER_THINKING_LEVEL,
+                armor=armor,
             )
         ],
     )
@@ -220,6 +227,7 @@ async def run_replan(
     variant_id: str = "",
     class_halted: bool = False,
     before_retry=None,
+    armor_text: str | None = None,
 ) -> ReplanReply:
 
     async def attempt(text: str, calls: int) -> ReplanReply:
@@ -229,6 +237,10 @@ async def run_replan(
             REPLAN_VARIANT_KEY: variant_id,
             CLASS_HALTED_KEY: class_halted,
         }
+        if (
+            armor_text and text == prompt
+        ):  # 生徒の文（予想）も Model Armor に通す。作り直しでは同じ文を再検査しない
+            state[ARMOR_TEXT_KEY] = armor_text
         outcome = await _run_once(runner, SPIKE_USER_ID, text, state)
         skipped = SKIP_REASON_KEY in outcome.flags or class_halted
         return ReplanReply(
@@ -238,6 +250,7 @@ async def run_replan(
             off_catalog=PLAN_OFF_CATALOG_KEY in outcome.flags,
             advice_replaced=PLAN_WHY_REPLACED_KEY in outcome.flags,
             condition_changed=PLAN_CONDITION_CHANGED_KEY in outcome.flags,
+            armor_unscreened=ARMOR_UNSCREENED_KEY in outcome.flags,
             calls_used=0 if skipped else 1,
         )
 
@@ -273,7 +286,7 @@ async def run_replan(
     )
 
 
-def build_next_runner(model: str | BaseLlm) -> Runner:
+def build_next_runner(model: str | BaseLlm, armor: ArmorClient | None = None) -> Runner:
     return _runner(
         build_next_agent(model),
         [
@@ -282,6 +295,7 @@ def build_next_runner(model: str | BaseLlm) -> Runner:
                 call_limit=NEXT_CALLS_PER_RECORD,
                 limit_text="この記録で次の一手を聞ける回数の上限です。カタログの順で進めます。",
                 thinking_level=PLANNER_THINKING_LEVEL,
+                armor=armor,
             )
         ],
     )
@@ -295,6 +309,7 @@ async def run_next(
     candidates: list[str],
     class_halted: bool = False,
     before_retry=None,
+    armor_text: str | None = None,
 ) -> NextReply:
     """結果のあとの次の一手。検査に落ちたら 1 回だけ作り直させる"""
 
@@ -304,6 +319,8 @@ async def run_next(
             NEXT_CANDIDATES_KEY: list(candidates),
             CLASS_HALTED_KEY: class_halted,
         }
+        if armor_text and text == prompt:
+            state[ARMOR_TEXT_KEY] = armor_text
         outcome = await _run_once(runner, SPIKE_USER_ID, text, state)
         skipped = SKIP_REASON_KEY in outcome.flags or class_halted
         return NextReply(
@@ -312,6 +329,7 @@ async def run_next(
             plan=None if skipped else parse_next(outcome.text),
             off_catalog=PLAN_OFF_CATALOG_KEY in outcome.flags,
             words_replaced=PLAN_WHY_REPLACED_KEY in outcome.flags,
+            armor_unscreened=ARMOR_UNSCREENED_KEY in outcome.flags,
             calls_used=0 if skipped else 1,
         )
 
@@ -459,6 +477,7 @@ async def run_planner(
             text=outcome.text,
             skipped=skipped,
             armor_blocked=armored,
+            armor_unscreened=ARMOR_UNSCREENED_KEY in outcome.flags,
             planner_calls=int(outcome.state.get(PLANNER_CALLS_KEY, calls)),
             plan=None if skipped or not candidates else parse_plan(outcome.text),
             off_catalog=PLAN_OFF_CATALOG_KEY in outcome.flags,
@@ -553,6 +572,7 @@ async def run_tutor(
         leaked=ANSWER_LEAK_KEY in outcome.flags,
         halted=class_halted,
         armor_blocked=armored,
+        armor_unscreened=ARMOR_UNSCREENED_KEY in outcome.flags,
     )
 
 
