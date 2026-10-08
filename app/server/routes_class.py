@@ -5,7 +5,9 @@
 
 from __future__ import annotations
 
+import logging
 import re
+import time
 from functools import lru_cache
 from typing import Annotated, Literal
 
@@ -28,12 +30,17 @@ from server.classroom import (
 )
 from server.ratelimit import SlidingWindowLimiter
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/api/class")
 
 CODE_RE = re.compile(r"^[A-Z0-9-]{3,20}$")
 NUMBER_RE = r"^[A-Za-z0-9-]{1,8}$"
 PIN_ATTEMPTS_PER_WINDOW = 10
 PIN_WINDOW_S = 600
+# 学級全体の間違いの上限（接続元を変えながら試すのを止める。先生が数人で間違えても届かない数）
+CLASS_PIN_ATTEMPTS_PER_WINDOW = 30
+CLASS_WIDE_KEY = "*"
 # 記録の送信は、合言葉の合った生徒ごとに数える（1 人 10 分 120 回）。
 # 学校は全員が同じ外向き IP なので、IP の上限は 40 人分の余裕を持たせる（10/2 の採点で 31 人の学級が止まると指摘）
 RECORD_POSTS_PER_STUDENT = 120
@@ -262,7 +269,6 @@ def _client_ip(request: Request) -> str:
 
 async def authorize_teacher(
     store: ClassStore,
-    limiter: SlidingWindowLimiter,
     request: Request,
     code: str,
     pin: str,
@@ -274,12 +280,25 @@ async def authorize_teacher(
     record = await _load(store, code)
     if teacher_session.verify(record, token):
         return record
-    key = f"{record.policy.class_code}|{_client_ip(request)}"
-    if limiter.exceeded(key):
+    code = record.policy.class_code
+    ip_key = _client_ip(request)
+    now = time.time()
+    # 間違いは Firestore で数える（インスタンスのメモリだと Cloud Run の台数ぶん多く試せた。10/9）。
+    # 接続元ごとに加えて学級全体でも数える（接続元を変えながらの総当たりを止める）
+    if (
+        await store.pin_failures(code, ip_key, PIN_WINDOW_S, now) >= PIN_ATTEMPTS_PER_WINDOW
+        or await store.pin_failures(code, CLASS_WIDE_KEY, PIN_WINDOW_S, now)
+        >= CLASS_PIN_ATTEMPTS_PER_WINDOW
+    ):
         raise HTTPException(status_code=429, detail=PIN_LOCKED)
     if pin and record.verify(pin):
         return record
-    if not limiter.allow(key):
+    mine = await store.add_pin_failure(code, ip_key, PIN_WINDOW_S, now)
+    everyone = await store.add_pin_failure(code, CLASS_WIDE_KEY, PIN_WINDOW_S, now)
+    logger.warning(
+        "先生の PIN の間違い class=%s 接続元の回数=%d 学級の回数=%d", code, mine, everyone
+    )
+    if mine > PIN_ATTEMPTS_PER_WINDOW or everyone > CLASS_PIN_ATTEMPTS_PER_WINDOW:
         raise HTTPException(status_code=429, detail=PIN_LOCKED)
     raise HTTPException(status_code=403, detail="PIN が違います")
 
@@ -332,10 +351,9 @@ async def reset_student(
     request: Request,
     response: Response,
     store: Annotated[ClassStore, Depends(get_class_store)],
-    limiter: Annotated[SlidingWindowLimiter, Depends(get_pin_limiter)],
 ) -> dict[str, bool]:
     """先生が番号の合言葉を消す（端末を替えた・合言葉をなくした子のため）。次の入場で新しい合言葉が出る"""
-    record = await authorize_teacher(store, limiter, request, code, body.pin, body.token)
+    record = await authorize_teacher(store, request, code, body.pin, body.token)
     if not re.match(NUMBER_RE, number):
         raise HTTPException(status_code=404, detail="番号の形が違います")
     await store.set_student_auth(record.policy.class_code, number.upper(), None)
@@ -350,10 +368,9 @@ async def halt(
     request: Request,
     response: Response,
     store: Annotated[ClassStore, Depends(get_class_store)],
-    limiter: Annotated[SlidingWindowLimiter, Depends(get_pin_limiter)],
 ) -> ClassOut:
     """全端末の測定を止める／解除する。止めるのは人だけ（ClassAgent の提案にこの種類は無い）"""
-    record = await authorize_teacher(store, limiter, request, code, body.pin, body.token)
+    record = await authorize_teacher(store, request, code, body.pin, body.token)
     policy = await store.update_policy(record.policy.class_code, halted=body.halted)
     if policy is None:
         raise HTTPException(status_code=404, detail=NOT_FOUND)
@@ -367,10 +384,9 @@ async def set_policy(
     request: Request,
     response: Response,
     store: Annotated[ClassStore, Depends(get_class_store)],
-    limiter: Annotated[SlidingWindowLimiter, Depends(get_pin_limiter)],
 ) -> ClassOut:
     """許可するセンサーと、先生が有効化する実験（家でやる振り子など）"""
-    record = await authorize_teacher(store, limiter, request, code, body.pin, body.token)
+    record = await authorize_teacher(store, request, code, body.pin, body.token)
     # 停止（halted）には触れない。許可と有効化の 2 項目だけを書く
     policy = await store.update_policy(
         record.policy.class_code,
@@ -389,10 +405,9 @@ async def dashboard(
     request: Request,
     response: Response,
     store: Annotated[ClassStore, Depends(get_class_store)],
-    limiter: Annotated[SlidingWindowLimiter, Depends(get_pin_limiter)],
 ) -> DashboardOut:
     """先生の 1 画面の元データ: 生徒ごとの「いまの記録」の要約。番号だけで名前は無い"""
-    record = await authorize_teacher(store, limiter, request, code, body.pin, body.token)
+    record = await authorize_teacher(store, request, code, body.pin, body.token)
     rows = await store.list_students(record.policy.class_code)
     response.headers["Cache-Control"] = "no-store"
     return DashboardOut(

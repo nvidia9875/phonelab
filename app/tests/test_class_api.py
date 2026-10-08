@@ -11,7 +11,12 @@ from server.agent.runner import build_runner
 from server.classroom import MemoryClassStore, new_class, seed_demo
 from server.main import app, get_plan_limiter, get_planner_runner
 from server.ratelimit import SlidingWindowLimiter
-from server.routes_class import get_class_store, get_pin_limiter
+from server.routes_class import (
+    CLASS_PIN_ATTEMPTS_PER_WINDOW,
+    PIN_ATTEMPTS_PER_WINDOW,
+    get_class_store,
+    get_pin_limiter,
+)
 
 PIN = "1234"
 
@@ -114,22 +119,45 @@ def test_the_teacher_changes_allowed_sensors_and_enables_home_experiments(client
     assert data["teacher_enabled"] == ["pendulum"]
 
 
+def wrong_pin(client, ip="203.0.113.1"):
+    return client.post(
+        "/api/class/DEMO-2026/halt",
+        json={"pin": "0000", "halted": True},
+        headers={"x-forwarded-for": ip},
+    ).status_code
+
+
 def test_wrong_pin_attempts_are_rate_limited(store, fake_llm):
     app.dependency_overrides[get_class_store] = lambda: store
-    limiter = SlidingWindowLimiter(limit=2, window_s=600)
-    app.dependency_overrides[get_pin_limiter] = lambda: limiter
     try:
         client = TestClient(app)
-        codes = [
-            client.post(
-                "/api/class/DEMO-2026/halt", json={"pin": "0000", "halted": True}
-            ).status_code
-            for _ in range(3)
+        codes = [wrong_pin(client) for _ in range(PIN_ATTEMPTS_PER_WINDOW + 1)]
+    finally:
+        app.dependency_overrides.clear()
+
+    assert codes == [403] * PIN_ATTEMPTS_PER_WINDOW + [429]
+
+
+def test_the_pin_lockout_holds_across_server_instances_and_changing_ips(store, fake_llm):
+    """10/9: 間違いの数はインスタンスのメモリではなく保存先で数える。接続元を変えても学級全体で止まる"""
+    app.dependency_overrides[get_class_store] = lambda: store
+    try:
+        client = TestClient(app)
+        # 1 つの接続元: 別のインスタンス（新しい TestClient）に移っても続きから数える
+        first = [wrong_pin(client) for _ in range(PIN_ATTEMPTS_PER_WINDOW)]
+        moved = wrong_pin(TestClient(app))
+        # 接続元を変えながら: 学級全体の上限で止まる
+        spread = [
+            wrong_pin(client, ip=f"198.51.100.{i}")
+            for i in range(CLASS_PIN_ATTEMPTS_PER_WINDOW - PIN_ATTEMPTS_PER_WINDOW + 1)
         ]
     finally:
         app.dependency_overrides.clear()
 
-    assert codes == [403, 403, 429]
+    assert first == [403] * PIN_ATTEMPTS_PER_WINDOW
+    assert moved == 429
+    assert spread[-1] == 429
+    assert set(spread[:-1]) == {403}
 
 
 def test_the_planner_refuses_to_run_while_the_class_is_halted(client, fake_llm):
@@ -278,8 +306,6 @@ def test_correct_pins_are_not_counted_and_a_session_survives_a_lockout(store, fa
     間違いが上限に達したら正しい PIN でも 429（総当たり対策。10/2 採点 2-6）。
     ただし PIN で入った先生のセッションの印は使い続けられる（同じ学校の IP の生徒に先生が締め出されない）"""
     app.dependency_overrides[get_class_store] = lambda: store
-    limiter = SlidingWindowLimiter(limit=2, window_s=600)
-    app.dependency_overrides[get_pin_limiter] = lambda: limiter
     try:
         client = TestClient(app)
         first = client.post("/api/class/DEMO-2026/dashboard", json={"pin": PIN}).json()
@@ -288,12 +314,7 @@ def test_correct_pins_are_not_counted_and_a_session_survives_a_lockout(store, fa
             client.post("/api/class/DEMO-2026/dashboard", json={"pin": PIN}).status_code
             for _ in range(5)
         ]
-        wrong = [
-            client.post(
-                "/api/class/DEMO-2026/halt", json={"pin": "0000", "halted": True}
-            ).status_code
-            for _ in range(3)
-        ]
+        wrong = [wrong_pin(client, ip="testclient") for _ in range(PIN_ATTEMPTS_PER_WINDOW + 1)]
         pin_after = client.post("/api/class/DEMO-2026/dashboard", json={"pin": PIN}).status_code
         token_after = client.post(
             "/api/class/DEMO-2026/dashboard", json={"token": token}
@@ -305,7 +326,7 @@ def test_correct_pins_are_not_counted_and_a_session_survives_a_lockout(store, fa
         app.dependency_overrides.clear()
 
     assert codes == [200] * 5
-    assert wrong == [403, 403, 429]
+    assert wrong == [403] * PIN_ATTEMPTS_PER_WINDOW + [429]
     assert pin_after == 429
     assert token_after == 200
     assert halt_with_token == 200

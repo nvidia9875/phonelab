@@ -121,6 +121,17 @@ class ClassStore(Protocol):
     async def reserve_counter(
         self, code: str, number: str, key: str, floor: int, limit: int
     ) -> int | None: ...
+    async def pin_failures(self, code: str, key: str, window_s: float, now: float) -> int: ...
+    async def add_pin_failure(self, code: str, key: str, window_s: float, now: float) -> int: ...
+
+
+def failure_key(key: str) -> str:
+    """PIN の間違いを数えるキー。接続元の IP をそのまま保存しない"""
+    return hashlib.sha256(key.encode()).hexdigest()[:32]
+
+
+def _within(times: list[float], window_s: float, now: float) -> list[float]:
+    return [t for t in times if now - t < window_s]
 
 
 class MemoryClassStore:
@@ -133,6 +144,7 @@ class MemoryClassStore:
         self._history: dict[str, dict[str, dict[str, Summary]]] = {}
         self._auth: dict[str, dict[str, StudentAuth]] = {}
         self._counters: dict[tuple[str, str, str], int] = {}
+        self._pin_failures: dict[tuple[str, str], list[float]] = {}
 
     def seed(self, record: ClassRecord) -> None:
         self._classes[record.policy.class_code] = record
@@ -192,6 +204,16 @@ class MemoryClassStore:
             return None
         self._counters[k] = current + 1
         return current
+
+    async def pin_failures(self, code: str, key: str, window_s: float, now: float) -> int:
+        times = self._pin_failures.get((normalize_code(code), failure_key(key)), [])
+        return len(_within(times, window_s, now))
+
+    async def add_pin_failure(self, code: str, key: str, window_s: float, now: float) -> int:
+        k = (normalize_code(code), failure_key(key))
+        times = [*_within(self._pin_failures.get(k, []), window_s, now), now]
+        self._pin_failures[k] = times
+        return len(times)
 
     async def list_students(self, code: str) -> list[StudentRow]:
         code = normalize_code(code)
@@ -352,6 +374,30 @@ class FirestoreClassStore:
             return current
 
         return await take(self._client.transaction())
+
+    def _pin_failure_doc(self, code: str, key: str):
+        return self._doc(code).collection("pin_failures").document(failure_key(key))
+
+    async def pin_failures(self, code: str, key: str, window_s: float, now: float) -> int:
+        snap = await self._pin_failure_doc(code, key).get()
+        times = [float(t) for t in (snap.to_dict() or {}).get("at", [])] if snap.exists else []
+        return len(_within(times, window_s, now))
+
+    async def add_pin_failure(self, code: str, key: str, window_s: float, now: float) -> int:
+        """間違いを 1 つ足して、窓の中の数を返す。インスタンスが何台あっても同じ数を見る（10/9）"""
+        from google.cloud import firestore
+
+        ref = self._pin_failure_doc(code, key)
+
+        @firestore.async_transactional
+        async def add(tx) -> int:
+            snap = await ref.get(transaction=tx)
+            old = [float(t) for t in (snap.to_dict() or {}).get("at", [])] if snap.exists else []
+            times = [*_within(old, window_s, now), now]
+            tx.set(ref, {"at": times, "updated_at": now_iso()})
+            return len(times)
+
+        return await add(self._client.transaction())
 
     async def list_students(self, code: str) -> list[StudentRow]:
         rows: list[StudentRow] = []

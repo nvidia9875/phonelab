@@ -31,7 +31,6 @@ from server.routes_class import (
     DashboardRequest,
     authorize_teacher,
     get_class_store,
-    get_pin_limiter,
 )
 
 router = APIRouter(prefix="/api/class")
@@ -83,12 +82,11 @@ async def insight(
     request: Request,
     response: Response,
     store: Annotated[ClassStore, Depends(get_class_store)],
-    pin_limiter: Annotated[SlidingWindowLimiter, Depends(get_pin_limiter)],
     limiter: Annotated[SlidingWindowLimiter, Depends(get_insight_limiter)],
     runner: Annotated[Runner, Depends(get_insight_runner)],
 ) -> InsightResponse:
     """ラボ先生が学級の様子を読み、先生に 3 行で伝える。操作はしない"""
-    record = await authorize_teacher(store, pin_limiter, request, code, body.pin, body.token)
+    record = await authorize_teacher(store, request, code, body.pin, body.token)
     class_code = record.policy.class_code
     response.headers["Cache-Control"] = "no-store"
     hit = _cache.get(class_code)
