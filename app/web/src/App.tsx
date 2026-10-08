@@ -15,7 +15,7 @@ import { Settings } from "./screens/Settings";
 import { Chat } from "./screens/Chat";
 import { repeatsOf, themeById, variantById, type Theme } from "./catalog/themes";
 import { matchRoute, nav, usePath, type Route } from "./router";
-import { activeRecordForTheme, clearAll, createRecord, myRecordById, setClassState, setHalted, setSettings, setStudent, useStore, type ClassState, type StudyRecord } from "./store/records";
+import { activeRecordForTheme, clearAll, createRecord, getState, myRecordById, setClassState, setHalted, setSettings, setStudent, useStore, type ClassState, type StudyRecord } from "./store/records";
 import { DEFAULT_CLASS_POLICY, detectCaps, themeStatus, type ClassPolicy, type DeviceCaps } from "./store/status";
 import { ClassError, fetchClass, joinClass, resetStudent, setClassHalt, setClassPolicyOnServer, type ClassInfo } from "./agent/classroom";
 import { startRecordSync } from "./agent/sync";
@@ -62,18 +62,30 @@ function classStateFrom(info: ClassInfo): ClassState {
 /** 学級の停止はポーリングで届く。測定と準備の画面では 2 秒、それ以外は 10 秒（docs/policy.md 5 章） */
 const POLL_MEASURING_MS = 2000;
 const POLL_IDLE_MS = 10000;
+/** 続けて何回確かめられなかったら「停止が届くか分からない」とするか（測定中なら約 6 秒）。10/9 Codex #9 */
+const UNREACHABLE_AFTER = 3;
 
 function useClassPoll(classCode: string | null, measuring: boolean): void {
   useEffect(() => {
     if (!classCode) return;
     let alive = true;
+    let failures = 0;
     const tick = async () => {
       try {
         const info = await fetchClass(classCode);
+        failures = 0;
         if (alive) setClassState(classStateFrom(info));
       } catch (e: unknown) {
-        // 学級が消えた（404）ときだけ端末の学級を外す。通信の失敗は前の状態を保つ
-        if (alive && e instanceof ClassError && e.status === 404) setClassState(null);
+        if (!alive) return;
+        // 学級が消えた（404）ときは端末の学級を外す
+        if (e instanceof ClassError && e.status === 404) {
+          setClassState(null);
+          return;
+        }
+        // 通信の失敗が続いたら、先生の停止が届くか分からないので測定に進ませない（前の「止めていない」を信じ続けない）
+        failures += 1;
+        const current = getState().classState;
+        if (failures >= UNREACHABLE_AFTER && current && !current.unreachable) setClassState({ ...current, unreachable: true });
       }
     };
     void tick();
@@ -86,13 +98,13 @@ function useClassPoll(classCode: string | null, measuring: boolean): void {
 }
 
 /** 描画中に副作用を起こさないため、リダイレクト先と「描画前にやること」をここで決める */
-function resolve(route: Route, rec: StudyRecord | undefined, theme: Theme | undefined, hasStudent: boolean, halted: boolean, allowed: boolean): { redirect?: string; need?: "create" | "judge" } {
+function resolve(route: Route, rec: StudyRecord | undefined, theme: Theme | undefined, hasStudent: boolean, halted: boolean, allowed: boolean, unreachable = false): { redirect?: string; need?: "create" | "judge" } {
   const inTheme = route.name === "predict" || route.name === "plan" || route.name === "rejected" || route.name === "setup" || route.name === "measure" || route.name === "hold" || route.name === "result" || route.name === "chat";
   if (!inTheme) return {};
   if (!theme) return { redirect: "/" };
   if (!hasStudent) return { redirect: "/me" };
   if (!allowed) return { redirect: "/" }; // 学級の許可・端末の能力で選べないテーマは URL 直打ちでも開かない（9/18 Codex I2）
-  if (halted && (route.name === "setup" || route.name === "measure")) return { redirect: "/halted" };
+  if ((halted || unreachable) && (route.name === "setup" || route.name === "measure")) return { redirect: "/halted" };
   // 承認してから測る（D4）。URL を直接開いても、承認していなければ計画へ戻す（10/2 の通し操作で飛ばせた）
   if ((route.name === "setup" || route.name === "measure") && rec && !rec.approvedAt) return { redirect: `/x/${theme.id}/plan` };
   if (route.name === "predict") {
@@ -152,7 +164,8 @@ export function App() {
   const theme = themeId ? themeById(themeId) : undefined;
   const rec = theme ? activeRecordForTheme(theme.id, store.records) : undefined;
   const allowed = !theme || themeStatus(theme, store.records, caps, policy, store.settings.testMode).kind !== "unavailable";
-  const { redirect, need } = resolve(route, rec, theme, !!store.student, halted, allowed);
+  const unreachable = !!cls?.unreachable;
+  const { redirect, need } = resolve(route, rec, theme, !!store.student, halted, allowed, unreachable);
 
   useEffect(() => {
     if (redirect) {
@@ -205,7 +218,7 @@ export function App() {
         />
       );
     case "halted":
-      return <Halted halted={halted} onHome={goHome} />;
+      return <Halted halted={halted} unreachable={unreachable && !halted} onHome={goHome} />;
     case "settings":
       return <Settings settings={store.settings} onChange={setSettings} onMe={() => nav("/me")} onTeacher={() => nav("/teacher")} onHome={goHome} />;
     case "me":

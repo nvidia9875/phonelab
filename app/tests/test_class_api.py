@@ -664,3 +664,58 @@ def test_replan_and_next_also_obey_the_class_permissions(client, fake_llm):
     assert replan.status_code == 403
     assert nxt.status_code == 403
     assert fake_llm.requests == []
+
+
+def test_in_production_the_lab_teacher_needs_a_class(client, fake_llm, monkeypatch):
+    """10/9 Codex #2: 学級を省くと停止・許可・回数の枠から外れられた。本番は学級の生徒だけが AI を呼べる"""
+    monkeypatch.setenv("PHONELAB_REQUIRE_CLASS", "1")
+
+    res = client.post(
+        "/api/plan",
+        json={"theme_id": "sound", "school": "jhs", "text": "強くはじくと高くなる。速く震えるから"},
+    )
+
+    assert res.status_code == 403
+    assert "学級" in res.json()["detail"]
+    assert fake_llm.requests == []
+
+
+def test_a_new_record_id_does_not_reset_the_students_daily_budget(store, monkeypatch):
+    """10/9 Codex #6: 記録 id を変えると記録ごとの枠は 0 から。その上に生徒ごと 1 日の総枠をかぶせる"""
+    import asyncio
+
+    from server import guards
+
+    monkeypatch.setitem(guards.DAILY_LIMITS, "plan", 3)
+    secret = "ABCDEF"
+    from server.classroom import auth_for
+
+    asyncio.run(store.set_student_auth("DEMO-2026", "S-09", auth_for(secret)))
+
+    async def take(record_id: str) -> int:
+        count = await guards.call_count(
+            store,
+            kind="plan",
+            claimed=0,
+            class_code="DEMO-2026",
+            number="S-09",
+            secret=secret,
+            record_id=record_id,
+        )
+        return (await count.reserve(store, 5)).reserved
+
+    taken = [asyncio.run(take(f"r{i}")) for i in range(5)]
+
+    assert taken == [1, 1, 1, 0, 0]
+
+
+def test_a_retry_is_not_run_once_the_teacher_has_halted_the_class(store):
+    import asyncio
+
+    from server.guards import CallCount, RetryGate
+
+    count = CallCount(start=0, key=("DEMO-2026", "S-09", "plan-r1"), reserved=1)
+    gate = RetryGate(count, store, 5)
+    asyncio.run(store.update_policy("DEMO-2026", halted=True))
+
+    assert asyncio.run(gate()) is False

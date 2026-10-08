@@ -161,6 +161,8 @@ export interface ClassState {
   updatedAt: string;
   /** この端末が最後に受け取った時刻 */
   seenAt: string;
+  /** 学級の状態を続けて確かめられない（先生の停止が届くか分からない）。測定には進ませない */
+  unreachable?: boolean;
 }
 
 const KEY_RECORDS = "phonelab.records.v1";
