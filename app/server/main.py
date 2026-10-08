@@ -81,6 +81,7 @@ from server.routes_class import router as class_router
 from server.routes_insight import router as insight_router
 from server.routes_next import router as next_router
 from server.samples import seed_samples
+from server.security_headers import SecurityHeaders
 from server.telemetry import disable_content_capture, setup_cloud_tracing
 
 STATIC = Path(__file__).parent / "static"
@@ -106,6 +107,7 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 
 
 app = FastAPI(title="PhoneLab", version="0.0.1", lifespan=lifespan)
+app.add_middleware(SecurityHeaders)
 app.include_router(class_router)
 app.include_router(records_router)
 app.include_router(next_router)
