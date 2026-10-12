@@ -81,6 +81,7 @@ from server.routes_class import router as class_router
 from server.routes_insight import router as insight_router
 from server.routes_next import router as next_router
 from server.samples import seed_samples
+from server.security_headers import SecurityHeaders
 from server.telemetry import disable_content_capture, setup_cloud_tracing
 
 STATIC = Path(__file__).parent / "static"
@@ -106,6 +107,7 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 
 
 app = FastAPI(title="PhoneLab", version="0.0.1", lifespan=lifespan)
+app.add_middleware(SecurityHeaders)
 app.include_router(class_router)
 app.include_router(records_router)
 app.include_router(next_router)
@@ -367,7 +369,9 @@ async def plan(
                     candidates=[c.id for c in candidates],
                     class_halted=halted,
                     tool_state=tool_state,
-                    armor_text=body.text,
+                    armor_text="\n".join(
+                        t for t in (body.text, body.previous_question_back or "") if t
+                    ),
                     student_text=body.text,
                     before_retry=gate,
                 ),
@@ -406,6 +410,21 @@ async def plan(
             trail=trail(
                 read,
                 "AI に渡す前のチェック（Model Armor）: 命令や授業に合わない言葉 → 止めた（AI は呼ばない）",
+            ),
+            trace_id=trace_id,
+        )
+    if reply.armor_unscreened:
+        return PlanResponse(
+            kind="plan",
+            variant_id=first.id,
+            why="いまは安全のチェックが使えないので、ラボ先生には渡さずにカタログの順で進めます",
+            planner_calls=reply.planner_calls,
+            skipped=True,
+            source="catalog",
+            trail=trail(
+                read,
+                policy_before_line("armor_unavailable"),
+                chose_line(experiment_words(first.id)),
             ),
             trace_id=trace_id,
         )
@@ -528,7 +547,7 @@ class ReplanResponse(BaseModel):
 
 @lru_cache(maxsize=1)
 def get_replan_runner() -> Runner:
-    return build_replan_runner(gemini(planner_model()))
+    return build_replan_runner(gemini(planner_model()), armor=armor_from_env())
 
 
 @app.post("/api/replan")
@@ -547,6 +566,10 @@ async def replan(
     halted = await class_is_halted(store, body.class_code)
     if halted:
         raise HTTPException(status_code=409, detail=HALTED_DETAIL)
+    # 学級の許可（センサー・家でやる実験）は計画だけでなく再計画でも効かせる（10/9 Codex セキュリティ #3）
+    denied = await class_denies_theme(store, body.class_code, CATALOG[body.theme_id])
+    if denied:
+        raise HTTPException(status_code=403, detail=denied)
     count = await call_count(
         store,
         kind="replan",
@@ -587,6 +610,7 @@ async def replan(
                     variant_id=body.variant_id,
                     class_halted=halted,
                     before_retry=gate,
+                    armor_text=body.prediction or None,
                 ),
                 timeout=REPLAN_TIMEOUT_S,
             )
@@ -614,7 +638,9 @@ async def replan(
             replan_calls=calls,
             trail=trail(
                 read,
-                policy_before_line("limit") if reply.skipped else checked,
+                policy_before_line("armor_unavailable" if reply.armor_unscreened else "limit")
+                if reply.skipped
+                else checked,
                 chose_line("定型の測り直し"),
             ),
             trace_id=trace_id,
@@ -686,6 +712,18 @@ class ChatRequest(BaseModel):
         if value not in MODEL_ANSWERS:
             raise ValueError("カタログにない実験です")
         return value
+
+
+def chat_armor_text(body: ChatRequest) -> str:
+    """端末から来る自由文はすべて Model Armor に通す（最新の発言だけでは、考え・予想・履歴に命令を隠せた。10/9 Codex #4）。
+    履歴の teacher 役も端末が送ってくるので、生徒の文と同じに扱う"""
+    parts = [
+        body.message,
+        body.student_thinking,
+        body.prediction,
+        *(m.text for m in body.messages),
+    ]
+    return "\n".join(p for p in parts if p.strip())
 
 
 class ChatResponse(BaseModel):
@@ -779,7 +817,7 @@ async def chat(
                     leak_phrases=phrases_for(answer, body.situation),
                     locked=not revealed,
                     class_halted=halted,
-                    armor_text=body.message,
+                    armor_text=chat_armor_text(body),
                 ),
                 timeout=CHAT_TIMEOUT_S,
             )
@@ -804,7 +842,7 @@ async def chat(
         reply=reply.text,
         revealed=revealed and not reply.skipped,
         turns_used=turns_used,
-        limit_reached=(reply.skipped and not reply.armor_blocked)
+        limit_reached=(reply.skipped and not reply.armor_blocked and not reply.armor_unscreened)
         or turns_used >= CHAT_TURNS_PER_RECORD,
         trace_id=trace_id,
     )

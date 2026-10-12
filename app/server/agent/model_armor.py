@@ -66,15 +66,19 @@ class CloudModelArmor:
         try:
             data = await asyncio.wait_for(asyncio.to_thread(self._post, text), timeout=TIMEOUT_S)
         except (TimeoutError, RequestException, GoogleAuthError, ValueError) as exc:
-            # 落ちていても授業は止めない。第 2・第 3 層は効いている
-            logger.warning("Model Armor に届かず通した: %s", type(exc).__name__)
+            # 検査できなかった。統制層はこの文をモデルに渡さず、決まりごとで進める（10/9 fail-closed）
+            logger.warning("Model Armor に届かなかった: %s", type(exc).__name__)
             return ArmorVerdict(matched=False, error=type(exc).__name__)
         return verdict_from(data)
 
 
 def verdict_from(data: dict) -> ArmorVerdict:
     result = data.get("sanitizationResult") or {}
+    state = result.get("invocationResult", "SUCCESS")
     if result.get("filterMatchState") != "MATCH_FOUND":
+        # 一部のフィルタが走らなかった・失敗した（PARTIAL / FAILURE）ときは「検知なし」ではなく「検査できなかった」
+        if state not in ("SUCCESS", "INVOCATION_RESULT_UNSPECIFIED"):
+            return ArmorVerdict(matched=False, error=f"invocation_{state.lower()}")
         return ArmorVerdict(matched=False)
     hits: list[str] = []
     for name, wrapped in (result.get("filterResults") or {}).items():

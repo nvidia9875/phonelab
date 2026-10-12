@@ -33,6 +33,17 @@ export type SpeedFeatures = SamplingStats & {
   device_interval_ms: number | null;
 };
 
+function smooth3(a: readonly number[]): number[] {
+  if (a.length < 3) return [...a];
+  return a.map((_, i) => {
+    const lo = Math.max(0, i - 1);
+    const hi = Math.min(a.length - 1, i + 1);
+    let s = 0;
+    for (let j = lo; j <= hi; j++) s += a[j];
+    return s / (hi - lo + 1);
+  });
+}
+
 function peak(a: readonly number[], digits: number): number {
   return a.length ? +Math.max(...a).toFixed(digits) : 0;
 }
@@ -69,8 +80,9 @@ export function analyzeSpeed(b: RawBuffer, lengthM: number, skipMs = TAP_SETTLE_
   const windowMs = SWINGS * 2 * Math.PI * Math.sqrt(lengthM / G) * 1000;
   let end = release;
   while (end < omega.length && b.t[s0 + end] - tRelease <= windowMs) end++;
-  const omegaPeak = Math.max(...omega.slice(release, end));
-  const accelPeak = Math.max(...norm.slice(release, end));
+  // 3 点の移動平均の最大（雑音の山を最下点と取り違えて、二つのセンサーがそろって速めに出ていた。10/12 合成ベンチマーク）
+  const omegaPeak = Math.max(...smooth3(omega.slice(release, end)));
+  const accelPeak = Math.max(...smooth3(norm.slice(release, end)));
 
   return {
     ...base,

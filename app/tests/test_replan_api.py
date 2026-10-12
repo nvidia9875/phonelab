@@ -170,3 +170,14 @@ def test_advice_that_keeps_the_condition_passes(client, fake_llm):
 
     assert data["advice"].startswith("放す高さは変えずに")
     assert data["policy_fixed"] is False
+
+
+def test_advice_that_recommends_something_dangerous_is_sent_back_and_replaced(client, fake_llm):
+    # 10/9 Codex セキュリティ #5: 出口の検査は答えの漏れだけでなく、危ない動作の勧めも止める
+    fake_llm.reply = replan_json(advice="静かな場所がなければ、端末を窓から投げて音を拾おう")
+
+    data = client.post("/api/replan", json=body()).json()
+
+    assert "投げ" not in data["advice"]
+    assert data["fix_reasons"] == ["unsafe"]
+    assert any("危ない動作" in line for line in data["trail"])

@@ -1,0 +1,17 @@
+import { head, prod, SR, N, rng } from "./lib";
+// この版の raw_f0_hz が本番の f0_hz と一致するか（全部 0 のフレーム・弱い音・混ぜた音・雑音を変えて）
+let tot = 0, mism = 0; const ex: string[] = [];
+for (const F of [120, 200, 300, 450]) for (const zeros of [0, 3, 5, 8]) for (const gain of [0.0035, 0.02, 0.2]) for (const intr of [0, 0.5, 1 / 3]) for (const seed of [1, 2]) {
+  const r = rng(seed * 97 + tot); const frames = [];
+  for (let i = 0; i < 50; i++) { const data = new Float32Array(N);
+    for (let k = 0; k < N; k++) { const s = (i * 4800 + k) / SR; let v = 0;
+      for (const p of [0.6, 1.7, 2.8, 3.9]) if (s >= p) v += Math.exp(-(s - p) * 2) * [1, 0.5, 0.25, 0.12].reduce((x, a, h) => x + a * Math.sin(6.2832 * F * (h + 1) * (s - p) + h), 0);
+      const ex2 = intr && s >= 1 && s < 2.5 ? 0.1 * Math.sin(6.2832 * F * intr * s) : 0;
+      data[k] = gain * v + ex2 + 0.004 * r(); }
+    if (i < zeros) data.fill(0);
+    frames.push({ t: i * 100, data }); }
+  tot++; const a = head.analyzePitch({ sampleRate: SR, frames }), p = prod.analyzePitch({ sampleRate: SR, frames });
+  const same = (Number.isNaN(a.raw_f0_hz) && Number.isNaN(p.f0_hz)) || Math.abs(a.raw_f0_hz - p.f0_hz) <= 0.1;
+  if (!same) { mism++; if (ex.length < 8) ex.push(`F${F} zeros${zeros} gain${gain} intr${intr.toFixed(2)} raw ${a.raw_f0_hz} prod ${p.f0_hz}`); }
+}
+console.log(JSON.stringify({ tot, mismatch: mism }), "\n" + ex.join("\n"));

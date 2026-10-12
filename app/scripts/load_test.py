@@ -212,7 +212,7 @@ def render(out: dict) -> str:
                 "# 31 人の授業の負荷試験",
                 "",
                 (
-                    f"> {out['at']}、{out['base']}、生徒 {out['students']} 人＋先生 1 人を同時に。全体 {out['duration_s']} 秒。"
+                    f"> {out['at']}、{out['base']}、生徒 {out['students']} 人＋先生 1 人ぶんの模擬クライアント（httpx）を同時に。全体 {out['duration_s']} 秒。"
                     "学級は使い捨て（終わったら削除）。再現: `cd app && uv run python -m scripts.load_test --base <URL>`"
                 ),
                 "",
@@ -221,8 +221,8 @@ def render(out: dict) -> str:
                 *rows,
                 "",
                 (
-                    f"**全端末停止**: 先生が押してから、測定中の端末が停止を見るまで 中央値 {h['p50_s']} 秒・最大 {h['max_s']} 秒"
-                    f"（{h['students_saw_halt']} / {out['students']} 人。端末は 2 秒ごとに確かめる）"
+                    f"**全端末停止**: 停止の API が応えてから、測定中の模擬クライアントが停止を受け取るまで 中央値 {h['p50_s']} 秒・最大 {h['max_s']} 秒"
+                    f"（{h['students_saw_halt']} / {out['students']} 本。2 秒ごとに確かめる。実機の端末のセンサーが止まるまでの時間ではない）"
                 ),
                 "",
             ]

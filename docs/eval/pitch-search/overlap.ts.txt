@@ -1,0 +1,23 @@
+import { head, prod, SR, N, rng } from "./lib";
+// 弱い本当の基本に、同じ高さの背景が重なる（はじくたびに位相がそろう最悪の場合も）。誤って通した数を数える
+const mode = process.argv[2] ?? "pluck"; // pluck | steady
+function run(m: typeof head, f0: number, amps: number[], bgA: number, ph: number, seed: number) {
+  const r = rng(seed); const frames = [];
+  for (let i = 0; i < 50; i++) { const data = new Float32Array(N);
+    for (let k = 0; k < N; k++) { const s = (i * 4800 + k) / SR; let v = 0;
+      if (mode === "pluck") { for (const p of [0.6, 1.7, 2.8, 3.9]) { if (s < p) continue; const env = Math.exp(-(s - p) * 3); amps.forEach((a, h) => (v += a * env * Math.sin(2 * Math.PI * f0 * (h + 1) * (s - p)))); } }
+      else if (s >= 0.5) amps.forEach((a, h) => (v += a * Math.sin(2 * Math.PI * f0 * (h + 1) * (s - 0.6))));
+      data[k] = 0.2 * v + 0.2 * bgA * Math.sin(2 * Math.PI * f0 * (s - 0.6) + ph) + 0.002 * r(); }
+    frames.push({ t: i * 100, data }); }
+  const x = m.analyzePitch({ sampleRate: SR, frames });
+  return { ok: m.pitchChecks(x, 0.03).every((c) => c.ok), f0: x.f0_hz };
+}
+let tot = 0, fpH = 0, fpP = 0, headOnly = 0; const ex: string[] = [];
+for (const f0 of [100, 150, 220]) for (const shape of ["h2", "h10"]) for (const fdB of [-20, -26, -30, -34]) for (const bgRel of [0.3, 0.6, 1, 1.5, 2.5]) for (let q = 0; q < 8; q++) {
+  const a = 10 ** (fdB / 20); const amps = shape === "h2" ? [a, 1, 0.3] : [a, 0, 0, 0, 0, 0, 0, 0, 0, 1]; if (f0 * amps.length > 5000) continue;
+  const ph = (2 * Math.PI * q) / 8; tot++;
+  const A = run(head, f0, amps, a * bgRel, ph, tot), P = mode === "pluck" && process.argv[3] !== "prod" ? { ok: false, f0: 0 } : run(prod, f0, amps, a * bgRel, ph, tot);
+  if (A.ok && Math.abs(A.f0 - f0) / f0 > 0.03) { fpH++; if (ex.length < 10) ex.push(`${f0} ${shape} ${fdB}dB bg×${bgRel} ph${q} -> ${A.f0}`); }
+  const pBad = P.ok && Math.abs(P.f0 - f0) / f0 > 0.03; if (pBad) fpP++; if (A.ok && Math.abs(A.f0 - f0) / f0 > 0.03 && !pBad) { headOnly++; console.log("HEADONLY", f0, shape, fdB, bgRel, q, A.f0, "prod", P.ok, P.f0); }
+}
+console.log(JSON.stringify({ mode, tot, fpH, fpP, headOnly }), "\n" + ex.join("\n"));

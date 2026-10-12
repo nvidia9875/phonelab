@@ -225,6 +225,23 @@ export function Teacher({ classCode, cls, halted, onHalt, onPolicy, onResetStude
               <p style={{ marginLeft: 8 }}>測定の上限</p>
               <span className="limit">30 秒</span>
             </div>
+            {dash?.audit && dash.audit.length > 0 && (
+              <details className="taudit">
+                <summary>操作の記録（新しい順・{dash.audit.length} 件。消せません）</summary>
+                <ol>
+                  {dash.audit.map((e, i) => (
+                    <li key={`${e.at}-${i}`}>
+                      <span className="taudit__t">{new Date(e.at).toLocaleTimeString("ja-JP")}</span>
+                      <span className={e.action.startsWith("PIN") ? "taudit__warn" : undefined}>{e.action}</span>
+                      {e.detail && <span className="taudit__d">{e.detail}</span>}
+                      <span className="taudit__d">
+                        {e.via}・端末 {e.who}
+                      </span>
+                    </li>
+                  ))}
+                </ol>
+              </details>
+            )}
           </section>
 
           <section className="tpanel tpanel--navy">

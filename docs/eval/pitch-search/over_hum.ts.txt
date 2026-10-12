@@ -1,0 +1,41 @@
+import { head, prod, harmonic, measure, rng, type Sig } from "./lib";
+function babble(level: number, seed: number) {
+  const r = rng(seed);
+  const voices = Array.from({ length: 4 }, () => ({ f: 110 + 150 * (r() + 0.5), vib: 2 + 3 * (r() + 0.5), ph: 6 * (r() + 0.5), syl: 3 + 3 * (r() + 0.5), sph: 6 * (r() + 0.5) }));
+  return (s: number) => {
+    let v = 0;
+    for (const vo of voices) {
+      const env = Math.max(0, Math.sin(2 * Math.PI * vo.syl * s + vo.sph));
+      if (env === 0) continue;
+      const phase = 2 * Math.PI * vo.f * (s + (0.03 / (2 * Math.PI * vo.vib)) * Math.sin(2 * Math.PI * vo.vib * s)) + vo.ph;
+      for (let k = 1; k <= 8; k++) v += (env / k) * Math.sin(k * phase);
+    }
+    return level * v / 4;
+  };
+}
+function hum(level: number, base: number) { return (s: number) => level * (Math.sin(2 * Math.PI * base * s) + 0.5 * Math.sin(2 * Math.PI * 2 * base * s + 1) + 0.3 * Math.sin(2 * Math.PI * 3 * base * s + 2)); }
+const freqs = [80, 85, 90, 100, 110, 120, 150, 200, 300, 440, 600];
+const shapes: [string, number[]][] = [["rubber", [1, 0.5, 0.25, 0.12]], ["pure", [1]]];
+function voice(level: number, f: number) { return (s: number) => { let v = 0; const ph = 2 * Math.PI * f * (s + 0.002 * Math.sin(2 * Math.PI * 4 * s)); for (let k = 1; k <= 10; k++) v += Math.sin(k * ph) / k; return level * v; }; }
+const envs: [string, Partial<Sig>][] = [
+  ["hum50 -30dB", { noise: 0.002, extra: hum(0.2 * 0.0316, 50) }], ["hum60 -30dB", { noise: 0.002, extra: hum(0.2 * 0.0316, 60) }],
+  ["hum50 -35dB", { noise: 0.002, extra: hum(0.2 * 0.0178, 50) }], ["hum60 -35dB", { noise: 0.002, extra: hum(0.2 * 0.0178, 60) }],
+  ["hum50 -25dB", { noise: 0.002, extra: hum(0.2 * 0.056, 50) }], ["hum60 -25dB", { noise: 0.002, extra: hum(0.2 * 0.056, 60) }],
+  ["babble-15dB", { noise: 0.002, extra: babble(0.2 * 0.18, 7) }], ["babble-25dB", { noise: 0.002, extra: babble(0.2 * 0.056, 8) }],
+  ["voice130 -25dB", { noise: 0.002, extra: voice(0.2 * 0.056, 130) }], ["voice210 -25dB", { noise: 0.002, extra: voice(0.2 * 0.056, 210) }],
+  ["voice130 -35dB", { noise: 0.002, extra: voice(0.2 * 0.018, 130) }],
+];
+const which = process.argv[2] ?? "all";
+for (const [en, env] of envs) {
+  if (which !== "all" && !en.startsWith(which)) continue;
+  for (const [sn, amps] of shapes) {
+    let hH = 0, hP = 0; const det: string[] = [];
+    for (const f of freqs) {
+      const sig = { partials: harmonic(f, amps), ...env } as Sig;
+      const a = measure(head, sig), b = measure(prod, sig);
+      if (!a.ok) hH++; if (!b.ok) hP++;
+      if (a.ok !== b.ok || (a.ok && Math.abs(a.f0 - f) / f > 0.03) || (b.ok && Math.abs(b.f0 - f) / f > 0.03)) det.push(`${f}:HEAD ${a.ok ? a.f0 : "hold(" + a.failed + " h2=" + a.h2 + ")"} PROD ${b.ok ? b.f0 : "hold(" + b.failed + ")"}`);
+    }
+    console.log(`${en} ${sn}: held HEAD ${hH}/${freqs.length} PROD ${hP}/${freqs.length}  ${det.join(" | ")}`);
+  }
+}

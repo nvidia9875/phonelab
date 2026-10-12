@@ -1,0 +1,50 @@
+import { head, prod, harmonic, frame1, rng, type Sig, type Partial } from "./lib";
+const family = process.argv[2] ?? "sparse8";
+const nShapes = +(process.argv[3] ?? 150);
+const seed = +(process.argv[4] ?? 1);
+const MOD = process.argv[5] === "prod" ? prod : head;
+const r = rng(seed * 7919 + 13);
+const u = () => r() + 0.5;
+const logu = (lo: number, hi: number) => lo * Math.pow(hi / lo, u());
+const freqs: number[] = []; for (let f = 80; f <= 1200; f *= 1.04) freqs.push(f);
+type Shape = { amps: number[]; stretch: number; noise: number; decays?: number[]; mix?: { ratio: number; a: number; amps: number[] } };
+function makeShape(): Shape {
+  const np = 3 + Math.floor(u() * 6); // 3..8 partials
+  const amps = [logu(0.02, 1)];
+  for (let k = 2; k <= np; k++) amps.push(u() < 0.6 ? logu(0.02, 1) : 0);
+  const mx = Math.max(...amps); const norm = amps.map((a) => +(a / mx).toFixed(3));
+  if (norm[0] < 0.02) norm[0] = 0.02;
+  const s: Shape = { amps: norm, stretch: 0, noise: 0.002 };
+  if (family === "stretch") s.stretch = [0.001, 0.003, 0.006, 0.01][Math.floor(u() * 4)];
+  if (family === "noise") s.noise = [0.005, 0.01, 0.02, 0.03][Math.floor(u() * 4)];
+  if (family === "pluck") s.decays = norm.map(() => +logu(0.15, 3).toFixed(2));
+  if (family === "mix") s.mix = { ratio: +logu(1.03, 2.5).toFixed(3) * (u() < 0.5 ? 1 : 1 / 1), a: +logu(0.05, 0.7).toFixed(2), amps: [1, 0.5, 0.25] };
+  return s;
+}
+function sigFor(sh: Shape, f0: number): Sig {
+  let partials: Partial[] = harmonic(f0, sh.amps, sh.stretch, sh.decays);
+  if (sh.mix) partials = partials.concat(harmonic(f0 * sh.mix.ratio, sh.mix.amps).map((p) => ({ ...p, a: p.a * sh.mix!.a })));
+  return { partials, noise: sh.noise, scale: 0.2 / Math.max(1, partials.reduce((s, p) => s + p.a, 0) / 3) };
+}
+
+let tot = 0, fpH = 0, fpP = 0, fpHonly = 0, fpPonly = 0, invH = 0, invP = 0, invHonly = 0, holdH = 0, holdP = 0, holdHonlyCorrect = 0;
+const ex: string[] = [];
+const fr = family === "pluck" ? 8 : 10;
+for (let si = 0; si < nShapes; si++) {
+  const sh = makeShape();
+  const res = freqs.map((f) => { const sg = sigFor(sh, f); const a = frame1(head, sg, fr), b = frame1(prod, sg, fr); return { f, a, b }; });
+  for (const x of res) {
+    tot++;
+    const fa = x.a.ok && Math.abs(x.a.f0 - x.f) / x.f > 0.03, fb = x.b.ok && Math.abs(x.b.f0 - x.f) / x.f > 0.03;
+    if (fa) fpH++; if (fb) fpP++; if (fa && !fb) { fpHonly++; if (ex.length < 25) ex.push(`FP-HEAD-only ${JSON.stringify(sh)} f=${x.f.toFixed(1)} head=${x.a.f0.toFixed(1)} prod=${x.b.ok ? x.b.f0.toFixed(1) : "hold"}`); }
+    if (fb && !fa) fpPonly++;
+    if (!x.a.ok) holdH++; if (!x.b.ok) holdP++;
+    if (!x.a.ok && x.b.ok && !fb) holdHonlyCorrect++;
+  }
+  const inv = (k: "a" | "b") => { const out: string[] = []; for (let i = 0; i < res.length; i++) for (let j = i + 1; j < res.length; j++) { const ra = res[j].f / res[i].f; if (ra < 1.03 || ra > 2.5) continue; const A = res[i][k], B = res[j][k]; if (A.ok && B.ok && B.f0 < 0.97 * A.f0) out.push(`${i},${j}`); } return out; };
+  const ih = inv("a"), ip = new Set(inv("b"));
+  invH += ih.length; invP += ip.size; const only = ih.filter((x) => !ip.has(x)); invHonly += only.length;
+  if (only.length && ex.length < 40) { const [i, j] = only[0].split(",").map(Number); ex.push(`INV-HEAD-only ${JSON.stringify(sh)} A=${res[i].f.toFixed(1)}->${res[i].a.f0.toFixed(1)} B=${res[j].f.toFixed(1)}->${res[j].a.f0.toFixed(1)} (prod ${res[i].b.ok ? res[i].b.f0.toFixed(1) : "hold"}/${res[j].b.ok ? res[j].b.f0.toFixed(1) : "hold"})`); }
+}
+console.log(JSON.stringify({ family, tot, fpH, fpP, fpHonly, fpPonly, invH, invP, invHonly, holdH, holdP, holdHonlyCorrect }));
+console.log(ex.join("\n"));

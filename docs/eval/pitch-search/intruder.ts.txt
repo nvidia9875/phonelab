@@ -1,0 +1,21 @@
+import { head, prod, SR, N, rng } from "./lib";
+function buf(f0: number, amps: number[], seed: number, extra: (s: number) => number) {
+  const r = rng(seed); const plucks = [0.6, 1.7, 2.8, 3.9].map((t) => t + 0.2 * (r() + 0.5)); const ph = plucks.map(() => amps.map(() => 6.28 * (r() + 0.5)));
+  const frames = [];
+  for (let i = 0; i < 50; i++) { const data = new Float32Array(N);
+    for (let k = 0; k < N; k++) { const s = (i * 4800 + k) / SR; let v = 0;
+      plucks.forEach((p, j) => { if (s < p) return; const e = Math.exp(-(s - p) * 3); amps.forEach((a, h) => (v += a * e * Math.sin(6.2832 * f0 * (h + 1) * (s - p) + ph[j][h]))); });
+      data[k] = 0.2 * v + extra(s) + 0.004 * r(); }
+    frames.push({ t: i * 100, data }); }
+  return { sampleRate: SR, frames };
+}
+let tot = 0, fH = 0, fP = 0, only = 0, hH = 0, hP = 0; const ex: string[] = [];
+for (const F of [200, 300, 450]) for (const ratio of [1 / 3, 0.5, 2 / 3, 0.75, 0.8, 1.25, 1.5, 2]) for (const amp of [0.005, 0.01, 0.02, 0.05, 0.1]) for (const onset of [0.8, 2.0, 0]) for (const harm of [false, true]) {
+  const fi = F * ratio * (1 + 0.003 * ((tot % 5) - 2)); tot++;
+  const ex2 = (s: number) => (s >= onset ? amp * (Math.sin(6.2832 * fi * s) + (harm ? 0.5 * Math.sin(6.2832 * 2 * fi * s + 1) + 0.25 * Math.sin(6.2832 * 3 * fi * s + 2) : 0)) : 0);
+  const b = buf(F, [1, 0.5, 0.25, 0.12], tot, ex2);
+  const run = (m: typeof head) => { const x = m.analyzePitch(b); return { ok: m.pitchChecks(x, 0.03).every((c) => c.ok), f0: x.f0_hz }; };
+  const A = run(head), P = run(prod); const bA = A.ok && Math.abs(A.f0 - F) / F > 0.03, bP = P.ok && Math.abs(P.f0 - F) / F > 0.03;
+  if (!A.ok) hH++; if (!P.ok) hP++; if (bA) fH++; if (bP) fP++; if (bA && !bP) { only++; if (ex.length < 12) ex.push(`F${F} intr ${fi.toFixed(1)} amp${amp} on${onset} harm${harm} -> ${A.f0} (prod ${P.ok ? P.f0 : "hold"})`); }
+}
+console.log(JSON.stringify({ tot, falsePassHEAD: fH, falsePassPROD: fP, headOnly: only, heldHEAD: hH, heldPROD: hP }), "\n" + ex.join("\n"));

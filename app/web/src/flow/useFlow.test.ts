@@ -25,6 +25,11 @@ function pitch(f0: number): Features {
     snr_db: 48,
     clipping_ratio: 0,
     voiced_frames: 45,
+    f0_steady_share: 1,
+    f0_follow: NaN,
+    f0_follow_db: NaN,
+    harmonic_over_f0_db: NaN,
+    raw_f0_hz: f0,
   };
 }
 
@@ -303,6 +308,7 @@ describe("switchExperiment", () => {
 
   it("returns null when every experiment of the theme is used up", () => {
     record(sound.id, "sound_string_length", { status: "signed", stage: "result" });
+    record(sound.id, "sound_tension", { status: "signed", stage: "result" });
     const rec = record(sound.id, "sound_pluck_strength", { status: "held", stage: "measure_A" });
 
     expect(switchExperiment(rec, sound)).toBeNull();

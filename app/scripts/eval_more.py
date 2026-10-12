@@ -146,6 +146,8 @@ def run_tutors(client: TestClient, usage, items: list[dict], timed_post) -> list
             "situation": item["situation"],
             "prediction": item["prediction"],
             "message": item["message"],
+            # 「自分の考え」の欄に命令を隠す場面（10/9: 最新の発言だけを検査していた）
+            "student_thinking": item.get("student_thinking", ""),
             "reveal": True,  # 生徒の考えが無いので、サーバは開かない（開かないことも見る）
             "result_statement": item.get("result", ""),
         }
@@ -253,7 +255,14 @@ SCENARIOS: dict[str, dict[str, float]] = {
         "instances": 1,
     },
     "混雑": {"plan": 2.5, "next": 2, "replan": 1, "tutor": 6, "insights": 30, "instances": 2},
-    "厳密な上限": {"plan": 5, "next": 3, "replan": 3, "tutor": 10, "insights": 100, "instances": 3},
+    "枠を使い切った場合": {
+        "plan": 5,
+        "next": 3,
+        "replan": 3,
+        "tutor": 10,
+        "insights": 100,
+        "instances": 3,
+    },
 }
 LESSON = {
     "students": 31,
@@ -339,19 +348,22 @@ def render_more(out: dict[str, Any], yen) -> list[str]:
     rp = out.get("replan", {}).get("rows", [])
     if rp:
         ok = sum(r["action"] == r["expected"] for r in rp)
-        kept = sum(r.get("condition_term") is None for r in rp)
-        both = sum(r["action"] == r["expected"] and r.get("condition_term") is None for r in rp)
+        retries = [r for r in rp if r["action"] == "retry"]
+        kept = sum(r.get("condition_term") is None for r in retries)
         lines += [
             f"## 6. 保留のあとの再計画（Replanner、{len(rp)} 場面）",
             "",
             f"保留が 2 回未満なら同じ実験で直す、2 回以上で直しようが無ければ別の実験へ、と合った: **{ok} / {len(rp)}**。",
-            f"測り直しの助言が実験の条件の値（放す高さ・はじく強さ など）を変えさせていない: **{kept} / {len(rp)}**。両方を満たした（助言として有効）: **{both} / {len(rp)}**。",
+            (
+                f"測り直し（retry）の助言 {len(retries)} 件のうち、条件の値（放す高さ・はじく強さ など）を変える言い方が見つからなかった: **{kept} / {len(retries)}**"
+                "（言い方の検出で、助言が実際に役立つかは評価していない。別の実験への切り替えは対象外）。"
+            ),
             f"統制層が条件を変える助言を見つけて作り直させた: {sum('condition_changed' in r.get('fix_reasons', []) for r in rp)} 件（作り直しで通った {sum('condition_changed' in r.get('fix_reasons', []) and r.get('self_corrected') for r in rp)} 件）。",
             "",
             "| 実験 | 保留の理由 | 同じ条件の保留 | 選んだ手 | 期待 | 条件 | 助言 |",
             "|---|---|---|---|---|---|---|",
             *[
-                f"| {r['variant']} | {','.join(r['hold_codes'])} | {r['retries']} | {r['action']} | {r['expected']} | {'守った' if r.get('condition_term') is None else '変えた: ' + r['condition_term']} | {r['advice'][:60]} |"
+                f"| {r['variant']} | {','.join(r['hold_codes'])} | {r['retries']} | {r['action']} | {r['expected']} | {('対象外（切り替え）' if r['action'] != 'retry' else '変える言い方なし' if r.get('condition_term') is None else '変える言い方あり: ' + r['condition_term'])} | {r['advice'][:60]} |"
                 for r in rp
             ],
             "",
@@ -359,7 +371,7 @@ def render_more(out: dict[str, Any], yen) -> list[str]:
     tu = out.get("tutor", {}).get("rows", [])
     if tu:
         lines += [
-            "## 7. ラボ先生との会話（説明が閉じているとき、答えを聞き出そうとする 6 場面）",
+            f"## 7. ラボ先生との会話（説明が閉じているとき、答えを聞き出そうとする {len(tu)} 場面。考えの欄に命令を隠した場面を含む）",
             "",
             (
                 f"説明を開いた: {sum(bool(r['revealed']) for r in tu)} / {len(tu)}。"
@@ -434,7 +446,7 @@ def render_more(out: dict[str, Any], yen) -> list[str]:
             row("**合計（無料枠を使わない場合）**", lambda v: f"**{yen(v['total_usd_if_paid'])}**"),
             "",
             (
-                "「厳密な上限」はサーバが数える回数の枠そのもの（計画 5・次の一手 3・再計画 3・会話 10 / 実験。作り直しも枠に入る。"
+                "「枠を使い切った場合」は、サーバが数える回数の枠を全員が使い切ったときの試算（1 回あたりの平均トークンを掛けているので、文が長くなれば増える。計画 5・次の一手 3・再計画 3・会話 10 / 実験。作り直しも枠に入る。"
                 "見立ては 30 秒のキャッシュがあるので 50 分で最大 100 回、Cloud Run は max-instances=3）。これ以上は 429 で断る。"
                 f"Cloud Run のリクエストは、全員が 2 秒ごと・先生が 5 秒ごとに授業中ずっと確かめる上側の見積もりで {lc['requests']:,.0f} 回。"
                 "Model Armor・Firestore・Cloud Run は月の無料枠に収まることが多い（その場合は 0 円）。Cloud Run の単価は Tier 1 の vCPU 秒 $0.000024・GiB 秒 $0.0000025・100 万リクエスト $0.40（提出前に価格表で要確認）。"

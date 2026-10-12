@@ -72,7 +72,9 @@ def test_picks_the_next_experiment_and_asks_for_a_new_prediction(client, fake_ll
 
 
 def test_does_not_call_the_model_when_no_experiment_is_left(client, fake_llm):
-    data = client.post("/api/next", json=body(done_variant_ids=["sound_string_length"])).json()
+    data = client.post(
+        "/api/next", json=body(done_variant_ids=["sound_string_length", "sound_tension"])
+    ).json()
 
     assert data["action"] == "reflect"
     assert data["source"] == "catalog"

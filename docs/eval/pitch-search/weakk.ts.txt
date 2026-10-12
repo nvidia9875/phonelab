@@ -1,0 +1,19 @@
+import { analyzePitch, pitchChecks } from "/Users/shun/Desktop/phonelab/app/web/src/measure/pitch";
+const SR = 48000, N = 4096;
+function sig(parts: { f: number; a: number }[]) {
+  const frames = [];
+  for (let i = 0; i < 50; i++) { const data = new Float32Array(N);
+    for (let k = 0; k < N; k++) { const s = (i * 4800 + k) / SR; data[k] = i < 5 ? 0.001 * Math.sin(9999 * k) : 0.2 * parts.reduce((v, p) => v + p.a * Math.sin(2 * Math.PI * p.f * s), 0); }
+    frames.push({ t: i * 100, data }); }
+  return analyzePitch({ sampleRate: SR, frames });
+}
+let n = 0, pass = 0, fp = 0; const ex: string[] = [];
+for (const k of [2,3,4,5,6,7,8,9,10,11,12,14,16,18,20]) for (const a of [0.01, 0.02, 0.04, 0.08]) for (const f of [85, 120, 150, 200, 300]) {
+  if (f * k > 6000) continue;
+  n++;
+  const r = sig([{ f, a }, { f: f * k, a: 1 }]);
+  if (!pitchChecks(r, 0.03).every((c) => c.ok)) continue;
+  pass++;
+  if (Math.abs(r.f0_hz - f) / f > 0.03) { fp++; if (a > 0.01) ex.push(`k=${k} a=${a} f=${f} -> ${r.f0_hz}`); }
+}
+console.log(JSON.stringify({ n, pass, fp, ex }, null, 1));

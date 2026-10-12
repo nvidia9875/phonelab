@@ -107,14 +107,14 @@ export function Me({ student, caps, policy, recordCount, onSave, onClear, onHome
         <div className="kv"><span className="kv__k">生データ</span><span>端末の中だけ。送っていません</span></div>
         {confirmClear ? (
           <div className="clear-confirm" role="group" aria-label="記録を消すか確かめる">
-            <p className="card__hint">この端末の記録を {recordCount} 件すべて消します。先生の画面に届いた分は残ります。</p>
+            <p className="card__hint">この端末の記録 {recordCount} 件と、番号・合言葉を消します（端末を次の人に渡すとき）。先生の画面に届いた分は残ります。</p>
             <div style={{ display: "flex", gap: 8 }}>
               <Button sm secondary onClick={() => setConfirmClear(false)}>やめる</Button>
               <Button sm onClick={() => { onClear(); setConfirmClear(false); }}>消す</Button>
             </div>
           </div>
         ) : (
-          <button type="button" className="link-danger" onClick={() => setConfirmClear(true)}>この端末の記録を消す…</button>
+          <button type="button" className="link-danger" onClick={() => setConfirmClear(true)}>この端末の記録と合言葉を消す…</button>
         )}
       </Card>
       </details>

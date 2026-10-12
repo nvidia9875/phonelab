@@ -22,6 +22,34 @@ FORBIDDEN: tuple[tuple[re.Pattern[str], str], ...] = (
     (re.compile(r"水に|プール|風呂"), "水の近く"),
     (re.compile(r"道路|車道|交差点"), "交通のある場所"),
 )
+# 出力（ラボ先生の文）で勧めてはいけない動作。入力の FORBIDDEN に、身のまわりの危険を足す
+UNSAFE_OUTPUT: tuple[tuple[re.Pattern[str], str], ...] = (
+    *FORBIDDEN,
+    (
+        re.compile(r"電子レンジ|コンセント|ライター|火をつけ|燃や|分解|電池を(外|抜|取)"),
+        "火・電気・分解",
+    ),
+    (re.compile(r"口に入れ|なめ|かじ"), "口に入れる"),
+)
+# 注意・禁止の文（「落とさないように」「窓から投げるのは危ない」）は勧めていないので止めない
+# 「やってみない？」は誘いなので注意に数えない
+WARNING_WORDS = re.compile(
+    r"ないよう|ないで|ないこと|ない方|ないほう|ません|ず[、。に]|禁止|だめ|ダメ|危な|危険|気をつけ|注意|やめ"
+)
+SENTENCES = re.compile(r"[^。！？!?\n]+")
+
+
+def unsafe_instruction(text: str) -> str | None:
+    """ラボ先生の文が危ない動作を勧めているか。勧めている文の種類を返す（無ければ None）。10/9 Codex #5"""
+    for sentence in SENTENCES.findall(text):
+        if WARNING_WORDS.search(sentence):
+            continue
+        for pattern, label in UNSAFE_OUTPUT:
+            if pattern.search(sentence):
+                return label
+    return None
+
+
 INJECTION = re.compile(r"飛ばして|無視して|と表示|答えは|チェックを飛ば|スキップ")
 ANSWER_REQUEST = re.compile(r"答え(だけ)?教えて|正解(は|を)|答えを教え")
 # 引用する文。指示文（注入）があればそれを、無ければ禁止動作の文を

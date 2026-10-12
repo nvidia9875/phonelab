@@ -66,6 +66,13 @@ CATALOG: dict[str, CatalogTheme] = {
                 changes="重さ（消しゴムを 1 個足す。端末も入っているので 2 倍にはならない）",
                 holds="放す高さ 15 cm、糸の長さ 80 cm",
             ),
+            CatalogVariant(
+                id="energy_length",
+                variable="length",
+                title="同じ高さから、糸の長さだけ半分にする",
+                changes="糸の長さ（80 cm から 40 cm へ）",
+                holds="放す高さ 15 cm、重さ",
+            ),
         ),
     ),
     "sound": CatalogTheme(
@@ -89,6 +96,13 @@ CATALOG: dict[str, CatalogTheme] = {
                 title="同じ強さで、震える長さだけ短くする",
                 changes="震える部分の長さ（そのまま から 半分 へ）",
                 holds="輪ゴム、はじく強さ",
+            ),
+            CatalogVariant(
+                id="sound_tension",
+                variable="tension",
+                title="同じ長さで、輪ゴムの張りだけ強くする",
+                changes="輪ゴムの張り（そのまま から ぴんと張る へ）",
+                holds="震える部分の長さ、はじく強さ",
             ),
         ),
     ),

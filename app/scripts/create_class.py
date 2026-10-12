@@ -17,9 +17,14 @@ import argparse
 import asyncio
 import re
 import secrets
-from dataclasses import replace
 
-from server.classroom import ClassStore, FirestoreClassStore, hash_pin, new_class, normalize_code
+from server.classroom import (
+    ClassStore,
+    FirestoreClassStore,
+    hash_teacher_pin,
+    new_class,
+    normalize_code,
+)
 
 CODE_RE = re.compile(r"^[A-Z0-9-]{3,20}$")  # routes_class.CODE_RE と同じ
 CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"  # 0/O/1/I を除く
@@ -58,7 +63,8 @@ async def rotate_pin(store: ClassStore, code: str) -> str:
     pin = new_pin()
     salt = secrets.token_hex(8)
     # PIN を変えると、塩も変わるので、先生のセッションの印（8 時間）もすべて無効になる
-    await store.put(replace(record, pin_hash=hash_pin(pin, salt), salt=salt))
+    # PIN の項目だけを書く（文書全体を書き戻すと、同時に先生が押した停止を消せた。10/9 Codex #12）
+    await store.set_pin(code, hash_teacher_pin(pin, salt), salt)
     return pin
 
 

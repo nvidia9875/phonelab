@@ -29,9 +29,9 @@ from server.guards import trace_id_of
 from server.ratelimit import SlidingWindowLimiter
 from server.routes_class import (
     DashboardRequest,
+    audit,
     authorize_teacher,
     get_class_store,
-    get_pin_limiter,
 )
 
 router = APIRouter(prefix="/api/class")
@@ -83,12 +83,11 @@ async def insight(
     request: Request,
     response: Response,
     store: Annotated[ClassStore, Depends(get_class_store)],
-    pin_limiter: Annotated[SlidingWindowLimiter, Depends(get_pin_limiter)],
     limiter: Annotated[SlidingWindowLimiter, Depends(get_insight_limiter)],
     runner: Annotated[Runner, Depends(get_insight_runner)],
 ) -> InsightResponse:
     """ラボ先生が学級の様子を読み、先生に 3 行で伝える。操作はしない"""
-    record = await authorize_teacher(store, pin_limiter, request, code, body.pin, body.token)
+    record = await authorize_teacher(store, request, code, body.pin, body.token)
     class_code = record.policy.class_code
     response.headers["Cache-Control"] = "no-store"
     hit = _cache.get(class_code)
@@ -98,6 +97,8 @@ async def insight(
         raise HTTPException(
             status_code=429, detail="見立てを聞く回数が多すぎます。少し待ってください"
         )
+    # エージェントを動かしたのが誰かを残す（キャッシュから返したときは動かしていないので残さない）
+    await audit(store, record, request, body.token, "ラボ先生に見立てを聞いた")
 
     rows = await store.list_students(class_code)
     snapshot, timelines = build_snapshot(

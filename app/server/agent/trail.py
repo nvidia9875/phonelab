@@ -6,13 +6,20 @@
 from __future__ import annotations
 
 from server.agent.catalog import CATALOG, short_changes
-from server.agent.runner import FIX_CONDITION, FIX_OFF_CATALOG, FIX_RESULT_WORDS, FIX_UNREADABLE
+from server.agent.runner import (
+    FIX_CONDITION,
+    FIX_OFF_CATALOG,
+    FIX_RESULT_WORDS,
+    FIX_UNREADABLE,
+    FIX_UNSAFE,
+)
 
 FIX_WORDS = {
     FIX_UNREADABLE: "形が読めない",
     FIX_OFF_CATALOG: "候補にない実験",
     FIX_RESULT_WORDS: "結果の言葉が混じった",
     FIX_CONDITION: "実験の条件を変えさせる助言",
+    FIX_UNSAFE: "危ない動作を勧める文",
 }
 MAX_LINES = 5
 
@@ -28,6 +35,7 @@ def policy_before_line(kind: str) -> str:
         "reject": "AI に渡す前のチェック: 危ない実験・メモの中の命令 → 止めた（AI は呼ばない）",
         "class_policy": "AI に渡す前のチェック: 学級で許されていない → 止めた（AI は呼ばない）",
         "limit": "聞ける回数の上限 → AI を呼ばずにリストの順",
+        "armor_unavailable": "AI に渡す前のチェック（Model Armor）: いまは検査できない → 生徒の文は AI に渡さず決まりごとで",
     }[kind]
 
 

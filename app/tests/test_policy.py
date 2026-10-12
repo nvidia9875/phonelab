@@ -77,3 +77,49 @@ def test_changes_condition_finds_advice_that_alters_the_variable_or_the_held_val
     assert changes_condition("放す高さは変えずに、包み直そう", "energy_height") is None
     assert changes_condition("端末を少し離して、もう一度", "sound_pluck_strength") is None
     assert changes_condition("糸の長さを短くして", "") is None
+
+
+def test_unsafe_instruction_catches_advice_but_not_warnings():
+    from server.agent.policy import unsafe_instruction
+
+    assert unsafe_instruction("端末を窓から投げてください。") == "端末の落下・投擲"
+    assert unsafe_instruction("窓から投げてみない？") == "端末の落下・投擲"
+    assert unsafe_instruction("電子レンジで温めてみよう") == "火・電気・分解"
+    assert unsafe_instruction("端末を落とさないように袋を結ぼう。") is None
+    assert unsafe_instruction("窓から投げるのは危ないのでやめよう。") is None
+    assert unsafe_instruction("1.98 m/s だったね。同じ高さから放そう") is None
+
+
+def test_changes_condition_covers_the_new_experiments_and_reads_clause_by_clause():
+    """10/12 デプロイ前レビュー: 新しい 2 実験の言い換えと、「同じ」が前半にあるだけで後半を見逃していた"""
+    from server.agent.planner import changes_condition
+
+    assert changes_condition("輪ゴムをゆるめて、もう一度測ろう", "sound_tension")
+    assert changes_condition("糸を短くして、もう一度放そう", "energy_length")
+    assert changes_condition("重さは同じにして、放す高さを低くしよう", "energy_length")
+    assert changes_condition("張りはそのまま、まわりを静かにしてもう一度", "sound_tension") is None
+    assert changes_condition("同じ高さから、そっと放そう", "energy_length") is None
+    # 読点の無い文でも、「同じ」がかかるのは重さだけ（2 回目のレビュー）
+    assert changes_condition("重さは同じにして放す高さを低くしよう", "energy_length")
+    assert changes_condition("輪ゴムをゆるくして、もう一度測ろう", "sound_tension")
+    assert (
+        changes_condition("放す高さや重さは変えず、端末の置き場所を少し変えよう", "energy_height")
+        is None
+    )
+
+
+def test_changes_condition_reads_change_words_before_the_condition_term():
+    """10/12 デプロイ前レビュー 3 回目: 変える言い方が条件の言葉の前にあると見逃していた"""
+    from server.agent.planner import changes_condition
+
+    assert changes_condition("低くした高さから放そう", "energy_height")
+    assert changes_condition("少なくした水で、もう一度吹こう", "bottle_water")
+    assert changes_condition("同じ高さから、そっと放そう", "energy_height") is None
+
+
+def test_changes_condition_checks_every_occurrence_of_a_term():
+    """10/12 デプロイ前レビュー 5 回目: 同じ言葉の 2 回目を見逃していた"""
+    from server.agent.planner import changes_condition
+
+    assert changes_condition("糸の長さは同じにして糸の長さを短くしよう", "energy_length")
+    assert changes_condition("重さは同じにして長くした糸を使おう", "energy_length")

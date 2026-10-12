@@ -5,8 +5,10 @@
 
 from __future__ import annotations
 
+import os
 import re
 from dataclasses import dataclass, replace
+from datetime import UTC, datetime
 from functools import lru_cache
 
 from fastapi import HTTPException, Request
@@ -97,6 +99,19 @@ async def class_rules(store: ClassStore, code: str | None) -> dict[str, object] 
 
 
 COUNTER_KEY_RE = re.compile(r"^[A-Za-z0-9-]{1,12}$")
+# 本番ではラボ先生（AI）を学級の生徒だけが呼べる。学級を省けば停止・許可・回数の枠から外れられた（10/9 Codex #2）
+REQUIRE_CLASS_ENV = "PHONELAB_REQUIRE_CLASS"
+NO_CLASS_DETAIL = "ラボ先生は、学級に入ってから使えます（先生に学級コードを聞いてね）"
+# 生徒ごと 1 日の総枠。記録 id を変えると記録ごとの枠は 0 から始まるので、その上にかぶせる（10/9 Codex #6）
+DAILY_LIMITS = {"plan": 40, "replan": 20, "next": 20, "chat": 100}
+
+
+def class_required() -> bool:
+    return os.environ.get(REQUIRE_CLASS_ENV) == "1"
+
+
+def _today() -> str:
+    return datetime.now(UTC).strftime("%Y%m%d")
 
 
 @dataclass(frozen=True)
@@ -106,13 +121,20 @@ class CallCount:
     start: int
     key: tuple[str, str, str] | None = None
     reserved: int = 0
+    # 生徒ごと 1 日の総枠のカウンタ
+    day_key: tuple[str, str, str] | None = None
+    day_limit: int = 0
 
     async def reserve(self, store: ClassStore, limit: int) -> CallCount:
-        """モデルを呼ぶ前に枠を 1 つ取る。取れなければ start を上限にして返す（統制層がモデルを呼ばない）"""
+        """モデルを呼ぶ前に枠を 1 つ取る（1 日の総枠と記録ごとの枠の両方）。取れなければ start を上限にして返す"""
         if not self.key:
             return self
+        if self.day_key and await store.reserve_counter(*self.day_key, 0, self.day_limit) is None:
+            return replace(self, start=limit, reserved=0)
         before = await store.reserve_counter(*self.key, self.start, limit)
         if before is None:
+            if self.day_key:
+                await store.add_counter(*self.day_key, -1)
             return replace(self, start=limit, reserved=0)
         return replace(self, start=before, reserved=1)
 
@@ -120,6 +142,8 @@ class CallCount:
         """実際に呼んだ回数との差を足す（自己修正で 2 回なら +1、呼ばなかったら -1 で枠を返す）"""
         if self.key and used != self.reserved:
             await store.add_counter(*self.key, used - self.reserved)
+            if self.day_key:
+                await store.add_counter(*self.day_key, used - self.reserved)
 
 
 class RetryGate:
@@ -135,7 +159,15 @@ class RetryGate:
     async def __call__(self) -> bool:
         if not self._count.key:
             return True
+        # やり直しの直前にも停止を確かめる（入口で見た停止の状態のまま走り続けない。10/9 Codex #9）
+        if await class_is_halted(self._store, self._count.key[0]):
+            return False
+        day = self._count.day_key
+        if day and await self._store.reserve_counter(*day, 0, self._count.day_limit) is None:
+            return False
         if await self._store.reserve_counter(*self._count.key, 0, self._limit) is None:
+            if day:
+                await self._store.add_counter(*day, -1)
             return False
         self.taken += 1
         return True
@@ -159,6 +191,8 @@ async def call_count(
     """端末の申告（claimed）とサーバの数えの大きい方から始める（10/2 採点 2-4: 回数が自己申告だった）。
     合言葉が違えば 403。学級に入っていない端末は申告のまま（IP ごとの回数制限はかかる）"""
     if not class_code:
+        if class_required():
+            raise HTTPException(status_code=403, detail=NO_CLASS_DETAIL)
         return CallCount(start=claimed)
     if not number:
         # 学級コードを付けて番号を省くと、端末の申告に戻れた（10/2 採点 3 回目 2-4）
@@ -172,4 +206,9 @@ async def call_count(
     await verify_student(store, code, no, secret)
     key = f"{kind}-{record_id}"
     stored = await store.get_counter(code, no, key)
-    return CallCount(start=max(claimed, stored), key=(code, no, key))
+    return CallCount(
+        start=max(claimed, stored),
+        key=(code, no, key),
+        day_key=(code, no, f"{kind}-day-{_today()}"),
+        day_limit=DAILY_LIMITS.get(kind, 20),
+    )

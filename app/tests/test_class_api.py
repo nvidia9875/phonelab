@@ -11,7 +11,12 @@ from server.agent.runner import build_runner
 from server.classroom import MemoryClassStore, new_class, seed_demo
 from server.main import app, get_plan_limiter, get_planner_runner
 from server.ratelimit import SlidingWindowLimiter
-from server.routes_class import get_class_store, get_pin_limiter
+from server.routes_class import (
+    CLASS_PIN_ATTEMPTS_PER_WINDOW,
+    PIN_ATTEMPTS_PER_WINDOW,
+    get_class_store,
+    get_pin_limiter,
+)
 
 PIN = "1234"
 
@@ -114,22 +119,45 @@ def test_the_teacher_changes_allowed_sensors_and_enables_home_experiments(client
     assert data["teacher_enabled"] == ["pendulum"]
 
 
+def wrong_pin(client, ip="203.0.113.1"):
+    return client.post(
+        "/api/class/DEMO-2026/halt",
+        json={"pin": "0000", "halted": True},
+        headers={"x-forwarded-for": ip},
+    ).status_code
+
+
 def test_wrong_pin_attempts_are_rate_limited(store, fake_llm):
     app.dependency_overrides[get_class_store] = lambda: store
-    limiter = SlidingWindowLimiter(limit=2, window_s=600)
-    app.dependency_overrides[get_pin_limiter] = lambda: limiter
     try:
         client = TestClient(app)
-        codes = [
-            client.post(
-                "/api/class/DEMO-2026/halt", json={"pin": "0000", "halted": True}
-            ).status_code
-            for _ in range(3)
+        codes = [wrong_pin(client) for _ in range(PIN_ATTEMPTS_PER_WINDOW + 1)]
+    finally:
+        app.dependency_overrides.clear()
+
+    assert codes == [403] * PIN_ATTEMPTS_PER_WINDOW + [429]
+
+
+def test_the_pin_lockout_holds_across_server_instances_and_changing_ips(store, fake_llm):
+    """10/9: 間違いの数はインスタンスのメモリではなく保存先で数える。接続元を変えても学級全体で止まる"""
+    app.dependency_overrides[get_class_store] = lambda: store
+    try:
+        client = TestClient(app)
+        # 1 つの接続元: 別のインスタンス（新しい TestClient）に移っても続きから数える
+        first = [wrong_pin(client) for _ in range(PIN_ATTEMPTS_PER_WINDOW)]
+        moved = wrong_pin(TestClient(app))
+        # 接続元を変えながら: 学級全体の上限で止まる
+        spread = [
+            wrong_pin(client, ip=f"198.51.100.{i}")
+            for i in range(CLASS_PIN_ATTEMPTS_PER_WINDOW - PIN_ATTEMPTS_PER_WINDOW + 1)
         ]
     finally:
         app.dependency_overrides.clear()
 
-    assert codes == [403, 403, 429]
+    assert first == [403] * PIN_ATTEMPTS_PER_WINDOW
+    assert moved == 429
+    assert spread[-1] == 429
+    assert set(spread[:-1]) == {403}
 
 
 def test_the_planner_refuses_to_run_while_the_class_is_halted(client, fake_llm):
@@ -278,8 +306,6 @@ def test_correct_pins_are_not_counted_and_a_session_survives_a_lockout(store, fa
     間違いが上限に達したら正しい PIN でも 429（総当たり対策。10/2 採点 2-6）。
     ただし PIN で入った先生のセッションの印は使い続けられる（同じ学校の IP の生徒に先生が締め出されない）"""
     app.dependency_overrides[get_class_store] = lambda: store
-    limiter = SlidingWindowLimiter(limit=2, window_s=600)
-    app.dependency_overrides[get_pin_limiter] = lambda: limiter
     try:
         client = TestClient(app)
         first = client.post("/api/class/DEMO-2026/dashboard", json={"pin": PIN}).json()
@@ -288,12 +314,7 @@ def test_correct_pins_are_not_counted_and_a_session_survives_a_lockout(store, fa
             client.post("/api/class/DEMO-2026/dashboard", json={"pin": PIN}).status_code
             for _ in range(5)
         ]
-        wrong = [
-            client.post(
-                "/api/class/DEMO-2026/halt", json={"pin": "0000", "halted": True}
-            ).status_code
-            for _ in range(3)
-        ]
+        wrong = [wrong_pin(client, ip="testclient") for _ in range(PIN_ATTEMPTS_PER_WINDOW + 1)]
         pin_after = client.post("/api/class/DEMO-2026/dashboard", json={"pin": PIN}).status_code
         token_after = client.post(
             "/api/class/DEMO-2026/dashboard", json={"token": token}
@@ -305,7 +326,7 @@ def test_correct_pins_are_not_counted_and_a_session_survives_a_lockout(store, fa
         app.dependency_overrides.clear()
 
     assert codes == [200] * 5
-    assert wrong == [403, 403, 429]
+    assert wrong == [403] * PIN_ATTEMPTS_PER_WINDOW + [429]
     assert pin_after == 429
     assert token_after == 200
     assert halt_with_token == 200
@@ -578,3 +599,154 @@ def test_a_summary_refuses_unknown_trace_stages_and_check_codes(client):
     res, secret = post_record(client, bad_stage)
     assert res.status_code == 422
     assert post_record(client, bad_code, secret=secret)[0].status_code == 422
+
+
+def test_teacher_actions_are_kept_in_an_append_only_audit_log(client):
+    """10/9 ガバナンス: 誰が（PIN か印か・接続元のハッシュ）いつ何を止めた・変えたかを残し、教員画面に出す"""
+    token = client.post("/api/class/DEMO-2026/dashboard", json={"pin": PIN}).json()["session_token"]
+    client.post("/api/class/DEMO-2026/halt", json={"token": token, "halted": True})
+    client.post("/api/class/DEMO-2026/halt", json={"pin": PIN, "halted": False})
+    client.put(
+        "/api/class/DEMO-2026/policy",
+        json={"token": token, "allowed_sensors": ["microphone"], "teacher_enabled": []},
+    )
+
+    log = client.post("/api/class/DEMO-2026/dashboard", json={"token": token}).json()["audit"]
+
+    assert [e["action"] for e in log] == ["許可を変えた", "停止を解除した", "全端末の測定を止めた"]
+    assert [e["via"] for e in log] == ["セッションの印", "PIN", "セッションの印"]
+    assert "microphone" in log[0]["detail"]
+    assert all(len(e["who"]) == 6 for e in log)
+
+
+def test_reaching_the_pin_limit_shows_up_in_the_audit_log(client):
+    for _ in range(PIN_ATTEMPTS_PER_WINDOW):
+        wrong_pin(client)
+
+    log = client.post("/api/class/DEMO-2026/dashboard", json={"pin": PIN}).json()["audit"]
+
+    assert log[0]["action"] == "PIN の間違いが上限に達した"
+
+
+def test_replan_and_next_also_obey_the_class_permissions(client, fake_llm):
+    """10/9 Codex セキュリティ #3: マイクを許していない学級で、計画だけでなく再計画・次の一手も 403"""
+    client.put(
+        "/api/class/DEMO-2026/policy",
+        json={"pin": PIN, "allowed_sensors": ["accelerometer"], "teacher_enabled": []},
+    )
+    secret = join(client).json()["secret"]
+    ident = {"class_code": "DEMO-2026", "number": "S-04", "secret": secret, "record_id": "r1"}
+
+    replan = client.post(
+        "/api/replan",
+        json={
+            "theme_id": "sound",
+            "variant_id": "sound_pluck_strength",
+            "condition": "A",
+            "hold_codes": ["low_snr"],
+            "retries": 0,
+            "prediction": "高くなる",
+            **ident,
+        },
+    )
+    nxt = client.post(
+        "/api/next",
+        json={
+            "theme_id": "sound",
+            "variant_id": "sound_pluck_strength",
+            "school": "jhs",
+            "observed": "same",
+            "consistent": False,
+            **ident,
+        },
+    )
+
+    assert replan.status_code == 403
+    assert nxt.status_code == 403
+    assert fake_llm.requests == []
+
+
+def test_in_production_the_lab_teacher_needs_a_class(client, fake_llm, monkeypatch):
+    """10/9 Codex #2: 学級を省くと停止・許可・回数の枠から外れられた。本番は学級の生徒だけが AI を呼べる"""
+    monkeypatch.setenv("PHONELAB_REQUIRE_CLASS", "1")
+
+    res = client.post(
+        "/api/plan",
+        json={"theme_id": "sound", "school": "jhs", "text": "強くはじくと高くなる。速く震えるから"},
+    )
+
+    assert res.status_code == 403
+    assert "学級" in res.json()["detail"]
+    assert fake_llm.requests == []
+
+
+def test_a_new_record_id_does_not_reset_the_students_daily_budget(store, monkeypatch):
+    """10/9 Codex #6: 記録 id を変えると記録ごとの枠は 0 から。その上に生徒ごと 1 日の総枠をかぶせる"""
+    import asyncio
+
+    from server import guards
+
+    monkeypatch.setitem(guards.DAILY_LIMITS, "plan", 3)
+    secret = "ABCDEF"
+    from server.classroom import auth_for
+
+    asyncio.run(store.set_student_auth("DEMO-2026", "S-09", auth_for(secret)))
+
+    async def take(record_id: str) -> int:
+        count = await guards.call_count(
+            store,
+            kind="plan",
+            claimed=0,
+            class_code="DEMO-2026",
+            number="S-09",
+            secret=secret,
+            record_id=record_id,
+        )
+        return (await count.reserve(store, 5)).reserved
+
+    taken = [asyncio.run(take(f"r{i}")) for i in range(5)]
+
+    assert taken == [1, 1, 1, 0, 0]
+
+
+def test_a_retry_is_not_run_once_the_teacher_has_halted_the_class(store):
+    import asyncio
+
+    from server.guards import CallCount, RetryGate
+
+    count = CallCount(start=0, key=("DEMO-2026", "S-09", "plan-r1"), reserved=1)
+    gate = RetryGate(count, store, 5)
+    asyncio.run(store.update_policy("DEMO-2026", halted=True))
+
+    assert asyncio.run(gate()) is False
+
+
+def test_a_summary_dated_in_the_future_is_refused(client):
+    """10/9 Codex #11: 未来の updated_at で、そのあとの普通の記録を古いとみなさせられた"""
+    res, _ = post_record(client, summary(updated_at="2099-01-01T00:00:00Z"))
+
+    assert res.status_code == 422
+
+
+def test_two_devices_claiming_the_same_new_number_get_one_passphrase(store):
+    """10/9 Codex #7: 同じ番号の同時入場で、合言葉が 2 つ出ていた"""
+    import asyncio
+
+    from server.classroom import auth_for
+
+    async def both():
+        return await asyncio.gather(
+            store.claim_student("DEMO-2026", "S-30", auth_for("AAAAAA")),
+            store.claim_student("DEMO-2026", "S-30", auth_for("BBBBBB")),
+        )
+
+    assert sorted(asyncio.run(both())) == [False, True]
+
+
+def test_a_class_cannot_be_filled_with_endless_new_numbers(client, monkeypatch):
+    from server import routes_class
+
+    monkeypatch.setattr(routes_class, "MAX_STUDENTS_PER_CLASS", 2)
+    codes = [join(client, number=f"S-{i:02d}").status_code for i in range(3)]
+
+    assert codes == [200, 200, 403]

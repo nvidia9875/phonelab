@@ -162,7 +162,7 @@ HOLD_WORDS: dict[str, str] = {
     "no_release": "振り子が動き出していない",
     "no_signal": "振り子が動いていない",
     "two_clocks_disagree": "二つの測り方の値が合わない",
-    "unstable": "前半と後半で周期が変わった",
+    "unstable": "前半と後半で値（周期・音の高さ）が変わった",
     "weak_autocorr": "周期がはっきり出ない",
     "too_uncertain": "差が測定のばらつきに埋もれて決められない",
 }
@@ -179,7 +179,7 @@ HOLD_TEMPLATE: dict[str, str] = {
     "no_release": "振り子が動き出していませんでした。「測る」を押してから、押さずに放してください。",
     "no_signal": "振り子が止まっていました。振ってから「測る」を押してください。",
     "two_clocks_disagree": "二つの測り方が合いませんでした。袋の中で端末が回っていないか、ほかの音が入っていないかを確かめて、もう一度。",
-    "unstable": "前半と後半で値が変わりました。途中で触っていないか確かめて、もう一度。",
+    "unstable": "前半と後半で値が変わりました。途中で触っていないか、途中からほかの音が入っていないか確かめて、もう一度。",
     "weak_autocorr": "周期がはっきり出ませんでした。糸が絡んでいないか、袋が回っていないかを確かめて、同じ条件でもう一度。",
     "too_uncertain": "差が測定のばらつきに埋もれて、決められませんでした。条件をそろえて、もう一度測りましょう。",
 }
@@ -228,27 +228,85 @@ CONDITION_TERMS: dict[str, tuple[str, ...]] = {
     # 音は「弱く」「強く」だけで条件（はじく強さ）を変えさせる（例:「さっきよりも弱くして」）
     "sound_pluck_strength": ("はじく強さ", "強さ", "弱く", "強く", "輪ゴムの長さ", "張り"),
     "sound_string_length": ("震える長さ", "長さ", "はじく強さ", "強さ", "弱く", "強く"),
+    "sound_tension": (
+        "張り",
+        "張る",
+        "張って",
+        "ゆるめ",
+        "ゆるく",
+        "震える長さ",
+        "長さ",
+        "はじく強さ",
+        "強さ",
+        "弱く",
+        "強く",
+    ),
+    "energy_length": ("糸の長さ", "糸", "長さ", "放す高さ", "高さ", "重さ", "おもり", "消しゴム"),
     "bottle_water": ("水の量", "水"),
     "pendulum_mass": ("重さ", "糸の長さ", "振れ幅"),
     "pendulum_length": ("糸の長さ", "長さ", "重さ", "振れ幅"),
     "pendulum_amplitude": ("振れ幅", "糸の長さ", "重さ"),
 }
 CHANGE_VERBS = re.compile(
-    r"変え|低く|高く|短く|長く|増や|減ら|小さく|大きく|弱く|強く|ゆるめ|足し|抜い|少なく|多く"
+    r"変え|低く|高く|短く|長く|増や|減ら|小さく|大きく|弱く|強く|ゆるめ|ゆるく|足し|抜い|少なく|多く|軽く|重く|半分|倍に|ぴんと|ピンと"
 )
 KEEP_WORDS = re.compile(r"同じ|そのまま|変えず|変えない|そろえ")
-SENTENCE_SPLIT = re.compile(r"[。！？!?\n]")
+# 文を節に分けて見る（「重さは同じにして、放す高さを低くしよう」の後ろ半分を、前半の「同じ」で見逃していた。10/12）
+SENTENCE_SPLIT = re.compile(r"[。！？!?\n、,]")
 
 
 def changes_condition(advice: str, variant_id: str) -> str | None:
-    """助言が実験の条件の値を変えさせているか。変えさせている言葉を返す（無ければ None）"""
-    for sentence in SENTENCE_SPLIT.split(advice):
-        if not CHANGE_VERBS.search(sentence) or KEEP_WORDS.search(sentence):
-            continue
-        for term in CONDITION_TERMS.get(variant_id, ()):
-            if term in sentence:
-                return term
+    """助言が実験の条件の値を変えさせているか。変えさせている言葉を返す（無ければ None）。
+    条件の言葉ごとに、その言葉から次の条件の言葉の手前まで（「重さは同じにして放す高さを低く」）と、
+    前の条件の言葉のあとからその言葉まで（「低くした高さから」）を見る。「同じ」がかかる範囲だけを外す（10/12）"""
+    terms = CONDITION_TERMS.get(variant_id, ())
+    for clause in SENTENCE_SPLIT.split(advice):
+        for term in terms:
+            # 同じ言葉が 2 回出ることがある（「糸の長さは同じにして糸の長さを短く」）。出てくるたびに見る
+            for m in re.finditer(re.escape(term), clause):
+                at = m.start()
+                found = _changes_at(clause, at, term, terms)
+                if found:
+                    return found
     return None
+
+
+def _changes_at(clause: str, at: int, term: str, terms: tuple[str, ...]) -> str | None:
+    """節の中の at に出てくる条件の言葉について、その前後に変える言い方があるか"""
+    after = _until_next_term(clause[at:], term, terms)
+    before = _since_previous_term(clause[:at], term, terms)
+    # 「同じ」「変えず」は、その直後にある言葉にだけかかる（「重さは同じにして長くした糸を」の「長くした」は糸の変更）
+    keep = list(KEEP_WORDS.finditer(before))
+    if keep:
+        before = before[keep[-1].end() :]
+    for scope in (after, before):
+        if CHANGE_VERBS.search(scope) and not KEEP_WORDS.search(scope):
+            return term
+    return None
+
+
+def _since_previous_term(head: str, term: str, terms: tuple[str, ...]) -> str:
+    """その言葉の前で、前の別の条件の言葉のあとから"""
+    start = 0
+    for other in terms:
+        if other in term or term in other:
+            continue
+        at = head.rfind(other)
+        if at >= 0:
+            start = max(start, at + len(other))
+    return head[start:]
+
+
+def _until_next_term(rest: str, term: str, terms: tuple[str, ...]) -> str:
+    """その言葉から、次の別の条件の言葉の手前まで（「同じ」や「低く」がどの条件にかかるかを見るため）"""
+    cut = len(rest)
+    for other in terms:
+        if other in term or term in other:
+            continue
+        at = rest.find(other, len(term))
+        if 0 < at < cut:
+            cut = at
+    return rest[:cut]
 
 
 def parse_replan(text: str) -> ReplanOutput | None:

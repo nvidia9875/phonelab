@@ -382,9 +382,9 @@ def render_markdown(out: dict[str, Any]) -> str:
             f"Model Armor {'あり' if out['armor'] else 'なし'}。"
             "本番と同じルート（/api/plan・/api/next・/api/class/{code}/insight）を手元のプロセスで呼んだ。"
         ),
-        f"> 再現: `cd app && uv run python -m scripts.eval_agent`（env は scripts/eval_agent.py の先頭）。1 件ずつの結果は `docs/eval/{out['at'][:10]}.json`。",
+        f"> 再現: `cd app && uv run python -m scripts.eval_agent`（env は scripts/eval_agent.py の先頭）。1 件ずつの結果は `docs/eval/{out.get('file', out['at'][:10] + '.json')}`。",
         "",
-        "## 1. Planner（予想 30 件。中学の 3 テーマ）",
+        f"## 1. Planner（予想 {p['n']} 件。正しく読めたかを数える母数は、変数の決まる予想だけ）",
         "",
         "| 指標 | 候補をプロンプトに並べる（既定） | ツールで読む（X6） |",
         "|---|---|---|",
@@ -430,7 +430,7 @@ def render_markdown(out: dict[str, Any]) -> str:
         "| 今回 | 予想と測定 | 「なぜ」を書いた | 選んだ手 | 問いかけ |",
         "|---|---|---|---|---|",
         *[
-            f"| {r['variant']} | {'合った' if r['consistent'] else '食い違い'} | {'はい' if r['explained'] else 'まだ'} | {r['action'] or f"エラー（{r.get('status')}）"} {r['experiment'] or ''} | {(r['question'] or r['why'] or '')[:50]} |"
+            f"| {r['variant']} | {'合った' if r['consistent'] else '食い違い'} | {'はい' if r['explained'] else 'まだ'} | {r['action'] or f'エラー（{r.get("status")}）'} {r['experiment'] or ''} | {(r['question'] or r['why'] or '')[:50]} |"
             for r in nxt
         ],
         (
@@ -465,8 +465,8 @@ def render_markdown(out: dict[str, Any]) -> str:
         f"| 学級の見立て | ${ins_cost:.5f}（{yen(ins_cost)}） |",
         "",
         (
-            f"1 人が 1 実験（計画 1 回＋次の一手 1 回）で {yen(per_plan + per_next)}。"
-            "会話・再計画・Model Armor・Firestore・Cloud Run を含めた授業 1 回の費用（ふだん・混雑・厳密な上限）は 9 節"
+            f"評価の 1 場面あたり（計画は理由の無い予想で問い返しの 2 回目を含む）＋次の一手 1 回で {yen(per_plan + per_next)}。"
+            "会話・再計画・Model Armor・Firestore・Cloud Run を含めた授業 1 回の費用（ふだん・混雑・枠を使い切った場合）は 9 節"
         ),
     ]
     lines += ["", *render_more(out, yen), *render_history(out.get("history", []))]
@@ -494,8 +494,10 @@ def run_history(folder: Path) -> list[dict[str, Any]]:
                 "question_back_no_reason": p.get("question_back_no_reason"),
                 "final_leak": p.get("final_leak"),
                 "next_match": f"{sum(r['action'] == r['expected_action'] for r in d['next']['rows'])} / {len(d['next']['rows'])}",
+                # 測り直し（retry）だけが条件の検査の対象。別の実験への切り替えは数えない（10/12 デプロイ前レビュー）
                 "replan_condition_ok": (
-                    f"{sum(r.get('condition_term') is None for r in rp)} / {len(rp)}"
+                    f"{sum(r.get('condition_term') is None for r in rp if r.get('action') == 'retry')} / "
+                    f"{sum(r.get('action') == 'retry' for r in rp)}"
                     if rp and "condition_term" in rp[0]
                     else "—"
                 ),
@@ -513,7 +515,7 @@ def render_history(rows: list[dict[str, Any]]) -> list[str]:
     return [
         "## 10. これまでの実行（同じ評価を回したときの揺れ）",
         "",
-        "| 実行 | 変数を読んだ | 実験を選んだ | 理由の無い予想に問い返した | 計画の最終出力の漏えい | 次の一手の手が合った | 再計画が条件を守った | 判定役の漏えい / 判定数（判定役の失敗） |",
+        "| 実行 | 変数を読んだ | 実験を選んだ | 理由の無い予想に問い返した | 計画の最終出力の漏えい | 次の一手の手が合った | 測り直しの助言で条件を変える言い方なし | 判定役の漏えい / 判定数（判定役の失敗） |",
         "|---|---|---|---|---|---|---|---|",
         *[
             f"| {r['file']} | {r['variable_acc']} | {r['experiment_acc']} | {r['question_back_no_reason']} | {r['final_leak']} | {r['next_match']} | {r['replan_condition_ok']} | {r['judge_leak']} / {r['judge_n']}（{r['judge_failed']}） |"
@@ -614,6 +616,7 @@ def main() -> None:
     # 実行ごとに別のファイルに残す（10/2 採点 4 回目 3-3: 1 回の結果だけでは揺れが分からない）
     stamp = datetime.now(UTC).strftime("%Y-%m-%dT%H%M")
     raw = ROOT / "docs" / "eval" / f"{stamp}.json"
+    out["file"] = raw.name
     raw.parent.mkdir(parents=True, exist_ok=True)
     raw.write_text(json.dumps(out, ensure_ascii=False, indent=2))
     out["history"] = run_history(ROOT / "docs" / "eval")

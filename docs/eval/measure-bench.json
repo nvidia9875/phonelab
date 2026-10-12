@@ -1,0 +1,463 @@
+{
+  "note": "合成の信号。実機のマイク・部屋の反響・センサーの癖は入らない。答えの分かっている信号で、解析と検査の論理を確かめる",
+  "tolerance": {
+    "pitch_rel": 0.03,
+    "speed_ms": 0.15
+  },
+  "pitch": [
+    {
+      "case": "きれいな音（雑音 小）",
+      "clean": true,
+      "trials": 40,
+      "passed": 40,
+      "held": 0,
+      "held_rate": "0%",
+      "false_pass": 0,
+      "median_error": "0.04%",
+      "worst_error": "0.13%"
+    },
+    {
+      "case": "教室ほどの雑音",
+      "clean": true,
+      "trials": 40,
+      "passed": 40,
+      "held": 0,
+      "held_rate": "0%",
+      "false_pass": 0,
+      "median_error": "0.04%",
+      "worst_error": "0.18%"
+    },
+    {
+      "case": "雑音が大きい（音が小さい）",
+      "clean": false,
+      "trials": 40,
+      "passed": 0,
+      "held": 40,
+      "held_rate": "100%",
+      "false_pass": 0,
+      "median_error": "—",
+      "worst_error": "—"
+    },
+    {
+      "case": "音割れ（大きすぎる）",
+      "clean": false,
+      "trials": 40,
+      "passed": 0,
+      "held": 40,
+      "held_rate": "100%",
+      "false_pass": 0,
+      "median_error": "—",
+      "worst_error": "—"
+    },
+    {
+      "case": "隣の班の音が同じくらい混ざる",
+      "clean": false,
+      "trials": 40,
+      "passed": 0,
+      "held": 40,
+      "held_rate": "100%",
+      "false_pass": 0,
+      "median_error": "—",
+      "worst_error": "—"
+    },
+    {
+      "case": "基本の音が弱く倍音が強い",
+      "clean": false,
+      "trials": 40,
+      "passed": 0,
+      "held": 40,
+      "held_rate": "100%",
+      "false_pass": 0,
+      "median_error": "—",
+      "worst_error": "—"
+    },
+    {
+      "case": "倍音の無い音（ペットボトルに近い）",
+      "clean": true,
+      "trials": 40,
+      "passed": 40,
+      "held": 0,
+      "held_rate": "0%",
+      "false_pass": 0,
+      "median_error": "0.09%",
+      "worst_error": "0.20%"
+    },
+    {
+      "case": "低い音（80〜100 Hz）・基本の音が弱い",
+      "clean": false,
+      "trials": 40,
+      "passed": 0,
+      "held": 40,
+      "held_rate": "100%",
+      "false_pass": 0,
+      "median_error": "—",
+      "worst_error": "—"
+    },
+    {
+      "case": "基本の音が弱く、第 3 倍音も弱い",
+      "clean": false,
+      "trials": 40,
+      "passed": 0,
+      "held": 40,
+      "held_rate": "100%",
+      "false_pass": 0,
+      "median_error": "—",
+      "worst_error": "—"
+    },
+    {
+      "case": "基本の音がとても弱い（−26 dB）",
+      "clean": false,
+      "trials": 40,
+      "passed": 0,
+      "held": 40,
+      "held_rate": "100%",
+      "false_pass": 0,
+      "median_error": "—",
+      "worst_error": "—"
+    }
+  ],
+  "speed": [
+    {
+      "case": "60 Hz・センサーの雑音 小",
+      "clean": true,
+      "trials": 40,
+      "passed": 40,
+      "held": 0,
+      "held_rate": "0%",
+      "false_pass": 0,
+      "median_error": "0.004 m/s",
+      "worst_error": "0.010 m/s"
+    },
+    {
+      "case": "60 Hz・センサーの雑音 中",
+      "clean": true,
+      "trials": 40,
+      "passed": 40,
+      "held": 0,
+      "held_rate": "0%",
+      "false_pass": 0,
+      "median_error": "0.011 m/s",
+      "worst_error": "0.054 m/s"
+    },
+    {
+      "case": "30 Hz（遅い端末）",
+      "clean": true,
+      "trials": 40,
+      "passed": 40,
+      "held": 0,
+      "held_rate": "0%",
+      "false_pass": 0,
+      "median_error": "0.018 m/s",
+      "worst_error": "0.031 m/s"
+    },
+    {
+      "case": "センサーの雑音 大",
+      "clean": false,
+      "trials": 40,
+      "passed": 36,
+      "held": 4,
+      "held_rate": "10%",
+      "false_pass": 7,
+      "median_error": "0.073 m/s",
+      "worst_error": "0.210 m/s"
+    }
+  ],
+  "before_fix": {
+    "note": "同じ信号・同じ数え方で、10/9 に本番に出した測定コード（コミット dfea9c2）を通した結果",
+    "pitch": [
+      {
+        "case": "きれいな音（雑音 小）",
+        "clean": true,
+        "trials": 40,
+        "passed": 40,
+        "held": 0,
+        "held_rate": "0%",
+        "false_pass": 0,
+        "median_error": "0.04%",
+        "worst_error": "0.13%"
+      },
+      {
+        "case": "教室ほどの雑音",
+        "clean": true,
+        "trials": 40,
+        "passed": 40,
+        "held": 0,
+        "held_rate": "0%",
+        "false_pass": 0,
+        "median_error": "0.04%",
+        "worst_error": "0.18%"
+      },
+      {
+        "case": "雑音が大きい（音が小さい）",
+        "clean": false,
+        "trials": 40,
+        "passed": 0,
+        "held": 40,
+        "held_rate": "100%",
+        "false_pass": 0,
+        "median_error": "—",
+        "worst_error": "—"
+      },
+      {
+        "case": "音割れ（大きすぎる）",
+        "clean": false,
+        "trials": 40,
+        "passed": 0,
+        "held": 40,
+        "held_rate": "100%",
+        "false_pass": 0,
+        "median_error": "—",
+        "worst_error": "—"
+      },
+      {
+        "case": "隣の班の音が同じくらい混ざる",
+        "clean": false,
+        "trials": 40,
+        "passed": 0,
+        "held": 40,
+        "held_rate": "100%",
+        "false_pass": 0,
+        "median_error": "—",
+        "worst_error": "—"
+      },
+      {
+        "case": "基本の音が弱く倍音が強い",
+        "clean": false,
+        "trials": 40,
+        "passed": 40,
+        "held": 0,
+        "held_rate": "0%",
+        "false_pass": 40,
+        "median_error": "100.07%",
+        "worst_error": "100.25%"
+      },
+      {
+        "case": "倍音の無い音（ペットボトルに近い）",
+        "clean": true,
+        "trials": 40,
+        "passed": 37,
+        "held": 3,
+        "held_rate": "8%",
+        "false_pass": 0,
+        "median_error": "0.09%",
+        "worst_error": "0.20%"
+      },
+      {
+        "case": "低い音（80〜100 Hz）・基本の音が弱い",
+        "clean": false,
+        "trials": 40,
+        "passed": 40,
+        "held": 0,
+        "held_rate": "0%",
+        "false_pass": 40,
+        "median_error": "100.44%",
+        "worst_error": "101.07%"
+      },
+      {
+        "case": "基本の音が弱く、第 3 倍音も弱い",
+        "clean": false,
+        "trials": 40,
+        "passed": 38,
+        "held": 2,
+        "held_rate": "5%",
+        "false_pass": 38,
+        "median_error": "100.08%",
+        "worst_error": "100.20%"
+      },
+      {
+        "case": "基本の音がとても弱い（−26 dB）",
+        "clean": false,
+        "trials": 40,
+        "passed": 37,
+        "held": 3,
+        "held_rate": "8%",
+        "false_pass": 37,
+        "median_error": "100.08%",
+        "worst_error": "100.19%"
+      }
+    ],
+    "speed": [
+      {
+        "case": "60 Hz・センサーの雑音 小",
+        "clean": true,
+        "trials": 40,
+        "passed": 40,
+        "held": 0,
+        "held_rate": "0%",
+        "false_pass": 0,
+        "median_error": "0.005 m/s",
+        "worst_error": "0.021 m/s"
+      },
+      {
+        "case": "60 Hz・センサーの雑音 中",
+        "clean": true,
+        "trials": 40,
+        "passed": 40,
+        "held": 0,
+        "held_rate": "0%",
+        "false_pass": 0,
+        "median_error": "0.033 m/s",
+        "worst_error": "0.112 m/s"
+      },
+      {
+        "case": "30 Hz（遅い端末）",
+        "clean": true,
+        "trials": 40,
+        "passed": 40,
+        "held": 0,
+        "held_rate": "0%",
+        "false_pass": 0,
+        "median_error": "0.007 m/s",
+        "worst_error": "0.049 m/s"
+      },
+      {
+        "case": "センサーの雑音 大",
+        "clean": false,
+        "trials": 40,
+        "passed": 37,
+        "held": 3,
+        "held_rate": "8%",
+        "false_pass": 20,
+        "median_error": "0.158 m/s",
+        "worst_error": "0.366 m/s"
+      }
+    ]
+  },
+  "paired_search": {
+    "note": "5 系統 × 70 通りの倍音の形 × 80〜1200 Hz の 70 の高さ（計 24,500 件）。直したあとの版は、1 フレームでふるい、残った候補を 5 秒の信号（端末と同じ analyzePitch）で確かめ直した。10/9 の版の数（before_fix）は 1 フレームのふるいの数。誤って通る = 検査を通ったのに 3% より外れる。向きが逆 = 高さの比 1.03〜2.5 の 2 条件が両方通ったのに低くなったと出る。再現: docs/eval/pitch-search/paired_full.ts.txt（引数 prod で 10/9 の版）",
+    "families": {
+      "倍音 8 つまで": {
+        "false_pass": 0,
+        "inversion": 0,
+        "before_fix": {
+          "false_pass": 1162,
+          "inversion": 1464
+        }
+      },
+      "倍音の番号に比例してずれる（第 h 倍音で最大 h% 程度）": {
+        "false_pass": 0,
+        "inversion": 0,
+        "before_fix": {
+          "false_pass": 1201,
+          "inversion": 1583
+        }
+      },
+      "雑音を強く": {
+        "false_pass": 0,
+        "inversion": 0,
+        "before_fix": {
+          "false_pass": 1139,
+          "inversion": 1555
+        }
+      },
+      "減衰するはじき": {
+        "false_pass": 0,
+        "inversion": 0,
+        "before_fix": {
+          "false_pass": 1215,
+          "inversion": 1798
+        }
+      },
+      "2 つの音が混ざる（和音）": {
+        "false_pass": 0,
+        "inversion": 0,
+        "before_fix": {
+          "false_pass": 1498,
+          "inversion": 1906
+        },
+        "note": "ほぼ全部を保留する（2 つの音が混ざると結論を出さない）"
+      }
+    },
+    "background": {
+      "note": "ふつうの輪ゴムの音（倍音 1/0.5/0.25/0.12）と純音に背景の音を混ぜ、80〜600 Hz の 11 の高さで保留した数（直したあと / 10/9 の版）。最初の 0.5 秒（音を出す前）から鳴っている背景は覚えて数えない。途中から鳴り始めた音は数える（安全側に保留）。再現: docs/eval/pitch-search/over.ts.txt・over_late.ts.txt",
+      "前から鳴っている: 電源のうなり −25 dB・ざわめき −15/−25 dB・声 −25/−35 dB（輪ゴムの音）": "0/11 / 0/11",
+      "前から鳴っている（純音）": "0〜1/11 / 7〜10/11",
+      "途中から: 声 −25 dB / −35 dB（輪ゴムの音）": "2/11・1/11 / 0/11",
+      "途中から: 電源のうなり −35 dB（輪ゴムの音）": "3/11 / 0/11"
+    },
+    "weak_fundamental_limit": "基本が弱く高い番号の倍音がいちばん強い音（倍音の番号 2〜20、基本の強さ 0.01〜0.08、85〜300 Hz の 300 通り）: 誤って通る 52 件はすべて基本が 0.01（約 −40 dB）。0.02（約 −34 dB）以上は 0 件。再現: docs/eval/pitch-search/weakk.ts.txt"
+  },
+  "background": {
+    "note": "10/12 デプロイ前レビュー 6 回目の対応後。はじく前 0.5 秒の背景の形を覚える。推定の 1/k などの位置に背景の山があるとき、(1) その背景がいちばん強い山より 41 dB 以上弱く大きさが変わらない、または (2) はじいた音が 10 dB 以上弱まっていくのに、その帯域だけはじいた瞬間以外ずっと ±1 dB で変わらない、のどちらかなら背景だけとみなす。どちらでもなければ保留。背景の山が消えた（逆の位相の基本で打ち消された）ときも保留。本当の基本が 60 Hz 未満になる位置は調べない。harness: docs/eval/pitch-search/pluck_hum.ts.txt, overlap.ts.txt, over_hum.ts.txt。10/12 夜: 基本が倍音より弱い音は保留にしたので、背景と重なる弱い基本の誤通過（overlap）は数字が同じでも、その音はふだんの授業では保留になる",
+    "plucked_40_random_pitches": {
+      "desc": "4 回はじく（exp(-3t) で弱まる）80〜600 Hz のでたらめな高さ 40 個。保留の数 / 誤って通した数",
+      "rubber": {
+        "none": "0/40",
+        "hum50_-25dB": "8/40",
+        "hum60_-25dB": "0/40",
+        "hum50_-35dB": "5/40",
+        "hum60_-35dB": "1/40",
+        "voice130_-25dB_sustained": "17/40",
+        "voice210_-25dB_sustained": "15/40",
+        "false_pass": 0,
+        "production_held": "0/40 in every row"
+      },
+      "pure": {
+        "none": "0/40 (production 5/40)",
+        "hum50_-25dB": "8/40 (production 12/40)",
+        "hum60_-25dB": "3/40 (14/40)",
+        "hum50_-35dB": "6/40 (8/40)",
+        "hum60_-35dB": "1/40 (8/40)",
+        "voice_-25dB_sustained": "15〜17/40 (27〜32/40)",
+        "false_pass": 0
+      }
+    },
+    "weak_fundamental_overlapping_background": {
+      "desc": "本当の基本（−20〜−34 dB、第 2 倍音か第 10 倍音がいちばん強い）と同じ高さに背景（基本の 0.3〜2.5 倍）、位相 8 通り、100/150/220 Hz。はじくたびに位相がそろう最悪の場合を含む。各 960 通り",
+      "plucked": {
+        "false_pass": 14,
+        "production_false_pass": 579,
+        "head_only": 5
+      },
+      "steady_tone": {
+        "false_pass": 2,
+        "production_false_pass": 568,
+        "head_only": 0
+      },
+      "limit": "残る誤りはすべて第 10 倍音がいちばん強く、背景が弱い基本と同じ高さ（差 0.2 Hz 未満）で、基本と同じかそれより強いとき。大きさだけでは原理的に見分けられない（どの大きさの比にも、山の大きさが変わらない位相がある）。はじいた音では弱まり方で見分けるが、背景が基本より強いと変化が 1 dB に届かない"
+    },
+    "steady_tone_harness_11_pitches": {
+      "hum50_-25dB_rubber": "4/11 (production 0/11)",
+      "late_voice130_-25dB_rubber": "2/11 (production 0/11)",
+      "desc": "弱まらない音（レビューの harness の既定）。音の大きさが変わらないと、うなりと弱い基本を時間でも見分けられないので保留する"
+    },
+    "independent_review_10_12": {
+      "desc": "別のエージェントに壊させた結果（4 回はじいた輪ゴム、40 個の高さ。本番の保留はどれも 0/40）",
+      "held": {
+        "low_frequency_noise_below_150Hz_-35dB": "30/40",
+        "low_frequency_noise_-40dB": "19/40",
+        "hum50_-40_to_-45dB": "9〜10/40",
+        "fan_87Hz_-40dB": "7/40",
+        "voice_-30dB": "10/40",
+        "agc_plus_hum": "15/40",
+        "harmonics_stretched_0.5pct": "40/40 (0.3% 以下は 0/40)",
+        "vibrato_pitch_drop_long_decay_single_pluck": "0/40"
+      },
+      "why": "音が 20 dB 以上弱まったフレームでは、いちばん強い山から −38 dB まで見るので、雑音やうなりの山が 1/k などの位置で数えられて保留になる",
+      "false_pass_outside_limit": "基本 −20〜−34 dB では見つからず（背景が基本から 0.5〜12 Hz ずれる 768 件で 0 件、本番 384 件。基本が倍音より速く弱まる 320 件で 0 件、本番 234 件）",
+      "regression": "測定の途中から、ちょうど 1 オクターブ下（±1.5%）の続く音が −15〜−20 dB で鳴り始めると、その音の高さを測って通ることがある（192 件中 57 件、本番 29 件）。途中から別の続く音が鳴るとその音を測るのは本番にもある",
+      "fixed": "マイクを開いた直後の値が全部 0 のフレームを、雑音と背景から除いた（うなり 60 Hz −30 dB で 40/40 保留、SNR 211 dB と出ていた）"
+    }
+  },
+  "intruder": {
+    "desc": "10/12 デプロイ前レビュー 7〜9 回目の対応後。4 回はじいた輪ゴム（200/300/450 Hz）に別の続く音を混ぜる。保留（unstable / two_clocks_disagree）の条件: (a) フレームごとの高さの 85% 以上が中央値から 6% 以内にそろわない、(b) はじいても大きさが変わらない音を基本と読んだ、(c) いちばん大きい 4 フレームで、第 2〜8 倍音のどれかが基本より 2 dB 以上強い（本番の版は、下の音が 4.8 dB（1/2）・3 dB（1/3）以上弱ければ上の音を読むので、それより手前で止める）。(d) 1 オクターブ下に直す前の読み方（10/9 の版が答える、自己相関の最初のピークそのままの高さの中央値）と 3% より違えば通さない。この版だけが別の音を読んで本番と結論が逆になるのを、しきい値でなく読み方の食い違いとして止める（レビュー 10 回目: 一時的な大きさの山で (c) のフレームの選び方がすり抜けられた）。harness: docs/eval/pitch-search/intruder.ts.txt, intruder_decay.ts.txt, intruder_wobble.ts.txt, normal.ts.txt",
+    "mixed_720": {
+      "desc": "途中（0.8・2.0 秒）または最初から。音は exp(-3t)",
+      "false_pass": 0,
+      "production_false_pass": 67
+    },
+    "decay_1920": {
+      "desc": "0.65・2.0 秒から、音の弱まり exp(-0.3t)〜exp(-3t)",
+      "false_pass": 0,
+      "production_false_pass": 119
+    },
+    "wobble_3600": {
+      "desc": "さらに混ぜた音の大きさを ±0〜30%（0.3 Hz）でゆらす",
+      "false_pass": 0,
+      "production_false_pass": 307
+    },
+    "ordinary_sounds": "倍音ごとに弱まる速さが違う・基本のほうが速く弱まる・1 回だけ・弱い音・ビブラート ±2%・はじいた直後に 3% 高い・ゆっくり弱まる（exp(-0.5t)）の 9 種 × 20 個で、保留 0（本番も 0）",
+    "cost": "基本が倍音より弱い音（基本 −16 dB など）は、1 オクターブ下の別の音と見分けられないので保留する（ベンチの 3 行が 40/40 保留。本番の版はこれらを 1 オクターブ上と答えて通していた）",
+    "raw_matches_production": "照合用の読み（raw_f0_hz）は、10/9 の版と同じ雑音の見積もり・フレームの選び方で数える（レビュー 11 回目: 全部 0 のフレームで選び方がずれていた）。全部 0 のフレーム 0〜8・弱い音・混ぜた音を変えた 288 通りで、本番の f0_hz と 0.1 Hz 以内で全部一致（docs/eval/pitch-search/rawmatch.ts.txt）"
+  }
+}

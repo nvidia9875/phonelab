@@ -1,0 +1,45 @@
+import { analyzePitch, pitchChecks } from "/Users/shun/Desktop/phonelab/app/web/src/measure/pitch";
+const SR = 48000, N = 4096;
+function sig(f0: number, amps: number[], noise: number) {
+  let seed = 7; const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647 - 0.5; };
+  const frames = [];
+  for (let i = 0; i < 11; i++) { const data = new Float32Array(N);
+    for (let k = 0; k < N; k++) { const s = (i * 4800 + k) / SR; data[k] = (i < 5 ? 0 : 0.2 * amps.reduce((v, a, h) => v + a * Math.sin(2 * Math.PI * f0 * (h + 1) * s), 0)) + noise * rnd(); }
+    frames.push({ t: i * 100, data }); }
+  return analyzePitch({ sampleRate: SR, frames });
+}
+const grid = [0, 0.02, 0.1, 0.3, 0.6, 1];
+const freqs = [85, 110, 150, 220, 260, 330, 440, 600];
+let total = 0, pass = 0, falsePass = 0; const fp: string[] = [];
+const passed: Record<string, number> = {};
+const byKind: Record<string, number> = {};
+for (const a1 of grid) for (const a2 of grid) for (const a3 of grid) for (const a4 of grid) {
+  const amps = [a1, a2, a3, a4]; if (Math.max(...amps) < 1) continue; // いちばん強い倍音を 1 に
+  const present = amps.map((a, i) => (a > 0 ? i + 1 : 0)).filter((x) => x > 0);
+  const gcd = (x: number, y: number): number => (y ? gcd(y, x % y) : x);
+  const g = present.reduce(gcd);
+  const weakestRatio = Math.min(...amps.filter((a) => a > 0)); // いちばん弱い成分
+  for (const f0 of freqs) {
+    const truth = f0 * g; // 入っている成分の繰り返しの高さ
+    total++;
+    const f = sig(f0, amps, 0.002); const ok = pitchChecks(f, 0.03).every((c) => c.ok);
+    if (!ok) continue;
+    pass++; passed[`${amps}|${f0}`] = f.f0_hz;
+    if (Math.abs(f.f0_hz - truth) / truth > 0.03) {
+      falsePass++;
+      const key = a1 >= 0.1 ? "fundamental>=0.1" : a1 > 0 ? "fundamental<0.1" : "no-fundamental";
+      byKind[key] = (byKind[key] ?? 0) + 1;
+      if (fp.length < 16) fp.push(`${JSON.stringify(amps)} ${f0} truth ${truth} -> ${f.f0_hz}`);
+    }
+  }
+}
+// 向きの逆転: 同じ倍音の形で、低い f0 と高い f0 の両方が通ったのに値が逆
+let inversions = 0;
+const invEx: string[] = [];
+for (const key of Object.keys(passed)) { const [amps, f] = key.split("|"); if (+amps.split(",")[0] === 0) continue; for (const g of freqs) { const k2 = `${amps}|${g}`; if (g > +f && passed[k2] !== undefined && passed[k2] < passed[key]) { inversions++; invEx.push(`${amps} ${f}->${g}`); } } }
+console.log(JSON.stringify({ total, pass, falsePass, byKind, inversions_with_fundamental: inversions, invEx, fp }, null, 1));
+for (const [amps, a, b] of [[[0.6, 0.3, 1, 0.2], 220, 260], [[0.5, 0, 0.2, 1], 220, 260], [[0.15, 1, 0.2], 220, 330]] as [number[], number, number][]) {
+  const fa = sig(a, amps, 0.002), fb = sig(b, amps, 0.002);
+  const oa = pitchChecks(fa, 0.03).every((c) => c.ok), ob = pitchChecks(fb, 0.03).every((c) => c.ok);
+  console.log("codex", JSON.stringify(amps), a, oa ? fa.f0_hz : "hold", b, ob ? fb.f0_hz : "hold");
+}

@@ -41,7 +41,7 @@ const CHECK_WORDS: Record<CheckCode, string> = {
   low_rate: "サンプリングが遅い",
   no_release: "動き出していない",
   two_clocks_disagree: "二系統が不一致",
-  unstable: "周期が不安定",
+  unstable: "途中で値が変わった",
   weak_autocorr: "周期が読めない",
   no_signal: "信号なし",
   too_uncertain: "ばらつきで決められない",

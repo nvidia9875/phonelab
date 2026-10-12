@@ -161,6 +161,8 @@ export interface ClassState {
   updatedAt: string;
   /** この端末が最後に受け取った時刻 */
   seenAt: string;
+  /** 学級の状態を続けて確かめられない（先生の停止が届くか分からない）。測定には進ませない */
+  unreachable?: boolean;
 }
 
 const KEY_RECORDS = "phonelab.records.v1";
@@ -353,4 +355,9 @@ export function activeRecordForTheme(themeId: string, records = snapshot.records
 }
 export function clearAll(): void {
   emit({ records: [], student: state.student, halted: false, settings: state.settings, classState: state.classState });
+}
+
+/** 共用の端末を次の人に渡す: 記録・番号・合言葉をすべて消す（前の子の合言葉で記録を書けないように。10/9 Codex #14） */
+export function wipeDevice(): void {
+  emit({ records: [], student: null, halted: false, settings: state.settings, classState: null });
 }

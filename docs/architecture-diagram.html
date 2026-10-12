@@ -38,13 +38,13 @@
   .never { color: var(--orange); font-weight: 700; }
 </style>
 <div class="wrap">
-  <h1>PhoneLab <small>スマホが実験器具。AI は答えを言わない。— 2026-10-02 時点で動いている範囲だけを描いた図</small></h1>
+  <h1>PhoneLab <small>スマホが実験器具。AI は答えを言わない。— 2026-10-09 時点で動いている範囲だけを描いた図</small></h1>
   <p class="sub">生徒が予想を書く → ラボ先生（Gemini）が予想を壊せる実験をカタログから選ぶ → 端末のセンサーで測る → 機械が検査して怪しければ保留 → 結果を読んで次の一手 → 先生は学級を一目で見て、ラボ先生の見立てを聞き、必要なら全端末を止める</p>
 
   <div class="cols">
     <!-- 端末 -->
     <div class="col">
-      <p class="lane">生徒の端末（PWA、学校の iPad ／ 家のスマホ）</p>
+      <p class="lane">生徒の端末（Web アプリ、学校の iPad ／ 家のスマホ）</p>
       <div class="box orange">
         <h3>予想ゲート</h3>
         <p>「こうなると思う」を書くまで、実験もヒントもセンサーも出ない。理由が無ければラボ先生が 1 回だけ問い返す</p>
@@ -65,7 +65,7 @@
       </div>
       <div class="box">
         <h3>教員画面（PC、学級コード＋教師 PIN）</h3>
-        <p>予想の向きの分布 → いま見に行く子 → <b>ラボ先生の見立て</b>（3 行・見に行く順） → 全員の表（番号だけ、記録の「判断」の行と Cloud Trace へのリンク） → 許可・家でやる実験 → <b>全端末停止</b></p>
+        <p>予想の向きの分布 → いま見に行く子 → <b>ラボ先生の見立て</b>（3 行・見に行く順） → 全員の表（番号だけ、記録の「判断」の行と Cloud Trace へのリンク） → 許可・家でやる実験 → <b>全端末停止</b>（先生の操作は「操作の記録」に残る）</p>
       </div>
     </div>
 
@@ -86,7 +86,7 @@
         <p>禁止動作（落とす・高所・水・交通）／メモ内の指示（「検査を飛ばして」）／答えの要求 → <b>モデルを呼ばずに</b>却下・問い返し。却下は理由 3 つ＋代替実験</p>
       </div>
       <div class="box teal">
-        <h3>ラボ先生 = 5 つの LlmAgent（Gemini 3.5 Flash-Lite、構造化出力）</h3>
+        <h3>ラボ先生 = 5 つの LlmAgent（Gemini 3.5 Flash-Lite。4 つは構造化出力、Tutor は文章）</h3>
         <ul>
           <li><b>Planner</b>: 予想を読み、残りの候補から実験を 1 つ選ぶ。<span class="never">答え（answers.py）は渡さない</span></li>
           <li><b>Replanner</b>: 保留の理由を読み、直して測り直す／別の実験へ（条件の値は変えさせない）</li>
@@ -101,7 +101,7 @@
           <div class="cb"><b>before_run</b><p>先生が学級を止めていれば、エージェントを走らせない</p></div>
           <div class="cb"><b>before_model</b><p><b>Model Armor</b> で生徒の文を検査。回数上限ならモデルを呼ばない。温度・思考量を強制</p></div>
           <div class="cb"><b>before_tool</b><p>許したツールだけ、4 回まで、学級にいる番号だけ</p></div>
-          <div class="cb"><b>after_model</b><p>候補外・結果の言葉・条件を変える助言・説明の漏えい・停止の勧めを検査。<b>落ちたら理由を返して 1 回作り直させる</b></p></div>
+          <div class="cb"><b>after_model</b><p>候補外・結果の言葉・条件を変える助言・危ない動作の勧め・説明の漏えい・停止の勧めを検査。<b>落ちたら理由を返して 1 回作り直させる</b></p></div>
         </div>
       </div>
       <div class="box">
@@ -123,11 +123,11 @@
       <p class="lane">Google Cloud</p>
       <div class="box teal">
         <h3>Vertex AI — Gemini 3.5 Flash-Lite</h3>
-        <p>5 つのエージェント。計画まで中央値 2 秒前後、授業 1 回 Gemini 約 41 円（上限 166 円。docs/eval.md）</p>
+        <p>5 つのエージェント。計画まで中央値 1〜3 秒、授業 1 回 Gemini 約 30 円の試算（docs/eval.md）</p>
       </div>
       <div class="box">
         <h3>Model Armor（us-central1）</h3>
-        <p>テンプレート <span class="mono">phonelab-student</span>: 注入・脱獄・有害表現。東京には多言語の検出が無いため us-central1。届かなければ通し、決定論の検査と出力の検査は必ずかかる</p>
+        <p>テンプレート <span class="mono">phonelab-student</span>: 注入・脱獄・有害表現。東京には多言語の検出が無いため us-central1。予想・会話の履歴も含めて検査し、<b>検査できないときは AI に渡さず</b>決まりごとで進める</p>
       </div>
       <div class="box">
         <h3>Cloud Trace（Telemetry API）</h3>
@@ -135,11 +135,11 @@
       </div>
       <div class="box">
         <h3>Firestore（native、asia-northeast1）</h3>
-        <p>学級・生徒・記録の要約。クライアント SDK は使わず、API 経由だけ。学級 <span class="mono">DEMO-2026</span> は起動時に作成</p>
+        <p>学級・生徒・記録の要約、回数の枠（トランザクション）、PIN の間違いの数、先生の操作の記録。クライアント SDK は使わず、API 経由だけ</p>
       </div>
       <div class="box">
         <h3>Cloud Build → Cloud Run</h3>
-        <p>ソースデプロイ（Dockerfile が Web もビルド）。min-instances 0、アイドル課金なし</p>
+        <p>ソースデプロイ（Dockerfile が Web もビルド）。min-instances 0。実行は専用の最小権限サービスアカウント（役割 4 つ）、秘密は Secret Manager</p>
       </div>
     </div>
   </div>

@@ -43,7 +43,7 @@ describe("summarizeRecord: traces and measurements", () => {
 
   it("sends each measurement's two values and failed checks, not the waveform", () => {
     const rec = createRecord("sound");
-    const features = { profile: "pitch", n_frames: 50, duration_s: 5, sample_rate: 48000, f0_hz: 220, f0_from_h2_hz: 220.5, rms_db: -2, noise_db: -60, snr_db: 58, clipping_ratio: 0.2, voiced_frames: 45 } as const;
+    const features = { profile: "pitch", n_frames: 50, duration_s: 5, sample_rate: 48000, f0_hz: 220, f0_from_h2_hz: 220.5, rms_db: -2, noise_db: -60, snr_db: 58, clipping_ratio: 0.2, voiced_frames: 45, f0_steady_share: 1, f0_follow: NaN, f0_follow_db: NaN, harmonic_over_f0_db: NaN, raw_f0_hz: 220 } as const;
     updateRecord(rec.id, (r) => ({
       ...r,
       measurements: [{ condition: "A", features, checks: [{ code: "clipping", ok: false, text: "音割れ" }], rawHash: "f".repeat(64), pass: false, at: "2026-10-02T10:00:00Z" }],
