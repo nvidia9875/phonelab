@@ -77,7 +77,10 @@ describe("1 オクターブ上の取り違え（10/12 合成ベンチマーク�
       const data = new Float32Array(N);
       for (let k = 0; k < N; k++) {
         const s = (i * 4800 + k) / SR;
-        data[k] = i < 5 ? 0.001 * Math.sin(9999 * k) : 0.2 * amps.reduce((v, a, h) => v + a * Math.sin(2 * Math.PI * 220 * (h + 1) * s), 0);
+        // はじいた音（はじくたびに exp(-3t) で弱まる）。基本も第 2 倍音と一緒に弱まる
+        let v = 0;
+        for (const p of [0.6, 1.7, 2.8, 3.9]) if (s >= p) v += Math.exp(-(s - p) * 3) * amps.reduce((x, a, h) => x + a * Math.sin(2 * Math.PI * 220 * (h + 1) * (s - p)), 0);
+        data[k] = 0.2 * v + 0.001 * Math.sin(9999 * k);
       }
       frames.push({ t: i * 100, data });
     }
@@ -289,6 +292,21 @@ describe("背景を覚えて、弱い本当の基本は見逃さない（10/12 �
     const f = analyzePitch({ sampleRate: SR, frames });
     expect(f.snr_db).toBeLessThan(80);
     expect(passes(f)).toBe(true);
+  });
+
+  it("holds when a slowly decaying note has a sustained sound an octave below from 0.65 s (8th review)", () => {
+    const frames = [];
+    for (let i = 0; i < 50; i++) {
+      const data = new Float32Array(N);
+      for (let k = 0; k < N; k++) {
+        const s = (i * 4800 + k) / SR;
+        let v = 0;
+        for (const p of [0.6, 1.7, 2.8, 3.9]) if (s >= p) v += Math.exp(-(s - p) * 1.5) * [1, 0.5, 0.25, 0.12].reduce((x, a, h) => x + a * Math.sin(2 * Math.PI * 300 * (h + 1) * (s - p) + h), 0);
+        data[k] = 0.2 * v + (s >= 0.65 ? 0.065 * Math.sin(2 * Math.PI * 150 * s) : 0) + 0.001 * Math.sin(9999 * k);
+      }
+      frames.push({ t: i * 100, data });
+    }
+    expect(passes(analyzePitch({ sampleRate: SR, frames }))).toBe(false);
   });
 
   it("holds when a sustained sound an octave below starts partway (7th review: 300 Hz read as 150 Hz)", () => {

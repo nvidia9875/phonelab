@@ -51,6 +51,11 @@ export type PitchFeatures = {
   voiced_frames: number;
   /** 高さが出たフレームのうち、全体の中央値から STEADY_PITCH_REL 以内だったものの割合 */
   f0_steady_share: number;
+  /** 基本の高さの音の大きさの幅 ÷ 第 2 倍音の大きさの幅（はじいた瞬間を除く）。0 に近いと、音と関係なく鳴り続けて
+   * いる別の音。決められないときは NaN */
+  f0_follow: number;
+  /** 基本の高さの音の大きさの幅（dB）。決められないときは NaN */
+  f0_follow_db: number;
 };
 
 const r1 = (v: number): number => +v.toFixed(1);
@@ -161,23 +166,26 @@ export function analyzePitch(b: PitchBuffer): PitchFeatures {
   // 音を出す前（最初の 0.5 秒）の周波数の形を背景として覚える（電源のうなり・続いている声）
   const background = backgroundSpectrum(frames.filter((_, i) => isQuiet(i)).map((f) => f.data));
   // 測定のあいだずっと大きさが変わらない帯域（うなり）。はじいた音の弱い基本は、音と一緒に大きさが変わる
-  const steady = steadyBins(background, voiced.map((i) => windowedSpectrum(hann(frames[i].data))));
+  const spectra = voiced.map((i) => windowedSpectrum(hann(frames[i].data)));
+  const steady = steadyBins(background, spectra);
 
   const f0s: number[] = [];
   const fromH2: number[] = [];
+  const near: { f0: number; spectrum: Float64Array }[] = [];
   let clipped = 0;
   let total = 0;
-  for (const i of voiced) {
+  voiced.forEach((i, n) => {
     const data = frames[i].data;
     const f0 = f0Autocorr(data, b.sampleRate);
     if (Number.isFinite(f0)) {
       f0s.push(f0);
+      near.push({ f0, spectrum: spectra[n] });
       const h = f0FromSecondHarmonic(data, b.sampleRate, f0, background, steady);
       if (Number.isFinite(h)) fromH2.push(h);
     }
     for (let k = 0; k < data.length; k++) if (Math.abs(data[k]) >= CLIP_LEVEL) clipped++;
     total += data.length;
-  }
+  });
   const rms = voiced.length ? median(voiced.map((i) => levels[i])) : noise;
   const last = frames.length ? frames[frames.length - 1].t : t0;
 
@@ -196,6 +204,7 @@ export function analyzePitch(b: PitchBuffer): PitchFeatures {
     clipping_ratio: total ? +(clipped / total).toFixed(4) : 0,
     voiced_frames: f0s.length,
     f0_steady_share: steadyShare(f0s),
+    ...followFeatures(fundamentalFollow(near, b.sampleRate, median(f0s))),
   };
 }
 
@@ -211,6 +220,47 @@ function steadyShare(f0s: number[]): number {
   return +(f0s.filter((f) => Math.abs(f - m) <= STEADY_PITCH_REL * m).length / f0s.length).toFixed(3);
 }
 
+/** 基本の高さの音は本当に同じ音の基本か。本物の基本ははじくたびに鳴り直して、音と一緒に大きさが変わる。途中から
+ * 鳴り始めた別の続く音（1 オクターブ下）は、はじいても大きさが変わらない。その音の高さで測ると、300 Hz の音を
+ * 150 Hz と測って結論が逆になった（10/12 デプロイ前レビュー 7・8 回目）。
+ * 第 2 倍音の大きさの幅（はじいた瞬間のフレームを除く）に対する、基本の大きさの幅の比を返す。0 に近いほど、
+ * 基本の高さの音は音と関係なく鳴り続けている。第 2 倍音が基本より 30 dB 以上弱い（倍音の無い音）か、第 2 倍音の
+ * 大きさが 4 dB も変わらない（弱まらない音）ときは決められないので NaN（この検査では止めない）。
+ * 傾き（回帰）は、ゆっくり弱まる音で前のはじきと次のはじきが打ち消し合って大きくぶれたので使わない */
+const FOLLOW_RANGE_DB = 4;
+const FOLLOW_MIN_DB = 2;
+const FOLLOW_MIN_RATIO = 0.15;
+const FOLLOW_H2_MIN_DB = -30;
+const ONSET_RISE_DB = 3;
+function fundamentalFollow(frames: { f0: number; spectrum: Float64Array }[], sampleRate: number, f0: number): { ratio: number; db: number } {
+  const none = { ratio: NaN, db: NaN };
+  const bin = sampleRate / FFT_SIZE;
+  const at = (m: Float64Array, hz: number) => {
+    const k = Math.round(hz / bin);
+    return 20 * Math.log10(Math.max(m[k - 1] ?? 0, m[k] ?? 0, m[k + 1] ?? 0) + 1e-12);
+  };
+  const top = frames.map((v) => 20 * Math.log10(v.spectrum.reduce((a, x, k) => (k > 0 && x > a ? x : a), 0) + 1e-12));
+  const near = frames.filter((v, j) => Math.abs(v.f0 - f0) <= STEADY_PITCH_REL * f0 && !(j > 0 && top[j] >= top[j - 1] + ONSET_RISE_DB));
+  if (near.length < MIN_VOICED_FRAMES) return none;
+  const x = near.map((v) => at(v.spectrum, 2 * f0));
+  const y = near.map((v) => at(v.spectrum, f0));
+  if (median(x) < median(y) + FOLLOW_H2_MIN_DB) return none;
+  const rx = Math.max(...x) - Math.min(...x);
+  if (rx < FOLLOW_RANGE_DB) return none;
+  const ry = Math.max(...y) - Math.min(...y);
+  return { ratio: +(ry / rx).toFixed(2), db: +ry.toFixed(1) };
+}
+
+function followFeatures(r: { ratio: number; db: number }): { f0_follow: number; f0_follow_db: number } {
+  return { f0_follow: r.ratio, f0_follow_db: r.db };
+}
+
+/** 基本の大きさがほとんど変わらない（2 dB 未満、かつ第 2 倍音の幅の 15% 未満）なら、音と関係ない続く音 */
+function followsNote(f: PitchFeatures): boolean {
+  if (!Number.isFinite(f.f0_follow)) return true;
+  return f.f0_follow >= FOLLOW_MIN_RATIO || f.f0_follow_db >= FOLLOW_MIN_DB;
+}
+
 export function pitchChecks(f: PitchFeatures, toleranceRel: number): LocalCheck[] {
   const d = Math.abs(f.f0_hz - f.f0_from_h2_hz) / f.f0_hz;
   const voicedOk = f.voiced_frames >= MIN_VOICED_FRAMES;
@@ -218,7 +268,8 @@ export function pitchChecks(f: PitchFeatures, toleranceRel: number): LocalCheck[
   const clipOk = f.clipping_ratio <= MAX_CLIPPING;
   const agree = Number.isFinite(d) && d <= toleranceRel;
   const inRange = f.f0_hz >= MIN_HZ && f.f0_hz <= MAX_HZ;
-  const steadyOk = f.f0_steady_share >= MIN_STEADY_SHARE;
+  const followOk = followsNote(f);
+  const steadyOk = f.f0_steady_share >= MIN_STEADY_SHARE && followOk;
   return [
     { code: "low_voiced", ok: voicedOk, text: voicedOk ? `音のあるところ ${f.voiced_frames} か所` : "音が短すぎて高さを決められません" },
     { code: "low_snr", ok: snrOk, text: snrOk ? `雑音より ${Math.round(f.snr_db)} dB 大きい` : "音が小さく、雑音と区別できません" },

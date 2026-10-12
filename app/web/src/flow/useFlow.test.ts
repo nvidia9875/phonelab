@@ -26,6 +26,8 @@ function pitch(f0: number): Features {
     clipping_ratio: 0,
     voiced_frames: 45,
     f0_steady_share: 1,
+    f0_follow: NaN,
+    f0_follow_db: NaN,
   };
 }
 
