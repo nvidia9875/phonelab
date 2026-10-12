@@ -24,6 +24,9 @@
 body { margin: 0; background: var(--paper); }
 
 #canvas {
+  /* 日本語は文節で折り返す */
+  word-break: auto-phrase;
+  line-break: strict;
   position: relative;
   background: var(--paper);
   color: var(--ink);

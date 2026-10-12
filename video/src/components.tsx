@@ -13,7 +13,11 @@ export const Paper: React.FC<{ children: React.ReactNode; dark?: boolean }> = ({
       backgroundSize: "26px 26px",
       fontFamily: body,
       color: dark ? "#fff" : C.ink,
+      // 日本語は文節で折り返す（「センサ／ー」「出な／い」のような切れ方をしない）
+      wordBreak: "auto-phrase" as React.CSSProperties["wordBreak"],
+      lineBreak: "strict",
     }}
+    lang="ja"
   >
     {children}
   </AbsoluteFill>

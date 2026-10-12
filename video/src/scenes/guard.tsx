@@ -94,9 +94,9 @@ export const Reject: React.FC = () => {
     <Paper>
       <Kicker text="却下" color={C.ink} />
       {/* 生徒の文 */}
-      <div style={{ position: "absolute", left: cardX + shake, top: 250, width: 420, padding: "22px 24px", background: C.card, border: `3px solid ${hit ? RED : C.orange}`, borderRadius: 20, fontSize: 28, lineHeight: 1.5, boxShadow: `0 5px 0 ${hit ? RED : C.orange}` }}>
+      <div style={{ position: "absolute", left: cardX + shake, top: 250, width: 440, padding: "22px 24px", background: C.card, border: `3px solid ${hit ? RED : C.orange}`, borderRadius: 20, fontSize: 28, lineHeight: 1.5, boxShadow: `0 5px 0 ${hit ? RED : C.orange}` }}>
         <div style={{ fontSize: 20, color: C.muted, marginBottom: 6 }}>生徒の文</div>
-        ペットボトルを<b>窓から落として</b>、落ちる音の高さを測りたい
+        ペットボトルを窓から落として、落ちる音の高さを測りたい
         {hit ? <div style={{ position: "absolute", right: -22, top: -22, width: 54, height: 54, borderRadius: 27, background: RED, color: "#fff", display: "grid", placeItems: "center", fontFamily: head, fontWeight: 900, fontSize: 34 }}>✕</div> : null}
       </div>
       {/* 盾 */}
