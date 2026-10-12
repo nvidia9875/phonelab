@@ -1,0 +1,26 @@
+import { head, prod, rng, SR, N } from "./lib";
+// 本物に近い: 4 回はじく（exp(-3t) で弱まる）+ 背景。はじく前 0.5 秒は背景だけ
+function hum(level: number, base: number) { return (s: number) => level * (Math.sin(2 * Math.PI * base * s) + 0.5 * Math.sin(2 * Math.PI * 2 * base * s + 1) + 0.3 * Math.sin(2 * Math.PI * 3 * base * s + 2)); }
+function voice(level: number, f: number) { return (s: number) => { let v = 0; const ph = 2 * Math.PI * f * (s + 0.002 * Math.sin(2 * Math.PI * 4 * s)); for (let k = 1; k <= 10; k++) v += Math.sin(k * ph) / k; return level * v; }; }
+function buf(f0: number, amps: number[], extra: (s: number) => number, seed: number, fundExtra?: (s: number, env: number) => number) {
+  const r = rng(seed); const plucks = [0.6, 1.7, 2.8, 3.9].map((t) => t + 0.2 * (r() + 0.5));
+  const ph = plucks.map(() => amps.map(() => 2 * Math.PI * (r() + 0.5)));
+  const frames = [];
+  for (let i = 0; i < 50; i++) { const data = new Float32Array(N);
+    for (let k = 0; k < N; k++) { const s = (i * 4800 + k) / SR; let v = 0;
+      plucks.forEach((p, j) => { if (s < p) return; const env = Math.exp(-(s - p) * 3); amps.forEach((a, h) => { v += a * env * Math.sin(2 * Math.PI * f0 * (h + 1) * (s - p) + ph[j][h]); }); });
+      data[k] = 0.2 * v + extra(s) + 0.004 * r(); }
+    frames.push({ t: i * 100, data }); }
+  return { sampleRate: SR, frames };
+}
+const rr = rng(4242); const freqs = Array.from({ length: 40 }, () => +(80 * Math.pow(600 / 80, rr() + 0.5)).toFixed(1));
+const envs: [string, (s: number) => number][] = [["none", () => 0],
+  ["hum50 -25dB", hum(0.2 * 0.056, 50)], ["hum60 -25dB", hum(0.2 * 0.056, 60)], ["hum50 -35dB", hum(0.2 * 0.0178, 50)], ["hum60 -35dB", hum(0.2 * 0.0178, 60)],
+  ["voice130 -25dB", voice(0.2 * 0.056, 130)], ["voice210 -25dB", voice(0.2 * 0.056, 210)]];
+for (const [sn, amps] of [["rubber", [1, 0.5, 0.25, 0.12]], ["pure", [1]]] as [string, number[]][]) for (const [en, ex] of envs) {
+  let hH = 0, hP = 0, bad = 0; const det: string[] = [];
+  freqs.forEach((f, n) => { const b = buf(f, amps, ex, 77 + n);
+    const run = (m: typeof head) => { const x = m.analyzePitch(b); return { ok: m.pitchChecks(x, 0.03).every((c) => c.ok), f0: x.f0_hz }; };
+    const a = run(head), p = run(prod); if (!a.ok) hH++; if (!p.ok) hP++; if (a.ok && Math.abs(a.f0 - f) / f > 0.03) { bad++; det.push(`BAD ${f}->${a.f0}`); } });
+  console.log(`${sn} ${en}: held HEAD ${hH}/40 PROD ${hP}/40 falsepass HEAD ${bad} ${det.join(" ")}`);
+}

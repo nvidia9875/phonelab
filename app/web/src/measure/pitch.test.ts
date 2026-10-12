@@ -212,10 +212,79 @@ describe("背景を覚えて、弱い本当の基本は見逃さない（10/12 �
     expect(passes(withQuiet(100, [0.02, 1]))).toBe(false);
   });
 
+  const hum = (s: number) => 0.011 * (Math.sin(2 * Math.PI * 50 * s) + 0.5 * Math.sin(2 * Math.PI * 100 * s) + 0.3 * Math.sin(2 * Math.PI * 150 * s));
+
   it("ignores a strong mains hum that was already there before the sound", () => {
-    const hum = (s: number) => 0.011 * (Math.sin(2 * Math.PI * 50 * s) + 0.5 * Math.sin(2 * Math.PI * 100 * s) + 0.3 * Math.sin(2 * Math.PI * 150 * s));
-    const f = withQuiet(100, [1, 0.5, 0.25, 0.12], hum);
+    const f = withQuiet(130, [1, 0.5, 0.25, 0.12], hum);
     expect(passes(f)).toBe(true);
-    expect(Math.abs(f.f0_hz - 100) / 100).toBeLessThan(0.03);
+    expect(Math.abs(f.f0_hz - 130) / 130).toBeLessThan(0.03);
+  });
+
+  /** 0.6 秒から 1.1 秒ごとに 4 回はじく（はじくたびに exp(-3t) で弱まる）。最初の 0.5 秒は背景だけ */
+  function plucked(f0: number, amps: number[], background: (s: number) => number) {
+    const frames = [];
+    for (let i = 0; i < 50; i++) {
+      const data = new Float32Array(N);
+      for (let k = 0; k < N; k++) {
+        const s = (i * 4800 + k) / SR;
+        let v = 0;
+        for (const p of [0.6, 1.7, 2.8, 3.9]) {
+          if (s < p) continue;
+          const env = Math.exp(-(s - p) * 3);
+          v += env * amps.reduce((x, a, h) => x + a * Math.sin(2 * Math.PI * f0 * (h + 1) * (s - p) + 1 + h), 0);
+        }
+        data[k] = 0.2 * v + background(s) + 0.001 * Math.sin(9999 * k);
+      }
+      frames.push({ t: i * 100, data });
+    }
+    return analyzePitch({ sampleRate: SR, frames });
+  }
+
+  it("passes a plucked note when a steady hum sits at 1/2 of it (unchanged through the measurement)", () => {
+    // 100 Hz の音の 1/2（50 Hz）にうなり。はじいた音は弱まっていくのに、50 Hz の山は大きさが変わらない → 背景だけ
+    expect(passes(plucked(100, [1, 0.5, 0.25, 0.12], hum))).toBe(true);
+  });
+
+  it("holds a steady (non-decaying) note when a hum sits at 1/2 of it (cannot tell them apart)", () => {
+    // 200 Hz の音の 1/2（100 Hz）にうなりの第 2 倍音。音の大きさが変わらないと、うなりと弱い基本を時間でも見分けられない
+    expect(passes(withQuiet(200, [1, 0.5, 0.25, 0.12], hum))).toBe(false);
+  });
+
+  it("does not hold for positions whose true fundamental would be below 60 Hz", () => {
+    // 100 Hz の音の 1/2 は 50 Hz（電源のうなり）。50 Hz の音は測る対象ではない
+    expect(passes(withQuiet(100, [1, 0.5, 0.25, 0.12], hum))).toBe(true);
+  });
+
+  it("holds a plucked note whose weak fundamental overlaps a steady background at the same pitch", () => {
+    // 本当は 100 Hz（基本 −34 dB）。どの位相で重なっても、はじいた音と一緒に大きさが変わる
+    for (const ph of [0, 1, 2, 2.1, 2.2, 3]) {
+      const bg = (s: number) => 0.004 * Math.sin(2 * Math.PI * 100 * (s - 0.6) + ph);
+      expect(passes(plucked(100, [0.02, 1, 0.5, 0.25], bg))).toBe(false);
+    }
+  });
+
+  it("holds when a weak fundamental overlaps a background sound and makes it louder (6th review)", () => {
+    // 本当は 100 Hz（基本 −34 dB）。同じ 100 Hz に背景の音。重なって山が大きくなるので、1/2 の位置の山として保留
+    const bg = (s: number) => 0.004 * Math.cos(2 * Math.PI * 100 * s);
+    expect(passes(withQuiet(100, [0.02, 1, 0.5, 0.25], bg))).toBe(false);
+  });
+
+  it("does not let a weak fundamental hide behind a background sound at the same pitch", () => {
+    const bg = (s: number) => 0.004 * Math.cos(2 * Math.PI * 100 * s);
+    expect(passes(withQuiet(100, [0.02, 1], bg))).toBe(false);
+  });
+
+  it("does not treat a single sound in the quiet part as background", () => {
+    const frames = [];
+    for (let i = 0; i < 50; i++) {
+      const data = new Float32Array(N);
+      for (let k = 0; k < N; k++) {
+        const s = (i * 4800 + k) / SR;
+        const note = 0.05 * [1, 0.5, 0.25, 0.12].reduce((v, a, h) => v + a * Math.sin(2 * Math.PI * 220 * (h + 1) * s), 0);
+        data[k] = (i >= 5 ? note : i === 0 ? 3 * note : 0) + 0.001 * Math.sin(9999 * k);
+      }
+      frames.push({ t: i * 100, data });
+    }
+    expect(passes(analyzePitch({ sampleRate: SR, frames }))).toBe(true);
   });
 });

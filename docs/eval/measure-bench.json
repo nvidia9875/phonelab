@@ -376,5 +376,50 @@
       "途中から: 電源のうなり −35 dB（輪ゴムの音）": "3/11 / 0/11"
     },
     "weak_fundamental_limit": "基本が弱く高い番号の倍音がいちばん強い音（倍音の番号 2〜20、基本の強さ 0.01〜0.08、85〜300 Hz の 300 通り）: 誤って通る 52 件はすべて基本が 0.01（約 −40 dB）。0.02（約 −34 dB）以上は 0 件。再現: docs/eval/pitch-search/weakk.ts.txt"
+  },
+  "background": {
+    "note": "10/12 デプロイ前レビュー 6 回目の対応後。はじく前 0.5 秒の背景の形を覚える。推定の 1/k などの位置に背景の山があるとき、(1) その背景がいちばん強い山より 41 dB 以上弱く大きさが変わらない、または (2) はじいた音が 10 dB 以上弱まっていくのに、その帯域だけはじいた瞬間以外ずっと ±1 dB で変わらない、のどちらかなら背景だけとみなす。どちらでもなければ保留。背景の山が消えた（逆の位相の基本で打ち消された）ときも保留。本当の基本が 60 Hz 未満になる位置は調べない。harness: docs/eval/pitch-search/pluck_hum.ts.txt, overlap.ts.txt, over_hum.ts.txt",
+    "plucked_40_random_pitches": {
+      "desc": "4 回はじく（exp(-3t) で弱まる）80〜600 Hz のでたらめな高さ 40 個。保留の数 / 誤って通した数",
+      "rubber": {
+        "none": "0/40",
+        "hum50_-25dB": "8/40",
+        "hum60_-25dB": "0/40",
+        "hum50_-35dB": "5/40",
+        "hum60_-35dB": "1/40",
+        "voice130_-25dB_sustained": "17/40",
+        "voice210_-25dB_sustained": "15/40",
+        "false_pass": 0,
+        "production_held": "0/40 in every row"
+      },
+      "pure": {
+        "none": "0/40 (production 5/40)",
+        "hum50_-25dB": "8/40 (production 12/40)",
+        "hum60_-25dB": "3/40 (14/40)",
+        "hum50_-35dB": "6/40 (8/40)",
+        "hum60_-35dB": "1/40 (8/40)",
+        "voice_-25dB_sustained": "15〜17/40 (27〜32/40)",
+        "false_pass": 0
+      }
+    },
+    "weak_fundamental_overlapping_background": {
+      "desc": "本当の基本（−20〜−34 dB、第 2 倍音か第 10 倍音がいちばん強い）と同じ高さに背景（基本の 0.3〜2.5 倍）、位相 8 通り、100/150/220 Hz。はじくたびに位相がそろう最悪の場合を含む。各 960 通り",
+      "plucked": {
+        "false_pass": 14,
+        "production_false_pass": 579,
+        "head_only": 5
+      },
+      "steady_tone": {
+        "false_pass": 2,
+        "production_false_pass": 568,
+        "head_only": 0
+      },
+      "limit": "残る誤りはすべて第 10 倍音がいちばん強く、背景が弱い基本と同じ高さ（差 0.2 Hz 未満）で、基本と同じかそれより強いとき。大きさだけでは原理的に見分けられない（どの大きさの比にも、山の大きさが変わらない位相がある）。はじいた音では弱まり方で見分けるが、背景が基本より強いと変化が 1 dB に届かない"
+    },
+    "steady_tone_harness_11_pitches": {
+      "hum50_-25dB_rubber": "4/11 (production 0/11)",
+      "late_voice130_-25dB_rubber": "2/11 (production 0/11)",
+      "desc": "弱まらない音（レビューの harness の既定）。音の大きさが変わらないと、うなりと弱い基本を時間でも見分けられないので保留する"
+    }
   }
 }
