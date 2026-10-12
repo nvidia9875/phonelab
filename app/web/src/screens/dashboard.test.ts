@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { RecordSummary, StudentRow } from "../agent/classroom";
-import { attentionOf, checkTextOf, distributionOf, stateOf } from "./dashboard";
+import { attentionOf, beliefsOf, checkTextOf, distributionOf, stateOf } from "./dashboard";
 
 function rec(over: Partial<RecordSummary> = {}): RecordSummary {
   return { record_id: "1", theme_id: "sound", variant_id: "sound_pluck_strength", status: "open", stage: "measure_A", prediction: "強くはじくと高くなる", claim: { variable: "strength", direction: "faster" }, hold_codes: [], retries: { A: 0, B: 0 }, result: null, plan_source: "agent", trace_id: null, rejection_title: null, chat_turns: 0, events: [], updated_at: "", ...over };
@@ -37,5 +37,24 @@ describe("attentionOf", () => {
     const students = [row("S-09", rec({ stage: "plan", rejection_title: "落下" })), row("S-02", rec({ status: "held" })), row("S-05", rec())];
 
     expect(attentionOf(students).map((s) => s.number)).toEqual(["S-02", "S-09"]);
+  });
+});
+
+describe("beliefsOf（学級の考えの集まり）", () => {
+  it("counts what students think across themes and flags only well-documented misconceptions", () => {
+    const row = (n: string, theme: string, variable: string, direction: string) =>
+      ({ number: n, last_seen_at: "", current: { theme_id: theme, claim: { variable, direction } } }) as unknown as StudentRow;
+    const beliefs = beliefsOf([
+      row("S-01", "sound", "strength", "faster"),
+      row("S-02", "sound", "strength", "faster"),
+      row("S-03", "sound", "length", "faster"),
+      row("S-04", "energy", "mass", "faster"),
+      row("S-05", "energy", "height", "unknown"),
+    ]);
+
+    expect(beliefs[0]).toMatchObject({ count: 2, misconception: "音の大きさと高さの混同" });
+    expect(beliefs.find((b) => b.text.includes("震える部分の長さ"))?.misconception).toBeNull();
+    expect(beliefs.find((b) => b.themeId === "energy")?.misconception).toBe("重いほど速いという思い込み");
+    expect(beliefs).toHaveLength(3);
   });
 });

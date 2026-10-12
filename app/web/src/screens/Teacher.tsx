@@ -4,7 +4,7 @@ import type { Sensor } from "../catalog/themes";
 import { ClassError, fetchDashboard, traceUrl, type DashboardInfo, type InsightInfo, type StudentRow } from "../agent/classroom";
 import { InsightPanel } from "./InsightPanel";
 import type { ClassState } from "../store/records";
-import { attentionOf, checkTextOf, claimTextOf, distributionOf, isOnline, measurementLinesOf, stateOf, tracesOfRow } from "./dashboard";
+import { attentionOf, beliefsOf, checkTextOf, claimTextOf, distributionOf, isOnline, measurementLinesOf, stateOf, tracesOfRow } from "./dashboard";
 import "./teacher.css";
 
 export interface TeacherProps {
@@ -44,6 +44,8 @@ export function Teacher({ classCode, cls, halted, onHalt, onPolicy, onResetStude
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [dash, setDash] = useState<DashboardInfo | null>(null);
+  // 学級の考えを教室の大きな画面に映す（名前・番号は出さない。測る前の話し合い用: Peer Instruction）
+  const [projecting, setProjecting] = useState(false);
   const [dashError, setDashError] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   // 許可はサーバの学級から（この端末の学級状態が無い教員 PC でも、既定値で上書きしない）
@@ -111,6 +113,7 @@ export function Teacher({ classCode, cls, halted, onHalt, onPolicy, onResetStude
 
   const students = dash?.students ?? [];
   const dist = distributionOf(students);
+  const beliefs = beliefsOf(students);
   const attention = attentionOf(students);
   const online = students.filter((s) => isOnline(s)).length;
   const held = students.filter((s) => s.current?.status === "held").length;
@@ -162,6 +165,27 @@ export function Teacher({ classCode, cls, halted, onHalt, onPolicy, onResetStude
                 </div>
               ))}
             </div>
+          )}
+
+          {beliefs.length > 0 && (
+            <>
+              <div className="tpanel__head" style={{ marginTop: 18 }}>
+                <h2>学級の考えの集まり</h2>
+                <button type="button" className="tbtn tbtn--outline tbtn--sm" onClick={() => setProjecting(true)}>
+                  大きく映す
+                </button>
+              </div>
+              <ul className="beliefs">
+                {beliefs.slice(0, 6).map((b) => (
+                  <li key={b.text}>
+                    <span>{b.text}</span>
+                    <strong>{b.count} 人</strong>
+                    {b.misconception && <span className="beliefs__tag">よくある思い込み（{b.misconception}）</span>}
+                  </li>
+                ))}
+              </ul>
+              <p className="tpanel__hint">予想の本文ではなく、「何を変えると、どうなる」と読んだものだけを数えています。測る前に学級で見比べると、話し合いの種になります。</p>
+            </>
           )}
 
           <div className="tpanel__head" style={{ marginTop: 18 }}>
@@ -292,6 +316,29 @@ export function Teacher({ classCode, cls, halted, onHalt, onPolicy, onResetStude
           </section>
         </div>
       </div>
+      {projecting && (
+        <div className="projector" role="dialog" aria-modal="true" aria-label="学級の考え（大きく映す）" onKeyDown={(e) => e.key === "Escape" && setProjecting(false)}>
+          <button type="button" className="projector__close" onClick={() => setProjecting(false)} autoFocus>
+            閉じる
+          </button>
+          <h2 className="projector__title">みんなは、どう予想した？</h2>
+          {dist && (
+            <>
+              <p className="projector__sub">{dist.themeTitle}（{dist.total} 人）</p>
+              <div className="projector__bars">
+                {dist.bars.filter((b) => b.label !== "まだ読めない").map((b) => (
+                  <div className="projector__bar" key={b.label}>
+                    <div className="projector__fill" style={{ height: `${dist.total ? Math.max(4, Math.round((b.count / dist.total) * 100)) : 4}%` }} />
+                    <p className="projector__n">{b.count}</p>
+                    <p className="projector__label">{b.label}</p>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+          <p className="projector__ask">どうしてそう思った？ となりの人と話してから、測ってみよう</p>
+        </div>
+      )}
     </main>
   );
 }

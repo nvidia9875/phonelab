@@ -133,3 +133,44 @@ export function attentionOf(students: StudentRow[]): StudentRow[] {
   const rank = (s: StudentRow) => (s.current?.status === "held" ? 0 : s.current?.rejection_title ? 1 : s.current && s.current.stage === "predict" && (s.current.chat_turns > 0 || (s.current.retries.A ?? 0) > 0) ? 2 : 9);
   return students.filter((s) => rank(s) < 9).sort((a, b) => rank(a) - rank(b) || a.number.localeCompare(b.number));
 }
+
+/** 研究や学習指導要領で報告されている思い込み（裏づけのあるものだけ。10/12 の教育研究の見直し）。
+ * 音: 大きさと高さの混同（学習指導要領解説、Aygün & Hacıoğlu 2022）。振り子: 重いほど速い（Halloun & Hestenes 1985） */
+const KNOWN_MISCONCEPTIONS: Record<string, string> = {
+  "sound|strength|faster": "音の大きさと高さの混同",
+  "energy|mass|faster": "重いほど速いという思い込み",
+};
+
+export interface Belief {
+  themeId: string;
+  text: string;
+  count: number;
+  misconception: string | null;
+}
+
+/** 学級の考えの集まり: 全テーマの「何を変えると、どうなる」と思っているかを人数で（予想の本文は使わない） */
+export function beliefsOf(students: StudentRow[]): Belief[] {
+  const counts = new Map<string, number>();
+  for (const s of students) {
+    const c = s.current?.claim;
+    if (!s.current || !c || c.variable === "unknown" || c.direction === "unknown") continue;
+    const key = `${s.current.theme_id}|${c.variable}|${c.direction}`;
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  const out: Belief[] = [];
+  for (const [key, count] of counts) {
+    const [themeId, variable, direction] = key.split("|");
+    const theme = themeById(themeId);
+    const variant = theme?.variants.find((v) => v.variable === variable);
+    if (!theme || !variant) continue;
+    const q = QUANTITY[variant.unit];
+    const word = direction === "faster" ? q.choiceFaster : direction === "slower" ? q.choiceSlower : "変わらない";
+    out.push({
+      themeId,
+      text: `${theme.title}: ${variant.changes.split("（")[0]}を変えると「${word}」`,
+      count,
+      misconception: KNOWN_MISCONCEPTIONS[key] ?? null,
+    });
+  }
+  return out.sort((a, b) => b.count - a.count);
+}
