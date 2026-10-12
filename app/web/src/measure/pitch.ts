@@ -8,7 +8,7 @@
 import type { LocalCheck } from "./checks";
 import { sha256Hex } from "./pendulum";
 import { firstAutocorrPeak, mean, median } from "./stats";
-import { explainsSpectrum } from "./spectrum";
+import { explainsSpectrum, windowedSpectrum } from "./spectrum";
 
 export const FFT_SIZE = 4096;
 const FRAME_MS = 100;
@@ -86,7 +86,7 @@ function autocorrAt(x: readonly number[], k: number): number {
 /** 二つ目の測り方: f0 の 1.8〜2.2 倍で最も強い周波数（Goertzel 法で走査）の半分。
  * 倍音がほとんど無い音（ペットボトルの音のような純音に近い音）では、倍音の位置の雑音を拾って一致しなくなるので、
  * f0 の 0.9〜1.1 倍の周波数の山（周波数の側から見た基本）を使う。自己相関とは別の計算（10/12 Codex のデプロイ前レビュー） */
-export function f0FromSecondHarmonic(data: Float32Array, sampleRate: number, f0: number): number {
+export function f0FromSecondHarmonic(data: Float32Array, sampleRate: number, f0: number, background?: Float64Array): number {
   if (!Number.isFinite(f0)) return NaN;
   const n = data.length;
   const windowed = new Float64Array(n);
@@ -94,11 +94,30 @@ export function f0FromSecondHarmonic(data: Float32Array, sampleRate: number, f0:
   const hi = Math.min(2.2 * f0, sampleRate / 2 - 1);
   if (hi <= 1.8 * f0) return NaN;
   // 入っている成分の山が f0 の整数倍で説明できなければ、倍音の取り違えか和音。値を出さない（10/12 デプロイ前レビュー 4 回目）
-  if (!explainsSpectrum(windowed, sampleRate, f0)) return NaN;
+  if (!explainsSpectrum(windowed, sampleRate, f0, background)) return NaN;
   const harmonic = goertzelPeak(windowed, sampleRate, 1.8 * f0, hi);
   const fundamental = goertzelPeak(windowed, sampleRate, 0.9 * f0, 1.1 * f0);
   if (harmonic.power < MIN_HARMONIC_RATIO * fundamental.power) return fundamental.freq;
   return harmonic.freq / 2;
+}
+
+function hann(data: Float32Array): Float64Array {
+  const n = data.length;
+  const w = new Float64Array(n);
+  for (let i = 0; i < n; i++) w[i] = data[i] * (0.5 - 0.5 * Math.cos((2 * Math.PI * i) / (n - 1)));
+  return w;
+}
+
+/** 静かな区間のフレームの振幅スペクトルの平均。フレームが無ければ undefined（背景を数えない） */
+function backgroundSpectrum(quiet: Float32Array[]): Float64Array | undefined {
+  if (!quiet.length) return undefined;
+  let sum: Float64Array | undefined;
+  for (const d of quiet) {
+    const m = windowedSpectrum(hann(d));
+    if (!sum) sum = new Float64Array(m.length);
+    for (let k = 0; k < m.length; k++) sum[k] += m[k] / quiet.length;
+  }
+  return sum;
 }
 
 function goertzelPeak(windowed: Float64Array, sampleRate: number, lo: number, hi: number): { freq: number; power: number } {
@@ -133,6 +152,8 @@ export function analyzePitch(b: PitchBuffer): PitchFeatures {
   const quiet = levels.filter((_, i) => frames[i].t - t0 < QUIET_MS);
   const noise = quiet.length ? median(quiet) : levels.length ? Math.min(...levels) : -120;
   const voiced = frames.map((_, i) => i).filter((i) => frames[i].t - t0 >= QUIET_MS && levels[i] >= noise + VOICED_ABOVE_NOISE_DB);
+  // 音を出す前（最初の 0.5 秒）の周波数の形を背景として覚える（電源のうなり・続いている声）
+  const background = backgroundSpectrum(frames.filter((f) => f.t - t0 < QUIET_MS).map((f) => f.data));
 
   const f0s: number[] = [];
   const fromH2: number[] = [];
@@ -143,7 +164,7 @@ export function analyzePitch(b: PitchBuffer): PitchFeatures {
     const f0 = f0Autocorr(data, b.sampleRate);
     if (Number.isFinite(f0)) {
       f0s.push(f0);
-      const h = f0FromSecondHarmonic(data, b.sampleRate, f0);
+      const h = f0FromSecondHarmonic(data, b.sampleRate, f0, background);
       if (Number.isFinite(h)) fromH2.push(h);
     }
     for (let k = 0; k < data.length; k++) if (Math.abs(data[k]) >= CLIP_LEVEL) clipped++;

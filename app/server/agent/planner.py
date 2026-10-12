@@ -262,18 +262,26 @@ def changes_condition(advice: str, variant_id: str) -> str | None:
     terms = CONDITION_TERMS.get(variant_id, ())
     for clause in SENTENCE_SPLIT.split(advice):
         for term in terms:
-            at = clause.find(term)
-            if at < 0:
-                continue
-            after = _until_next_term(clause[at:], term, terms)
-            before = _since_previous_term(clause[:at], term, terms)
-            # 「同じ」「変えず」は、その直後にある言葉にだけかかる（「重さは同じにして長くした糸を」の「長くした」は糸の変更）
-            keep = list(KEEP_WORDS.finditer(before))
-            if keep:
-                before = before[keep[-1].end() :]
-            for scope in (after, before):
-                if CHANGE_VERBS.search(scope) and not KEEP_WORDS.search(scope):
-                    return term
+            # 同じ言葉が 2 回出ることがある（「糸の長さは同じにして糸の長さを短く」）。出てくるたびに見る
+            for m in re.finditer(re.escape(term), clause):
+                at = m.start()
+                found = _changes_at(clause, at, term, terms)
+                if found:
+                    return found
+    return None
+
+
+def _changes_at(clause: str, at: int, term: str, terms: tuple[str, ...]) -> str | None:
+    """節の中の at に出てくる条件の言葉について、その前後に変える言い方があるか"""
+    after = _until_next_term(clause[at:], term, terms)
+    before = _since_previous_term(clause[:at], term, terms)
+    # 「同じ」「変えず」は、その直後にある言葉にだけかかる（「重さは同じにして長くした糸を」の「長くした」は糸の変更）
+    keep = list(KEEP_WORDS.finditer(before))
+    if keep:
+        before = before[keep[-1].end() :]
+    for scope in (after, before):
+        if CHANGE_VERBS.search(scope) and not KEEP_WORDS.search(scope):
+            return term
     return None
 
 

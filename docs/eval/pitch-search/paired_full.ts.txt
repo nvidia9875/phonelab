@@ -32,8 +32,8 @@ const ex: string[] = [];
 const fr = family === "pluck" ? 8 : 10;
 for (let si = 0; si < nShapes; si++) {
   const sh = makeShape();
-  const res = freqs.map((f) => { const sg = sigFor(sh, f); return { f, sg, a: frame1(head, sg, fr), full: null as null | { ok: boolean; f0: number } }; });
-  const full = (i: number) => { if (!res[i].full) { const m = measure(head, res[i].sg); res[i].full = { ok: m.ok, f0: m.f0 }; } return res[i].full!; };
+  const res = freqs.map((f) => { const sg = sigFor(sh, f); return { f, sg, a: frame1(MOD, sg, fr), full: null as null | { ok: boolean; f0: number } }; });
+  const full = (i: number) => { if (!res[i].full) { const m = measure(MOD, res[i].sg); res[i].full = { ok: m.ok, f0: m.f0 }; } return res[i].full!; };
   for (let i = 0; i < res.length; i++) {
     tot++;
     const x = res[i];

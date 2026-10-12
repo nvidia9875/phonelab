@@ -48,26 +48,38 @@ export function magnitudeSpectrum(x: Float64Array): Float64Array {
 
 /** 山の高さの既定の下限（約 −24 dB） */
 const PEAK_REL = 10 ** (-24 / 20);
-/** これより低い山は見ない（電源の 50/60 Hz のうなりは弱ければ無視） */
+/** これより低い山は見ない */
 const MIN_PEAK_HZ = 40;
 /** 整数倍とみなす幅（相対）と、最小の幅（周波数の分解能 11.7 Hz を補間した精度） */
 const HARMONIC_TOL_REL = 0.015;
 const HARMONIC_TOL_HZ = 4;
-/** 電源のうなり（50/60 Hz とその倍）の近くの弱い山は数えない */
-const MAINS = [50, 60];
-const MAINS_TOL_HZ = 2;
-// うなりらしい弱い山（−30 dB より下）だけ除く。広くすると 100・120・150 Hz の本物の弱い基本まで見逃した
-const MAINS_MAX_REL = 10 ** (-30 / 20);
+/** 調べる山の高さの下限（約 −38 dB。弱い基本や混ざった音も拾い、教室ほどの雑音の 1 帯域 −45 dB 前後は拾わない） */
+const SUB_PEAK_REL = 10 ** (-38 / 20);
+/** 音を出す前（最初の 0.5 秒）からその高さで鳴っていた山は、背景の音（電源のうなり・続いている声）として数えない。
+ * 背景より 6 dB 以上大きくなった山だけを、測っている音の一部とみなす */
+const BACKGROUND_MARGIN = 10 ** (6 / 20);
+// 弱い本当の基本が残りうる位置（推定の何倍か）。自己相関がいちばん強い倍音の 2 周期・3 周期を取ると 2/3・3/4 にも残る
+const SUB_POSITIONS = [1 / 2, 1 / 3, 2 / 3, 1 / 4, 3 / 4];
+/** 弱い山の位置の許容（倍音が少しずれた音でも拾えるように、強い山より広く） */
+const SUB_TOL_REL = 0.03;
+/** 1/k（k は大きくてよい）の位置の許容。k が大きいと位置が密になるので狭く */
+const INT_SUB_TOL_REL = 0.006;
+const INT_SUB_TOL_HZ = 1;
 
 export interface Peak {
   freq: number;
   mag: number;
+  rel: number;
+  /** 背景（音を出す前）の同じ高さの大きさ */
+  bg: number;
 }
 
-/** 調べる山の高さの下限（約 −38 dB。弱い基本や混ざった音も拾い、教室ほどの雑音の 1 帯域 −45 dB 前後は拾わない） */
-const SUB_PEAK_REL = 10 ** (-38 / 20);
+/** 窓をかけたフレームの振幅スペクトル（背景の平均を作るのにも使う） */
+export function windowedSpectrum(windowed: Float64Array): Float64Array {
+  return magnitudeSpectrum(windowed);
+}
 
-export function spectralPeaks(windowed: Float64Array, sampleRate: number, maxHz: number, rel = PEAK_REL): Peak[] {
+export function spectralPeaks(windowed: Float64Array, sampleRate: number, maxHz: number, rel = PEAK_REL, background?: Float64Array): Peak[] {
   const mag = magnitudeSpectrum(windowed);
   const bin = sampleRate / windowed.length;
   let top = 0;
@@ -83,45 +95,32 @@ export function spectralPeaks(windowed: Float64Array, sampleRate: number, maxHz:
     const off = d !== 0 ? (0.5 * (a - c)) / d : 0;
     const freq = (k + off) * bin;
     if (freq < MIN_PEAK_HZ) continue;
-    peaks.push({ freq, mag: mag[k] });
+    const bg = background ? Math.max(background[k - 1] ?? 0, background[k] ?? 0, background[k + 1] ?? 0) : 0;
+    peaks.push({ freq, mag: mag[k], rel: mag[k] / top, bg });
   }
-  return peaks.map((p) => ({ ...p, rel: p.mag / top })) as Peak[];
+  return peaks;
 }
-
-function nearMains(freq: number): boolean {
-  return MAINS.some((m) => {
-    const k = Math.round(freq / m);
-    return k >= 1 && k <= 6 && Math.abs(freq - k * m) <= MAINS_TOL_HZ;
-  });
-}
-
-// 弱い本当の基本が残りうる位置（推定の何倍か）。自己相関がいちばん強い倍音の 2 周期・3 周期を取ると 2/3・3/4 にも残る
-const SUB_POSITIONS = [1 / 2, 1 / 3, 2 / 3, 1 / 4, 3 / 4, 1 / 5, 1 / 6, 1 / 7, 1 / 8];
-/** 弱い山の位置の許容（倍音が少しずれた音でも拾えるように、強い山より広く） */
-const SUB_TOL_REL = 0.03;
 
 /** f0 の整数倍で、入っている成分の山が説明できるか。
- * (a) 強い山（−24 dB 以上）はすべて f0 の整数倍の近くになければならない。和音・隣の音・倍音を基本と取り違えて
- *     本当の基本が強く残っている場合は、ここで落ちる
- * (b) 弱い山（−38 dB 以上）は、f0 の 1/2〜1/8 の位置にあるときだけ取り違えとみなす（弱い本当の基本）。
- *     弱い山をすべて倍音にそろえよ、とすると、教室のざわめき・声・電源のうなり（−25 dB 程度）で輪ゴムの音まで
- *     保留になった（10/12）。背景の音は、たいてい f0 の 1/k とは無関係な位置にある
- * 電源のうなり（50/60 Hz の倍）の近くの弱い山（−30 dB より下）は数えない */
-export function explainsSpectrum(windowed: Float64Array, sampleRate: number, f0: number): boolean {
+ * (a) 強い山（−24 dB 以上）はすべて f0 の整数倍の近く（和音・隣の音・倍音の取り違えで強く残った基本はここで落ちる）
+ * (b) 弱い山（−38 dB 以上）は、f0 の 1/2・1/3・2/3・1/4・3/4、または 1/k（k はいくつでも）の位置に無い（弱い本当の基本）
+ * (c) f0 の高さそのものに山がある（4:3 の和音は 1/3 の高さの 3・4 倍音に見えるが、その高さには音が無い）
+ * 音を出す前からあった山（背景）は数えない。背景を周波数で決め打ちして除くと、100 Hz の本物の弱い基本まで消えた（10/12 レビュー 5 回目） */
+export function explainsSpectrum(windowed: Float64Array, sampleRate: number, f0: number, background?: Float64Array): boolean {
   if (!Number.isFinite(f0) || f0 <= 0) return false;
   const maxHz = Math.min(sampleRate / 2 - 1, Math.max(8.5 * f0, 2500));
-  const peaks = spectralPeaks(windowed, sampleRate, maxHz, SUB_PEAK_REL) as (Peak & { rel: number })[];
-  // 基本の高さそのものに音が無ければ、和音（4:3 の 2 音は 1/3 の高さの 3・4 倍音に見える）か倍音だけの信号。結論を出さない
+  const peaks = spectralPeaks(windowed, sampleRate, maxHz, SUB_PEAK_REL, background).filter((p) => p.mag > p.bg * BACKGROUND_MARGIN);
   if (!peaks.some((p) => Math.abs(p.freq - f0) <= Math.max(HARMONIC_TOL_REL * f0, HARMONIC_TOL_HZ))) return false;
   for (const p of peaks) {
-    if (p.rel < MAINS_MAX_REL && nearMains(p.freq)) continue;
-    const tol = Math.max(HARMONIC_TOL_REL * p.freq, HARMONIC_TOL_HZ);
     if (p.rel >= PEAK_REL) {
       const k = Math.round(p.freq / f0);
-      if (k < 1 || Math.abs(p.freq - k * f0) > tol) return false;
-    } else if (SUB_POSITIONS.some((r) => Math.abs(p.freq - f0 * r) <= Math.max(SUB_TOL_REL * p.freq, HARMONIC_TOL_HZ))) {
-      return false;
+      if (k < 1 || Math.abs(p.freq - k * f0) > Math.max(HARMONIC_TOL_REL * p.freq, HARMONIC_TOL_HZ)) return false;
+      continue;
     }
+    if (p.freq >= f0 * 0.97) continue; // 基本より上の弱い山は、倍音のずれや背景として許す
+    if (SUB_POSITIONS.some((r) => Math.abs(p.freq - f0 * r) <= Math.max(SUB_TOL_REL * p.freq, HARMONIC_TOL_HZ))) return false;
+    const k = Math.round(f0 / p.freq);
+    if (k >= 2 && Math.abs(p.freq - f0 / k) <= Math.max(INT_SUB_TOL_REL * p.freq, INT_SUB_TOL_HZ)) return false;
   }
   return true;
 }

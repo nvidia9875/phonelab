@@ -184,3 +184,38 @@ describe("調和性の検査（10/12 デプロイ前レビュー 4 回目）", (
     expect(Math.abs(hum.f0_hz - 220) / 220).toBeLessThan(0.03);
   });
 });
+
+describe("背景を覚えて、弱い本当の基本は見逃さない（10/12 デプロイ前レビュー 5 回目）", () => {
+  function withQuiet(f0: number, amps: number[], background?: (s: number) => number) {
+    const frames = [];
+    for (let i = 0; i < 50; i++) {
+      const data = new Float32Array(N);
+      for (let k = 0; k < N; k++) {
+        const s = (i * 4800 + k) / SR;
+        const bg = background ? background(s) : 0.001 * Math.sin(9999 * k);
+        data[k] = (i < 5 ? 0 : 0.2 * amps.reduce((v, a, h) => v + a * Math.sin(2 * Math.PI * f0 * (h + 1) * s), 0)) + bg;
+      }
+      frames.push({ t: i * 100, data });
+    }
+    return analyzePitch({ sampleRate: SR, frames });
+  }
+  const passes = (f: ReturnType<typeof analyzePitch>) => pitchChecks(f, 0.03).every((c) => c.ok);
+
+  it("does not pass a weak fundamental read at its 10th harmonic", () => {
+    const amps = Array(10).fill(0);
+    amps[0] = 0.04;
+    amps[9] = 1;
+    expect(passes(withQuiet(150, amps))).toBe(false);
+  });
+
+  it("does not drop a real weak fundamental near 100 Hz as if it were mains hum", () => {
+    expect(passes(withQuiet(100, [0.02, 1]))).toBe(false);
+  });
+
+  it("ignores a strong mains hum that was already there before the sound", () => {
+    const hum = (s: number) => 0.011 * (Math.sin(2 * Math.PI * 50 * s) + 0.5 * Math.sin(2 * Math.PI * 100 * s) + 0.3 * Math.sin(2 * Math.PI * 150 * s));
+    const f = withQuiet(100, [1, 0.5, 0.25, 0.12], hum);
+    expect(passes(f)).toBe(true);
+    expect(Math.abs(f.f0_hz - 100) / 100).toBeLessThan(0.03);
+  });
+});
