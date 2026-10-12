@@ -146,6 +146,8 @@ def run_tutors(client: TestClient, usage, items: list[dict], timed_post) -> list
             "situation": item["situation"],
             "prediction": item["prediction"],
             "message": item["message"],
+            # 「自分の考え」の欄に命令を隠す場面（10/9: 最新の発言だけを検査していた）
+            "student_thinking": item.get("student_thinking", ""),
             "reveal": True,  # 生徒の考えが無いので、サーバは開かない（開かないことも見る）
             "result_statement": item.get("result", ""),
         }
@@ -253,7 +255,7 @@ SCENARIOS: dict[str, dict[str, float]] = {
         "instances": 1,
     },
     "混雑": {"plan": 2.5, "next": 2, "replan": 1, "tutor": 6, "insights": 30, "instances": 2},
-    "厳密な上限": {"plan": 5, "next": 3, "replan": 3, "tutor": 10, "insights": 100, "instances": 3},
+    "枠を使い切った場合": {"plan": 5, "next": 3, "replan": 3, "tutor": 10, "insights": 100, "instances": 3},
 }
 LESSON = {
     "students": 31,
@@ -359,7 +361,7 @@ def render_more(out: dict[str, Any], yen) -> list[str]:
     tu = out.get("tutor", {}).get("rows", [])
     if tu:
         lines += [
-            "## 7. ラボ先生との会話（説明が閉じているとき、答えを聞き出そうとする 6 場面）",
+            f"## 7. ラボ先生との会話（説明が閉じているとき、答えを聞き出そうとする {len(tu)} 場面。考えの欄に命令を隠した場面を含む）",
             "",
             (
                 f"説明を開いた: {sum(bool(r['revealed']) for r in tu)} / {len(tu)}。"
@@ -434,7 +436,7 @@ def render_more(out: dict[str, Any], yen) -> list[str]:
             row("**合計（無料枠を使わない場合）**", lambda v: f"**{yen(v['total_usd_if_paid'])}**"),
             "",
             (
-                "「厳密な上限」はサーバが数える回数の枠そのもの（計画 5・次の一手 3・再計画 3・会話 10 / 実験。作り直しも枠に入る。"
+                "「枠を使い切った場合」は、サーバが数える回数の枠を全員が使い切ったときの試算（1 回あたりの平均トークンを掛けているので、文が長くなれば増える。計画 5・次の一手 3・再計画 3・会話 10 / 実験。作り直しも枠に入る。"
                 "見立ては 30 秒のキャッシュがあるので 50 分で最大 100 回、Cloud Run は max-instances=3）。これ以上は 429 で断る。"
                 f"Cloud Run のリクエストは、全員が 2 秒ごと・先生が 5 秒ごとに授業中ずっと確かめる上側の見積もりで {lc['requests']:,.0f} 回。"
                 "Model Armor・Firestore・Cloud Run は月の無料枠に収まることが多い（その場合は 0 円）。Cloud Run の単価は Tier 1 の vCPU 秒 $0.000024・GiB 秒 $0.0000025・100 万リクエスト $0.40（提出前に価格表で要確認）。"

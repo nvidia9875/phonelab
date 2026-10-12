@@ -466,7 +466,7 @@ def render_markdown(out: dict[str, Any]) -> str:
         "",
         (
             f"1 人が 1 実験（計画 1 回＋次の一手 1 回）で {yen(per_plan + per_next)}。"
-            "会話・再計画・Model Armor・Firestore・Cloud Run を含めた授業 1 回の費用（ふだん・混雑・厳密な上限）は 9 節"
+            "会話・再計画・Model Armor・Firestore・Cloud Run を含めた授業 1 回の費用（ふだん・混雑・枠を使い切った場合）は 9 節"
         ),
     ]
     lines += ["", *render_more(out, yen), *render_history(out.get("history", []))]
