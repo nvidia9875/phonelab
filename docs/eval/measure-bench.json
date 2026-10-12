@@ -1,0 +1,111 @@
+{
+  "note": "合成の信号。実機のマイク・部屋の反響・センサーの癖は入らない。答えの分かっている信号で、解析と検査の論理を確かめる",
+  "tolerance": {
+    "pitch_rel": 0.03,
+    "speed_ms": 0.15
+  },
+  "pitch": [
+    {
+      "case": "きれいな音（雑音 小）",
+      "clean": true,
+      "trials": 40,
+      "passed": 40,
+      "held": 0,
+      "false_pass": 0,
+      "median_error": "0.04%",
+      "worst_error": "0.13%"
+    },
+    {
+      "case": "教室ほどの雑音",
+      "clean": true,
+      "trials": 40,
+      "passed": 40,
+      "held": 0,
+      "false_pass": 0,
+      "median_error": "0.04%",
+      "worst_error": "0.18%"
+    },
+    {
+      "case": "雑音が大きい（音が小さい）",
+      "clean": false,
+      "trials": 40,
+      "passed": 0,
+      "held": 40,
+      "false_pass": 0,
+      "median_error": "—",
+      "worst_error": "—"
+    },
+    {
+      "case": "音割れ（大きすぎる）",
+      "clean": false,
+      "trials": 40,
+      "passed": 0,
+      "held": 40,
+      "false_pass": 0,
+      "median_error": "—",
+      "worst_error": "—"
+    },
+    {
+      "case": "隣の班の音が同じくらい混ざる",
+      "clean": false,
+      "trials": 40,
+      "passed": 0,
+      "held": 40,
+      "false_pass": 0,
+      "median_error": "—",
+      "worst_error": "—"
+    },
+    {
+      "case": "基本の音が弱く倍音が強い",
+      "clean": false,
+      "trials": 40,
+      "passed": 40,
+      "held": 0,
+      "false_pass": 0,
+      "median_error": "0.04%",
+      "worst_error": "0.11%"
+    }
+  ],
+  "speed": [
+    {
+      "case": "60 Hz・センサーの雑音 小",
+      "clean": true,
+      "trials": 40,
+      "passed": 40,
+      "held": 0,
+      "false_pass": 0,
+      "median_error": "0.022 m/s",
+      "worst_error": "0.033 m/s"
+    },
+    {
+      "case": "60 Hz・センサーの雑音 中",
+      "clean": true,
+      "trials": 40,
+      "passed": 40,
+      "held": 0,
+      "false_pass": 0,
+      "median_error": "0.017 m/s",
+      "worst_error": "0.037 m/s"
+    },
+    {
+      "case": "30 Hz（遅い端末）",
+      "clean": true,
+      "trials": 40,
+      "passed": 40,
+      "held": 0,
+      "false_pass": 0,
+      "median_error": "0.039 m/s",
+      "worst_error": "0.057 m/s"
+    },
+    {
+      "case": "センサーの雑音 大",
+      "clean": false,
+      "trials": 40,
+      "passed": 36,
+      "held": 4,
+      "false_pass": 4,
+      "median_error": "0.053 m/s",
+      "worst_error": "0.189 m/s"
+    }
+  ]
+}

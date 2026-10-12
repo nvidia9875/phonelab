@@ -16,6 +16,8 @@ const VOICED_ABOVE_NOISE_DB = 10;
 const MIN_HZ = 80;
 const MAX_HZ = 2000;
 const AUTOCORR_THRESHOLD = 0.5;
+/** 2 倍の周期の繰り返しが、これだけはっきりしていたら 1 オクターブ下を基本とする */
+const OCTAVE_MARGIN = 0.1;
 const HARMONIC_STEPS = 160;
 const CLIP_LEVEL = 0.99;
 const MIN_VOICED_FRAMES = 5;
@@ -54,12 +56,25 @@ function levelDb(data: Float32Array): number {
   return 20 * Math.log10(Math.sqrt(s / data.length) + 1e-12);
 }
 
-/** 自己相関の最初のピークから基本周波数。見つからなければ NaN */
+/** 自己相関の最初のピークから基本周波数。見つからなければ NaN。
+ * 基本の音が弱く第 2 倍音が強いと、最初のピークは半分の周期（1 オクターブ上）に出る。2 倍の周期のほうが
+ * はっきり繰り返していれば、そちらを基本とする（10/12 合成ベンチマークで、1 オクターブ上を答えて検査も通っていた） */
 export function f0Autocorr(data: Float32Array, sampleRate: number): number {
   const m = mean(data);
   const x = Array.from(data, (v) => v - m);
-  const { tau } = firstAutocorrPeak(x, 1 / sampleRate, 1 / MAX_HZ, 1 / MIN_HZ, AUTOCORR_THRESHOLD);
-  return Number.isFinite(tau) && tau > 0 ? 1 / tau : NaN;
+  const { tau, r } = firstAutocorrPeak(x, 1 / sampleRate, 1 / MAX_HZ, 1 / MIN_HZ, AUTOCORR_THRESHOLD);
+  if (!(Number.isFinite(tau) && tau > 0)) return NaN;
+  const double = 2 * tau;
+  if (double <= 1 / MIN_HZ && autocorrAt(x, Math.round(double * sampleRate)) > r + OCTAVE_MARGIN) return 1 / double;
+  return 1 / tau;
+}
+
+function autocorrAt(x: readonly number[], k: number): number {
+  let e0 = 0;
+  let s = 0;
+  for (let i = 0; i < x.length; i++) e0 += x[i] * x[i];
+  for (let i = 0; i + k < x.length; i++) s += x[i] * x[i + k];
+  return e0 > 0 ? s / e0 : 0;
 }
 
 /** f0 の 1.8〜2.2 倍で最も強い周波数（Goertzel 法で走査）の半分 */

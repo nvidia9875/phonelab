@@ -67,3 +67,29 @@ describe("analyzePitch", () => {
     expect(pitchChecks(f, 0.03).find((c) => c.code === "clipping")?.ok).toBe(false);
   });
 });
+
+describe("1 オクターブ上の取り違え（10/12 合成ベンチマーク）", () => {
+  it("reads the fundamental even when the second harmonic is much stronger", () => {
+    // 基本の音が弱く、第 2 倍音が強い（倍音の強さ 0.15・1・0.5・0.3）。自己相関の最初のピークは半分の周期に出る
+    const amps = [0.15, 1, 0.5, 0.3];
+    const frames = [];
+    for (let i = 0; i < 50; i++) {
+      const data = new Float32Array(N);
+      for (let k = 0; k < N; k++) {
+        const s = (i * 4800 + k) / SR;
+        data[k] = i < 5 ? 0.001 * Math.sin(9999 * k) : 0.2 * amps.reduce((v, a, h) => v + a * Math.sin(2 * Math.PI * 220 * (h + 1) * s), 0);
+      }
+      frames.push({ t: i * 100, data });
+    }
+    const f = analyzePitch({ sampleRate: SR, frames });
+
+    expect(Math.abs(f.f0_hz - 220) / 220).toBeLessThan(0.03);
+    expect(pitchChecks(f, 0.03).every((c) => c.ok)).toBe(true);
+  });
+
+  it("does not halve a clean tone", () => {
+    const f = analyzePitch(tone({ f0: 330 }));
+
+    expect(Math.abs(f.f0_hz - 330) / 330).toBeLessThan(0.03);
+  });
+});

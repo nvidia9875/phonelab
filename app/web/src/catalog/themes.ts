@@ -79,8 +79,8 @@ const PENDULUM_LENGTH_M = 0.8;
 const PENDULUM_SHORT_LENGTH_M = 0.4;
 /** 放す高さは手で合わせるので毎回ぶれる。3 回測って平均する（音は 5 秒の中で何十回分を中央値にしているので 1 回） */
 const PENDULUM_REPEATS = 3;
-const SPEED_TOLERANCE_MS = 0.15;
-const PITCH_TOLERANCE_REL = 0.03;
+export const SPEED_TOLERANCE_MS = 0.15;
+export const PITCH_TOLERANCE_REL = 0.03;
 const PERIOD_TOLERANCE_S = 0.05;
 
 type Later = Omit<Theme, "variants" | "build" | "measureHint" | "enabledBy" | "measureProfile" | "example" | "goCue"> & Partial<Pick<Theme, "enabledBy">>;
