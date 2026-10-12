@@ -38,7 +38,7 @@
   <div class="abs" style="left:56px; top:40px">
     <div class="kicker">システム構成</div>
     <div class="headline">端末で測り、Cloud Run の 1 つのサービスでエージェントを動かす</div>
-    <div class="lede">音声や加速度の生データは端末から出ない。サーバに届くのは、文と、検査を通った数値の要約だけ。</div>
+    <div class="lede" data-nobr>音声や加速度の生データは端末から出ない。サーバに届くのは、文と、検査を通った数値の要約だけ。</div>
   </div>
 
   <div class="zone-label" style="left:56px; top:166px">教室</div>
@@ -79,10 +79,10 @@
   </div>
   <div class="card box" style="left:510px; top:350px; width:566px; height:112px">
     <div class="head" style="margin-bottom:4px"><span class="icon"><i data-lucide="door-closed"></i></span><div class="title">入口の守り</div></div>
-    <div class="desc">AI を呼べるのは<b>学級の生徒だけ</b>（番号と合言葉）。接続元ごとのレート制限、回数の枠はモデルの前に Firestore で取る。停止中は 409。</div>
+    <div class="desc" data-nobr>AI を呼べるのは<b>学級の生徒だけ</b>（番号と合言葉）。接続元ごとのレート制限、回数の枠はモデルの前に Firestore で取る。停止中は 409。</div>
   </div>
   <div class="card box ai" style="left:510px; top:482px; width:566px; height:398px">
-    <div class="head" style="margin-bottom:0"><span class="icon" style="background:var(--teal-soft); color:#13807c"><i data-lucide="bot"></i></span><div><div class="title">ラボ先生 ＝ 5 つの LlmAgent</div><div class="small">Gemini 3.5 Flash-Lite。4 つは構造化出力、Tutor は文章</div></div></div>
+    <div class="head" style="margin-bottom:0"><span class="icon" style="background:var(--teal-soft); color:#13807c"><i data-lucide="bot"></i></span><div><div class="title">ラボ先生 ＝ 5 つの LlmAgent</div><div class="small" data-nobr>Gemini 3.5 Flash-Lite。4 つは構造化出力、Tutor は文章</div></div></div>
     <div class="agents">
       <div class="agent"><b>Planner</b><span>予想を読み、実験を選ぶ・問い返す</span></div>
       <div class="agent"><b>Replanner</b><span>保留の理由から、測り直すか別の実験か</span></div>
@@ -99,7 +99,7 @@
         <div><code>after_model</code>出口の検査と作り直し</div>
       </div>
     </div>
-    <div class="small" style="margin-top:12px">決定論の Policy（危ない実験・命令）は、Runner に渡す前に止める。答え（answers.py）はエージェントに渡さない。</div>
+    <div class="small" data-nobr style="margin-top:12px">決定論の Policy（危ない実験・命令）は、Runner に渡す前に止める。答え（answers.py）はエージェントに渡さない。</div>
   </div>
 
   <!-- サービス -->
@@ -140,4 +140,5 @@
   <div class="wlabel" style="left:1096px; top:692px; width:88px">起動時</div>
   <div class="wlabel" style="left:1096px; top:812px; width:88px">デプロイ</div>
 </div>
+<script src="break.js"></script>
 <script>lucide.createIcons();</script>

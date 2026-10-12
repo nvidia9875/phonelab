@@ -1,5 +1,6 @@
 import React from "react";
 import { AbsoluteFill, Easing, interpolate, spring, useCurrentFrame, useVideoConfig } from "remotion";
+import { twoLines } from "./anim";
 import { body, C, head } from "./theme";
 
 const ease = Easing.bezier(0.16, 1, 0.3, 1);
@@ -53,8 +54,8 @@ export const Caption: React.FC<{ text: string; sub?: string }> = ({ text, sub })
           boxShadow: "0 6px 0 rgba(30,42,58,0.25)",
         }}
       >
-        <div style={{ fontFamily: head, fontWeight: 900, fontSize: 40, lineHeight: 1.4, letterSpacing: "0.02em" }}>{text}</div>
-        {sub ? <div style={{ fontSize: 26, color: "#C9D3DE", marginTop: 6, lineHeight: 1.5 }}>{sub}</div> : null}
+        <div style={{ fontFamily: head, fontWeight: 900, fontSize: 40, lineHeight: 1.4, letterSpacing: "0.02em" }}>{twoLines(text)}</div>
+        {sub ? <div style={{ fontSize: 26, color: "#C9D3DE", marginTop: 6, lineHeight: 1.5, whiteSpace: "nowrap" }}>{sub}</div> : null}
       </div>
     </div>
   );

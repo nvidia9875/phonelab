@@ -230,3 +230,42 @@ export const Count: React.FC<{ to: number; at: number; dur?: number; decimals?: 
   const v = to * prog(t, at, dur, Easing.out(Easing.cubic));
   return <>{v.toFixed(decimals)}</>;
 };
+
+/** 「、」「。」のところで改行する（短すぎる切れ端は次とつなぐ）。見出し・字幕を、意味の切れ目で読めるように */
+export function breakAtPunct(text: string, min = 5): React.ReactNode {
+  const parts = text.match(/[^、。！？]+[、。！？]?/g) ?? [text];
+  const lines: string[] = [];
+  for (const p of parts) {
+    const last = lines[lines.length - 1];
+    if (last !== undefined && last.replace(/[、。！？]/g, "").length < min) lines[lines.length - 1] = last + p;
+    else lines.push(p);
+  }
+  return lines.map((l, i) => (
+    <span key={i} style={{ display: "block" }}>
+      {l.trim()}
+    </span>
+  ));
+}
+
+/** 字幕用: 短ければ 1 行、長ければ真ん中にいちばん近い「、」「。」で 2 行に */
+export function twoLines(text: string, max = 26): React.ReactNode {
+  if (text.length <= max) return text;
+  const mid = text.length / 2;
+  // 「。」が真ん中の近く（全体の 3 割以内）にあれば、そちらを優先する
+  const pick = (chars: string) => {
+    let best = -1;
+    for (let i = 0; i < text.length - 1; i++) {
+      if (chars.includes(text[i]) && (best < 0 || Math.abs(i - mid) < Math.abs(best - mid))) best = i;
+    }
+    return best;
+  };
+  const period = pick("。");
+  const best = period >= 0 && Math.abs(period - mid) <= text.length * 0.3 ? period : pick("、。");
+  if (best < 0) return text;
+  return (
+    <>
+      <span style={{ display: "block" }}>{text.slice(0, best + 1)}</span>
+      <span style={{ display: "block" }}>{text.slice(best + 1)}</span>
+    </>
+  );
+}

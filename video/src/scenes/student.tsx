@@ -1,7 +1,7 @@
 // 生徒の流れ: つかみ → 課題 → 予想 → 計画 → 許可と測定 → 結果
 import React from "react";
 import { Easing, interpolate, Sequence } from "remotion";
-import { Chip, Count, Mark, Pop, prog, Rows, Stamp, Tap, Type, useSpring, useT, Wave } from "../anim";
+import { breakAtPunct, Chip, Count, Mark, Pop, prog, Rows, Stamp, Tap, Type, useSpring, useT, Wave } from "../anim";
 import { Kicker, Logo, Paper } from "../components";
 import { Phone } from "../devices";
 import { body, C, head } from "../theme";
@@ -30,8 +30,8 @@ export const SideText: React.FC<{ title: string; sub?: string; subAt?: number; x
   return (
     <div style={{ position: "absolute", left: x, top: y, width: w }}>
       <div style={{ width: 90 * a, height: 8, borderRadius: 4, background: color, marginBottom: 24 }} />
-      <div style={{ fontFamily: head, fontWeight: 900, fontSize: size, lineHeight: 1.4, opacity: a, transform: `translateY(${(1 - a) * 30}px)` }}>{title}</div>
-      {sub ? <div style={{ fontSize: 34, lineHeight: 1.6, color: C.ink2, marginTop: 22, opacity: b, transform: `translateY(${(1 - b) * 20}px)` }}>{sub}</div> : null}
+      <div style={{ fontFamily: head, fontWeight: 900, fontSize: size, lineHeight: 1.4, opacity: a, transform: `translateY(${(1 - a) * 30}px)` }}>{breakAtPunct(title)}</div>
+      {sub ? <div style={{ fontSize: 34, lineHeight: 1.6, color: C.ink2, marginTop: 22, opacity: b, transform: `translateY(${(1 - b) * 20}px)` }}>{breakAtPunct(sub)}</div> : null}
     </div>
   );
 };
@@ -158,7 +158,7 @@ export const Plan: React.FC = () => (
       <Mark x={30} y={455} w={340} h={142} at={3.8} until={7.4} color={C.teal} label="判断の跡" />
       <Mark x={36} y={603} w={328} h={90} at={7.8} color={C.orange} label="変えるのは 1 つ" />
     </Phone>
-    <SideText title="予想を読んで、確かめられる実験をカタログから選ぶ。答えは知らない。" x={1000} y={150} size={50} color={C.teal} />
+    <SideText title="予想を読んで、確かめる実験をカタログから選ぶ。答えは知らない。" x={960} y={140} w={900} size={48} color={C.teal} />
     <div style={{ position: "absolute", left: 1000, top: 520, width: 820 }}>
       <Rows
         at={4.0}
