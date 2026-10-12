@@ -106,3 +106,12 @@ def test_changes_condition_covers_the_new_experiments_and_reads_clause_by_clause
         changes_condition("放す高さや重さは変えず、端末の置き場所を少し変えよう", "energy_height")
         is None
     )
+
+
+def test_changes_condition_reads_change_words_before_the_condition_term():
+    """10/12 デプロイ前レビュー 3 回目: 変える言い方が条件の言葉の前にあると見逃していた"""
+    from server.agent.planner import changes_condition
+
+    assert changes_condition("低くした高さから放そう", "energy_height")
+    assert changes_condition("少なくした水で、もう一度吹こう", "bottle_water")
+    assert changes_condition("同じ高さから、そっと放そう", "energy_height") is None

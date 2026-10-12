@@ -263,7 +263,7 @@
       "variant": "sound_tension",
       "variable": "tension",
       "claim_variable": "tension",
-      "claim_direction": "same"
+      "claim_direction": "faster"
     },
     {
       "text": "ゴムをきつくしたら低い音になりそう",

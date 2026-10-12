@@ -465,7 +465,7 @@ def render_markdown(out: dict[str, Any]) -> str:
         f"| 学級の見立て | ${ins_cost:.5f}（{yen(ins_cost)}） |",
         "",
         (
-            f"1 人が 1 実験（計画 1 回＋次の一手 1 回）で {yen(per_plan + per_next)}。"
+            f"評価の 1 場面あたり（計画は理由の無い予想で問い返しの 2 回目を含む）＋次の一手 1 回で {yen(per_plan + per_next)}。"
             "会話・再計画・Model Armor・Firestore・Cloud Run を含めた授業 1 回の費用（ふだん・混雑・枠を使い切った場合）は 9 節"
         ),
     ]

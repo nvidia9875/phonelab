@@ -257,17 +257,32 @@ SENTENCE_SPLIT = re.compile(r"[。！？!?\n、,]")
 
 def changes_condition(advice: str, variant_id: str) -> str | None:
     """助言が実験の条件の値を変えさせているか。変えさせている言葉を返す（無ければ None）。
-    条件の言葉ごとに、その言葉から節の終わりまでを見る（「重さは同じにして放す高さを低く」の「同じ」は重さにだけかかる。10/12）"""
+    条件の言葉ごとに、その言葉から次の条件の言葉の手前まで（「重さは同じにして放す高さを低く」）と、
+    前の条件の言葉のあとからその言葉まで（「低くした高さから」）を見る。「同じ」がかかる範囲だけを外す（10/12）"""
     terms = CONDITION_TERMS.get(variant_id, ())
     for clause in SENTENCE_SPLIT.split(advice):
         for term in terms:
             at = clause.find(term)
             if at < 0:
                 continue
-            scope = _until_next_term(clause[at:], term, terms)
-            if CHANGE_VERBS.search(scope) and not KEEP_WORDS.search(scope):
-                return term
+            after = _until_next_term(clause[at:], term, terms)
+            before = _since_previous_term(clause[:at], term, terms)
+            for scope in (after, before):
+                if CHANGE_VERBS.search(scope) and not KEEP_WORDS.search(scope):
+                    return term
     return None
+
+
+def _since_previous_term(head: str, term: str, terms: tuple[str, ...]) -> str:
+    """その言葉の前で、前の別の条件の言葉のあとから"""
+    start = 0
+    for other in terms:
+        if other in term or term in other:
+            continue
+        at = head.rfind(other)
+        if at >= 0:
+            start = max(start, at + len(other))
+    return head[start:]
 
 
 def _until_next_term(rest: str, term: str, terms: tuple[str, ...]) -> str:
