@@ -156,9 +156,9 @@
     {
       "text": "糸を長くしたら速くなると思う",
       "question": true,
-      "variant": "energy_height",
-      "variable": "height",
-      "claim_variable": "unknown",
+      "variant": "energy_length",
+      "variable": "length",
+      "claim_variable": "length",
       "claim_direction": "faster"
     },
     {
@@ -240,6 +240,38 @@
       "variable": "length",
       "claim_variable": "length",
       "claim_direction": "same"
+    },
+    {
+      "text": "糸を長くすると、大きく振れるから、いちばん下で速くなると思う",
+      "question": false,
+      "variant": "energy_length",
+      "variable": "length",
+      "claim_variable": "length",
+      "claim_direction": "faster"
+    },
+    {
+      "text": "糸の長さを変えても、同じ高さから放せば速さは同じだと思う。落ちる高さが同じだから",
+      "question": false,
+      "variant": "energy_length",
+      "variable": "length",
+      "claim_variable": "length",
+      "claim_direction": "same"
+    },
+    {
+      "text": "輪ゴムをぴんと張ると、ギターのねじを締めるのと同じで、音が高くなると思う",
+      "question": false,
+      "variant": "sound_tension",
+      "variable": "tension",
+      "claim_variable": "tension",
+      "claim_direction": "same"
+    },
+    {
+      "text": "ゴムをきつくしたら低い音になりそう",
+      "question": true,
+      "variant": "sound_tension",
+      "variable": "tension",
+      "claim_variable": "tension",
+      "claim_direction": "slower"
     }
   ]
 }

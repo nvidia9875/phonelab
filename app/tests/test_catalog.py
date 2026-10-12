@@ -24,16 +24,10 @@ def test_catalog_holds_no_answers():
 
 
 def test_candidates_put_undone_experiments_first_and_never_run_out():
-    assert [v.id for v in candidates_for("sound", ())] == [
-        "sound_pluck_strength",
-        "sound_string_length",
-    ]
+    every = ["sound_pluck_strength", "sound_string_length", "sound_tension"]
+    assert [v.id for v in candidates_for("sound", ())] == every
     assert [v.id for v in candidates_for("sound", ("sound_pluck_strength",))] == [
-        "sound_string_length"
-    ]
-    assert [
-        v.id for v in candidates_for("sound", ("sound_pluck_strength", "sound_string_length"))
-    ] == [
-        "sound_pluck_strength",
         "sound_string_length",
+        "sound_tension",
     ]
+    assert [v.id for v in candidates_for("sound", tuple(every))] == every

@@ -68,13 +68,22 @@ function tone(f0: number, seconds: number): PitchBuffer {
 export function demoFeatures(theme: Theme, variant: Variant, idx: 0 | 1): Features {
   switch (theme.measureProfile) {
     case "pendulum_speed": {
-      const lengthM = variant.lengthM ?? 0.8;
+      const lengthM = variant.conditions[idx].lengthM ?? variant.lengthM ?? 0.8;
       const heightM = variant.variable === "height" ? (idx === 0 ? 0.1 : 0.2) : 0.15 + idx * 0.003;
       return analyzeSpeed(swing(lengthM, heightM, theme.seconds), lengthM);
     }
     case "pitch": {
       const base = variant.variable === "water" ? 180 : 220;
-      const f0 = variant.variable === "length" ? base * (idx === 0 ? 1 : 2) : variant.variable === "water" ? (idx === 0 ? 180 : 250) : base * (1 + idx * 0.005);
+      const f0 =
+        variant.variable === "length"
+          ? base * (idx === 0 ? 1 : 2)
+          : variant.variable === "tension"
+            ? base * (idx === 0 ? 1 : 1.3)
+            : variant.variable === "water"
+              ? idx === 0
+                ? 180
+                : 250
+              : base * (1 + idx * 0.005);
       return analyzePitch(tone(f0, theme.seconds));
     }
     default: {

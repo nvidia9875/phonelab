@@ -335,7 +335,8 @@ export function App() {
               m.markUnsupported("テストモード: サンプルの測定で進めます");
             } else if (profile === "pendulum_period" || profile === "pendulum_speed" || profile === "pitch") {
               // iOS の許可はこのタップの中で求める
-              void m.start({ profile, sensors: t.sensors, seconds: t.seconds, lengthM: variant!.lengthM }, variant!);
+              const lengthM = variant!.conditions.find((c) => c.key === route.cond)?.lengthM ?? variant!.lengthM;
+              void m.start({ profile, sensors: t.sensors, seconds: t.seconds, lengthM }, variant!);
             } else {
               m.markUnsupported("この実験の測定はまだ実装中です。サンプルで進めます");
             }

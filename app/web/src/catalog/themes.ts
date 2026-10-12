@@ -6,7 +6,7 @@
 import type { Unit } from "./quantity";
 
 export type Sensor = "accelerometer" | "gyroscope" | "microphone" | "camera" | "speaker";
-export type Variable = "mass" | "length" | "amplitude" | "object" | "height" | "water" | "beat" | "distance" | "surface" | "jump" | "strength";
+export type Variable = "mass" | "length" | "amplitude" | "object" | "height" | "water" | "beat" | "distance" | "surface" | "jump" | "strength" | "tension";
 export type School = "jhs" | "hs";
 /** 端末の段階（docs/curriculum-coverage.md 2.3）。T0 カメラ・マイク / T1 ＋加速度 / T2 ＋方位 */
 export type Tier = "T0" | "T1" | "T2";
@@ -16,6 +16,8 @@ export interface Condition {
   key: "A" | "B";
   label: string;
   setup: string;
+  /** 条件ごとに糸の長さを変える実験（振り子とエネルギーの「糸の長さ」）。無ければ Variant の lengthM */
+  lengthM?: number;
 }
 
 export interface Variant {
@@ -74,6 +76,7 @@ export const SENSOR_LABEL: Record<Sensor, string> = {
 };
 
 const PENDULUM_LENGTH_M = 0.8;
+const PENDULUM_SHORT_LENGTH_M = 0.4;
 /** 放す高さは手で合わせるので毎回ぶれる。3 回測って平均する（音は 5 秒の中で何十回分を中央値にしているので 1 回） */
 const PENDULUM_REPEATS = 3;
 const SPEED_TOLERANCE_MS = 0.15;
@@ -140,6 +143,22 @@ const CATALOG: Theme[] = [
         lengthM: PENDULUM_LENGTH_M,
         repeats: PENDULUM_REPEATS,
       },
+      {
+        id: "energy_length",
+        variable: "length",
+        title: "同じ高さから、糸の長さだけ半分にする",
+        changes: "糸の長さ（80 cm から 40 cm へ）",
+        holds: "放す高さ 15 cm、重さ",
+        conditions: [
+          { key: "A", label: "糸 80 cm", setup: "糸 80 cm のまま、袋の底を 15 cm 持ち上げて持つ", lengthM: PENDULUM_LENGTH_M },
+          { key: "B", label: "糸 40 cm", setup: "糸を 40 cm に結び直して、同じ 15 cm 持ち上げて持つ", lengthM: PENDULUM_SHORT_LENGTH_M },
+        ],
+        tolerance: SPEED_TOLERANCE_MS,
+        toleranceKind: "abs",
+        unit: "m/s",
+        lengthM: PENDULUM_LENGTH_M,
+        repeats: PENDULUM_REPEATS,
+      },
     ],
   },
   {
@@ -186,6 +205,20 @@ const CATALOG: Theme[] = [
         conditions: [
           { key: "A", label: "長さ そのまま", setup: "輪ゴムを押さえずに、そのままはじく" },
           { key: "B", label: "長さ 半分", setup: "輪ゴムの真ん中を指で押さえ、片側だけを同じ強さではじく" },
+        ],
+        tolerance: PITCH_TOLERANCE_REL,
+        toleranceKind: "rel",
+        unit: "Hz",
+      },
+      {
+        id: "sound_tension",
+        variable: "tension",
+        title: "同じ長さで、輪ゴムの張りだけ強くする",
+        changes: "輪ゴムの張り（そのまま から ぴんと張る へ）",
+        holds: "震える部分の長さ、はじく強さ",
+        conditions: [
+          { key: "A", label: "張り そのまま", setup: "箱にかけたままの輪ゴムを、いつもの強さではじく" },
+          { key: "B", label: "ぴんと張る", setup: "輪ゴムの端を箱の裏へ引いて、指で押さえてぴんと張る。震える長さは変えずに、同じ強さではじく" },
         ],
         tolerance: PITCH_TOLERANCE_REL,
         toleranceKind: "rel",

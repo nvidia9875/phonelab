@@ -303,6 +303,7 @@ describe("switchExperiment", () => {
 
   it("returns null when every experiment of the theme is used up", () => {
     record(sound.id, "sound_string_length", { status: "signed", stage: "result" });
+    record(sound.id, "sound_tension", { status: "signed", stage: "result" });
     const rec = record(sound.id, "sound_pluck_strength", { status: "held", stage: "measure_A" });
 
     expect(switchExperiment(rec, sound)).toBeNull();

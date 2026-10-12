@@ -67,7 +67,7 @@ def test_the_planner_reads_the_candidates_with_a_tool(client, scripted_llm):
     # 候補はプロンプトに並べず、ツールで読む。やり終えた実験はツールの結果にも出ない
     assert "sound_pluck_strength:" not in texts(scripted_llm.requests[0])
     ids = [e["id"] for e in tool_results(scripted_llm.requests[-1])[0]["experiments"]]
-    assert ids == ["sound_pluck_strength"]
+    assert ids == ["sound_pluck_strength", "sound_tension"]
     # ツールを読んだあとの呼び出しは数えない（1 回の計画 = 1 回）
     assert data["planner_calls"] == 1
 
