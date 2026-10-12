@@ -59,6 +59,8 @@ export type PitchFeatures = {
   /** いちばん大きい 4 フレームで、第 2〜8 倍音のいちばん強いものが基本よりどれだけ大きいか（dB の中央値）。
    * 決められないときは NaN */
   harmonic_over_f0_db: number;
+  /** 1 オクターブ下に直す前の、自己相関の最初のピークそのままの高さの中央値（10/9 の版が答える値） */
+  raw_f0_hz: number;
 };
 
 const r1 = (v: number): number => +v.toFixed(1);
@@ -73,16 +75,21 @@ function levelDb(data: Float32Array): number {
  * 基本の音が弱く第 2 倍音が強いと、最初のピークは半分の周期（1 オクターブ上）に出る。2 倍の周期のほうが
  * はっきり繰り返していれば、そちらを基本とする（10/12 合成ベンチマークで、1 オクターブ上を答えて検査も通っていた） */
 export function f0Autocorr(data: Float32Array, sampleRate: number): number {
+  return autocorrPitch(data, sampleRate).f0;
+}
+
+/** f0Autocorr の中身。raw は 1 オクターブ下に直す前の、自己相関の最初のピークそのままの高さ（10/9 の版の読み方） */
+function autocorrPitch(data: Float32Array, sampleRate: number): { f0: number; raw: number } {
   const m = mean(data);
   const x = Array.from(data, (v) => v - m);
   const { tau, r } = firstAutocorrPeak(x, 1 / sampleRate, 1 / MAX_HZ, 1 / MIN_HZ, AUTOCORR_THRESHOLD);
-  if (!(Number.isFinite(tau) && tau > 0)) return NaN;
+  if (!(Number.isFinite(tau) && tau > 0)) return { f0: NaN, raw: NaN };
   const lag = Math.round(2 * tau * sampleRate);
-  if (lag >= x.length / 2 || autocorrAt(x, lag) <= r + OCTAVE_MARGIN) return 1 / tau;
+  if (lag >= x.length / 2 || autocorrAt(x, lag) <= r + OCTAVE_MARGIN) return { f0: 1 / tau, raw: 1 / tau };
   // 1 オクターブ下が基本。ただし測れる下限より低ければ、どちらか決められないので値を出さない（保留にする）。
   // 下限の手前で片方の条件だけ補正されると、比べた向きが逆になった（10/12 Codex のデプロイ前レビュー）
   const lower = 1 / (2 * tau);
-  return lower >= MIN_HZ ? lower : NaN;
+  return { f0: lower >= MIN_HZ ? lower : NaN, raw: 1 / tau };
 }
 
 function autocorrAt(x: readonly number[], k: number): number {
@@ -175,11 +182,13 @@ export function analyzePitch(b: PitchBuffer): PitchFeatures {
   const f0s: number[] = [];
   const fromH2: number[] = [];
   const near: { f0: number; spectrum: Float64Array }[] = [];
+  const raws: number[] = [];
   let clipped = 0;
   let total = 0;
   voiced.forEach((i, n) => {
     const data = frames[i].data;
-    const f0 = f0Autocorr(data, b.sampleRate);
+    const { f0, raw } = autocorrPitch(data, b.sampleRate);
+    if (Number.isFinite(raw)) raws.push(raw);
     if (Number.isFinite(f0)) {
       f0s.push(f0);
       near.push({ f0, spectrum: spectra[n] });
@@ -209,6 +218,7 @@ export function analyzePitch(b: PitchBuffer): PitchFeatures {
     f0_steady_share: steadyShare(f0s),
     ...followFeatures(fundamentalFollow(near, b.sampleRate, median(f0s))),
     harmonic_over_f0_db: harmonicOverF0(near, b.sampleRate, median(f0s)),
+    raw_f0_hz: r1(median(raws)),
   };
 }
 
@@ -302,7 +312,11 @@ export function pitchChecks(f: PitchFeatures, toleranceRel: number): LocalCheck[
   const voicedOk = f.voiced_frames >= MIN_VOICED_FRAMES;
   const snrOk = f.snr_db >= MIN_SNR_DB;
   const clipOk = f.clipping_ratio <= MAX_CLIPPING;
-  const fundamentalOk = !(f.harmonic_over_f0_db > MAX_HARMONIC_OVER_F0_DB);
+  // 10/9 の版（直す前の読み方）が答える高さと違えば、通さない。この版だけが別の音（1 オクターブ下の続く音など）を
+  // 読んで結論が逆になるのを、しきい値の調整ではなく、読み方の食い違いとして止める（10/12 デプロイ前レビュー 10 回目。
+  // ゆらぎ・一時的な大きさの山・弱まり方を変えるたびに、しきい値の検査をすり抜けた）
+  const sameAsPlainRead = Number.isFinite(f.raw_f0_hz) && Math.abs(f.raw_f0_hz - f.f0_hz) <= toleranceRel * f.f0_hz;
+  const fundamentalOk = !(f.harmonic_over_f0_db > MAX_HARMONIC_OVER_F0_DB) && sameAsPlainRead;
   const agree = Number.isFinite(d) && d <= toleranceRel && fundamentalOk;
   const inRange = f.f0_hz >= MIN_HZ && f.f0_hz <= MAX_HZ;
   const followOk = followsNote(f);
@@ -314,7 +328,7 @@ export function pitchChecks(f: PitchFeatures, toleranceRel: number): LocalCheck[
     {
       code: "two_clocks_disagree",
       ok: agree,
-      text: !fundamentalOk ? "基本の音が倍音より弱く、高さを決められません（低いほかの音が入っているかも）" : Number.isFinite(d) ? `二つの計算で求めた高さが${agree ? "一致" : "一致しない"}（差 ${(d * 100).toFixed(1)}%、許容 ${Math.round(toleranceRel * 100)}%）` : "高さを決められません",
+      text: !fundamentalOk ? "基本の音が倍音より弱いか、1 オクターブ違う高さとも読めるので、高さを決められません（低いほかの音が入っているかも）" : Number.isFinite(d) ? `二つの計算で求めた高さが${agree ? "一致" : "一致しない"}（差 ${(d * 100).toFixed(1)}%、許容 ${Math.round(toleranceRel * 100)}%）` : "高さを決められません",
     },
     { code: "unstable", ok: steadyOk, text: steadyOk ? "途中で高さが変わらない" : "途中で高さが変わった（ほかの音が入ったかも）" },
     { code: "out_of_range", ok: inRange, text: inRange ? `${Math.round(f.f0_hz)} Hz` : "音の高さとして考えにくい値です" },

@@ -312,6 +312,24 @@ describe("背景を覚えて、弱い本当の基本は見逃さない（10/12 �
     expect(passes(analyzePitch({ sampleRate: SR, frames }))).toBe(false);
   });
 
+  it("holds when a brief swell of the sound an octave below takes the loudest frames (10th review)", () => {
+    const frames = [];
+    for (let i = 0; i < 50; i++) {
+      const data = new Float32Array(N);
+      for (let k = 0; k < N; k++) {
+        const s = (i * 4800 + k) / SR;
+        let v = 0;
+        for (const p of [0.6, 1.7, 2.8, 3.9]) if (s >= p) v += Math.exp(-(s - p) * 1.2) * [1, 0.25, 0.25, 0.12].reduce((x, a, h) => x + a * Math.sin(2 * Math.PI * 300 * (h + 1) * (s - p) + h), 0);
+        const env = 0.065 * (1 + 0.15 * Math.sin(2 * Math.PI * 0.3 * (s - 0.65) + 3)) + 0.35 * Math.exp(-(((s - 4.5) / 0.2) ** 2));
+        data[k] = 0.2 * v + (s >= 0.65 ? env * Math.sin(2 * Math.PI * 150 * s) : 0) + 0.001 * Math.sin(9999 * k);
+      }
+      frames.push({ t: i * 100, data });
+    }
+    const f = analyzePitch({ sampleRate: SR, frames });
+    expect(passes(f)).toBe(false);
+    expect(Math.abs(f.raw_f0_hz - 300) / 300).toBeLessThan(0.03);
+  });
+
   it("holds when a slowly decaying note has a sustained sound an octave below from 0.65 s (8th review)", () => {
     const frames = [];
     for (let i = 0; i < 50; i++) {
