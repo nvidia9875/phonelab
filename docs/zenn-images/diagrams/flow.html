@@ -8,12 +8,21 @@
   .step { position: absolute; top: 196px; width: 232px; height: 392px; padding: 16px 16px 0; display: flex; flex-direction: column; gap: 8px; overflow: hidden; }
   .step .head { display: flex; align-items: center; gap: 10px; white-space: nowrap; }
   .step .desc { min-height: 44px; }
-  .thumb {
-    margin: 4px -16px 0; flex: 1; border-top: 2px solid var(--line);
-    background-size: 100% auto; background-repeat: no-repeat; background-color: var(--paper);
-  }
-  .step.ai .thumb { border-top-color: var(--teal-soft); }
-  .step.student .thumb { border-top-color: var(--orange-soft); }
+  .art { margin: 6px -16px 0; flex: 1; border-top: 2px solid var(--line); background: var(--paper); display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 16px; padding: 40px 14px 20px; }
+  .step.ai .art { border-top-color: var(--teal-soft); background: #f1f8f6; }
+  .step.student .art { border-top-color: var(--orange-soft); background: #fdf5ee; }
+  .big { width: 76px; height: 76px; border-radius: 22px; display: grid; place-items: center; background: var(--ink); color: #fff; box-shadow: 0 3px 0 rgba(30,42,58,.25); }
+  .big svg { width: 38px; height: 38px; stroke-width: 2; }
+  .step.ai .big { background: var(--teal); }
+  .step.student .big { background: var(--orange); }
+  .bubble { position: relative; width: 100%; background: var(--card); border: 2px solid var(--ink); border-radius: 14px; padding: 10px 12px; font-size: 14px; line-height: 1.55; text-align: center; color: var(--ink); }
+  .bubble::before { content: ""; position: absolute; left: 50%; top: -9px; width: 14px; height: 14px; background: var(--card); border-left: 2px solid var(--ink); border-top: 2px solid var(--ink); transform: translateX(-50%) rotate(45deg); }
+  .step.ai .bubble, .step.ai .bubble::before { border-color: var(--teal); }
+  .step.student .bubble, .step.student .bubble::before { border-color: var(--orange); }
+  .bubble b { font-family: var(--font-head); font-weight: 900; }
+  .bubble .who { display: block; font-size: 11.5px; color: var(--muted); margin-bottom: 2px; font-family: var(--font-head); font-weight: 700; }
+  .nums { display: flex; gap: 6px; justify-content: center; align-items: baseline; font-family: var(--font-head); font-weight: 900; font-size: 22px; }
+  .nums small { font-size: 12px; color: var(--muted); font-weight: 700; }
   .chev { position: absolute; top: 372px; width: 20px; height: 40px; color: var(--ink); }
   .loop { position: absolute; top: 676px; width: 348px; padding: 14px 16px; display: flex; gap: 12px; align-items: flex-start; }
   .loop .icon { flex: none; width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; }
@@ -38,32 +47,32 @@
   <div class="card step student" style="left:56px">
     <div class="head"><span class="num" style="background:var(--orange)">1</span><span class="title">予想と理由を書く</span></div>
     <div class="desc">書くまで、実験もセンサーも出ない。</div>
-    <div class="thumb" style="background-image:url(../02-question-back.png); background-position:0 74%"></div>
+    <div class="art"><div class="big"><i data-lucide="pencil-line"></i></div><div class="bubble"><span class="who">生徒</span>「強くはじくと高くなると思う。<b>速く震えそうだから</b>」</div></div>
   </div>
   <div class="card step ai" style="left:308px">
     <div class="head"><span class="num" style="background:var(--teal)">2</span><span class="title">実験を選ぶ</span></div>
     <div class="desc">予想を読んで、カタログから選ぶ。答えは知らない。</div>
-    <div class="thumb" style="background-image:url(../03-plan.png); background-position:0 21%"></div>
+    <div class="art"><div class="big"><i data-lucide="flask-conical"></i></div><div class="bubble"><span class="who">ラボ先生</span>「同じ輪ゴムで、<b>はじく強さだけ</b>変える」</div></div>
   </div>
   <div class="card step student" style="left:560px">
     <div class="head"><span class="num" style="background:var(--orange)">3</span><span class="title">見て、承認する</span></div>
     <div class="desc">「マイクを 5 秒だけ」を見て、自分で押す。</div>
-    <div class="thumb" style="background-image:url(../03-plan.png); background-position:0 100%"></div>
+    <div class="art"><div class="big"><i data-lucide="mic"></i></div><div class="bubble"><span class="who">画面</span>使うのは<b>マイクを 5 秒だけ</b>。カメラ・位置は使わない</div></div>
   </div>
   <div class="card step" style="left:812px">
     <div class="head"><span class="num">4</span><span class="title">測って、検査</span></div>
     <div class="desc">2 条件を測る。計算と検査は端末の中。</div>
-    <div class="thumb" style="background-image:url(../04-checks.png); background-position:0 38%"></div>
+    <div class="art"><div class="big"><i data-lucide="activity"></i></div><div class="bubble"><span class="who">端末の中で</span><span class="nums">220<small>Hz</small> / 222<small>Hz</small></span>二つの計算が一致・雑音より 30 dB</div></div>
   </div>
   <div class="card step" style="left:1064px">
     <div class="head"><span class="num">5</span><span class="title">予想と比べる</span></div>
     <div class="desc">差がずれの目安より大きいかで決める。</div>
-    <div class="thumb" style="background-image:url(../05-result.png); background-position:0 0%"></div>
+    <div class="art"><div class="big"><i data-lucide="scale"></i></div><div class="bubble"><span class="who">結果</span>差 2 Hz は目安 7 Hz より小さい。<b>高さは変わらなかった</b></div></div>
   </div>
   <div class="card step ai" style="left:1316px">
     <div class="head"><span class="num" style="background:var(--teal)">6</span><span class="title">次の一手</span></div>
     <div class="desc">次の実験か、先にふり返りかを選ぶ。</div>
-    <div class="thumb" style="background-image:url(../06-chat.png); background-position:0 44%"></div>
+    <div class="art"><div class="big"><i data-lucide="message-circle-question"></i></div><div class="bubble"><span class="who">ラボ先生</span>予想と違ったので、<b>先にふり返り</b>。「なぜだと思う？」</div></div>
   </div>
 
   <!-- 段のあいだの矢印 -->
