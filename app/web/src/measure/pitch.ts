@@ -49,6 +49,8 @@ export type PitchFeatures = {
   snr_db: number;
   clipping_ratio: number;
   voiced_frames: number;
+  /** 高さが出たフレームのうち、全体の中央値から STEADY_PITCH_REL 以内だったものの割合 */
+  f0_steady_share: number;
 };
 
 const r1 = (v: number): number => +v.toFixed(1);
@@ -193,7 +195,20 @@ export function analyzePitch(b: PitchBuffer): PitchFeatures {
     snr_db: r1(rms - noise),
     clipping_ratio: total ? +(clipped / total).toFixed(4) : 0,
     voiced_frames: f0s.length,
+    f0_steady_share: steadyShare(f0s),
   };
+}
+
+/** フレームごとの高さが、全体の中央値から 6% 以内にそろっている割合。途中から別の続く音（1 オクターブ下など）が
+ * 鳴り始めると、音が弱まったフレームだけその音の高さになる。中央値だけを見ると、その切り替わりが隠れて別の音の
+ * 高さで通っていた（10/12 デプロイ前レビュー 7 回目） */
+const STEADY_PITCH_REL = 0.06;
+/** これより少ない割合しかそろっていなければ保留（ふつうの音は 0.97 以上、途中から別の音が入ると 0.6 前後） */
+const MIN_STEADY_SHARE = 0.85;
+function steadyShare(f0s: number[]): number {
+  if (!f0s.length) return 0;
+  const m = median(f0s);
+  return +(f0s.filter((f) => Math.abs(f - m) <= STEADY_PITCH_REL * m).length / f0s.length).toFixed(3);
 }
 
 export function pitchChecks(f: PitchFeatures, toleranceRel: number): LocalCheck[] {
@@ -203,6 +218,7 @@ export function pitchChecks(f: PitchFeatures, toleranceRel: number): LocalCheck[
   const clipOk = f.clipping_ratio <= MAX_CLIPPING;
   const agree = Number.isFinite(d) && d <= toleranceRel;
   const inRange = f.f0_hz >= MIN_HZ && f.f0_hz <= MAX_HZ;
+  const steadyOk = f.f0_steady_share >= MIN_STEADY_SHARE;
   return [
     { code: "low_voiced", ok: voicedOk, text: voicedOk ? `音のあるところ ${f.voiced_frames} か所` : "音が短すぎて高さを決められません" },
     { code: "low_snr", ok: snrOk, text: snrOk ? `雑音より ${Math.round(f.snr_db)} dB 大きい` : "音が小さく、雑音と区別できません" },
@@ -212,6 +228,7 @@ export function pitchChecks(f: PitchFeatures, toleranceRel: number): LocalCheck[
       ok: agree,
       text: Number.isFinite(d) ? `二つの計算で求めた高さが${agree ? "一致" : "一致しない"}（差 ${(d * 100).toFixed(1)}%、許容 ${Math.round(toleranceRel * 100)}%）` : "高さを決められません",
     },
+    { code: "unstable", ok: steadyOk, text: steadyOk ? "途中で高さが変わらない" : "途中で高さが変わった（ほかの音が入ったかも）" },
     { code: "out_of_range", ok: inRange, text: inRange ? `${Math.round(f.f0_hz)} Hz` : "音の高さとして考えにくい値です" },
   ];
 }

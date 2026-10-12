@@ -291,6 +291,23 @@ describe("背景を覚えて、弱い本当の基本は見逃さない（10/12 �
     expect(passes(f)).toBe(true);
   });
 
+  it("holds when a sustained sound an octave below starts partway (7th review: 300 Hz read as 150 Hz)", () => {
+    const frames = [];
+    for (let i = 0; i < 50; i++) {
+      const data = new Float32Array(N);
+      for (let k = 0; k < N; k++) {
+        const s = (i * 4800 + k) / SR;
+        let v = 0;
+        for (const p of [0.6, 1.7, 2.8, 3.9]) if (s >= p) v += Math.exp(-(s - p) * 3) * [1, 0.5, 0.25, 0.12].reduce((x, a, h) => x + a * Math.sin(2 * Math.PI * 300 * (h + 1) * (s - p) + h), 0);
+        data[k] = 0.2 * v + (s >= 0.8 ? 0.02 * Math.sin(2 * Math.PI * 150 * s) : 0) + 0.001 * Math.sin(9999 * k);
+      }
+      frames.push({ t: i * 100, data });
+    }
+    const f = analyzePitch({ sampleRate: SR, frames });
+    expect(f.f0_steady_share).toBeLessThan(0.85);
+    expect(pitchChecks(f, 0.03).find((c) => c.code === "unstable")?.ok).toBe(false);
+  });
+
   it("does not treat a single sound in the quiet part as background", () => {
     const frames = [];
     for (let i = 0; i < 50; i++) {

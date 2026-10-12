@@ -25,6 +25,7 @@ function pitch(f0: number): Features {
     snr_db: 48,
     clipping_ratio: 0,
     voiced_frames: 45,
+    f0_steady_share: 1,
   };
 }
 
