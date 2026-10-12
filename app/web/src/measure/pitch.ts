@@ -23,7 +23,10 @@ const HARMONIC_STEPS = 160;
 const MIN_HARMONIC_RATIO = 0.003;
 /** 推定の半分の高さの音が、基本のこれ以上なら、1 オクターブ上の取り違えを疑う（約 −37 dB。教室ほどの雑音は 1 帯域あたりこれよりずっと小さい） */
 const MAX_SUBHARMONIC_RATIO = 0.0002;
-const SUBHARMONICS = [2, 3, 4];
+// 第 5 倍音以上の取り違えも見る（10/12 独立レビュー: 1/4 までだと第 5 倍音以上を純音の分かれ道が追認した）
+const SUBHARMONICS = [2, 3, 4, 5, 6, 7, 8];
+/** これより低い位置は見ない（電源の 50/60 Hz のうなり）。測れる下限 80 Hz の少し下の音を 2 倍で読むのは捕まえる */
+const SUB_FLOOR_HZ = 65;
 const CLIP_LEVEL = 0.99;
 const MIN_VOICED_FRAMES = 5;
 const MIN_SNR_DB = 10;
@@ -99,9 +102,10 @@ export function f0FromSecondHarmonic(data: Float32Array, sampleRate: number, f0:
   const fundamental = goertzelPeak(windowed, sampleRate, 0.9 * f0, 1.1 * f0);
   // 推定の 1/2・1/3・1/4 の高さにも音があるなら、f0 は倍音を基本と取り違えているかもしれない。どちらとも決めない（保留）。
   // 純音の分かれ道が、取り違えを「一致」と追認していた（10/12 Codex のデプロイ前レビュー 2・3 回目: 第 2・第 3・第 4 倍音）。
-  // 測れる下限より低い位置は見ない（電源の 50/60 Hz のうなりで保留にしないため。そこが基本なら、どのみち測れない）
+  // 65 Hz より低い位置は見ない（電源の 50/60 Hz のうなりで保留にしないため）。80 Hz の少し下の音が 2 倍で通っていたので、
+  // 下限 80 Hz ちょうどではなく少し下まで見る（10/12 独立レビュー）
   for (const k of SUBHARMONICS) {
-    if (f0 / k < MIN_HZ) break;
+    if (f0 / k < SUB_FLOOR_HZ) break;
     const sub = goertzelPeak(windowed, sampleRate, (f0 / k) * 0.95, (f0 / k) * 1.05);
     if (sub.power >= MAX_SUBHARMONIC_RATIO * fundamental.power) return NaN;
   }

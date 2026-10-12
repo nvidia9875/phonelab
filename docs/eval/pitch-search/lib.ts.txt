@@ -1,0 +1,52 @@
+import * as head from "/Users/shun/Desktop/phonelab/app/web/src/measure/pitch";
+import * as prod from "./pitch_prod";
+export { head, prod };
+export const SR = 48000, N = 4096;
+export interface Partial { f: number; a: number; decay?: number; phase?: number }
+export interface Sig { partials: Partial[]; scale?: number; noise?: number; seconds?: number; quietS?: number; seed?: number;
+  extra?: (s: number, i: number) => number; }
+export function rng(seed: number) { let x = seed; return () => { x = (x * 16807) % 2147483647; return x / 2147483647 - 0.5; }; }
+export function harmonic(f0: number, amps: number[], stretch = 0, decays?: number[]): Partial[] {
+  const r = rng(12345 + Math.round(f0 * 7));
+  return amps.map((a, h) => ({ f: f0 * (h + 1) * (1 + stretch * h), a, decay: decays?.[h], phase: 2 * Math.PI * (r() + 0.5) })).filter((p) => p.a > 0);
+}
+export function frameAt(sig: Sig, i: number, rand: () => number): Float32Array {
+  const { partials, scale = 0.2, noise = 0.002, quietS = 0.5 } = sig;
+  const data = new Float32Array(N);
+  const t0 = quietS;
+  for (let k = 0; k < N; k++) {
+    const s = (i * 4800 + k) / SR;
+    let v = 0;
+    if (s >= t0 || i * 100 >= quietS * 1000) {
+      const dt = s - t0;
+      if (dt >= 0) for (const p of partials) v += p.a * (p.decay ? Math.exp(-dt / p.decay) : 1) * Math.sin(2 * Math.PI * p.f * s + (p.phase ?? 0));
+    }
+    let x = scale * v + 2 * noise * rand();
+    if (sig.extra) x += sig.extra(s, i);
+    data[k] = Math.max(-1, Math.min(1, x));
+  }
+  return data;
+}
+export function buffer(sig: Sig) {
+  const rand = rng(sig.seed ?? 1);
+  const frames = [];
+  const n = (sig.seconds ?? 5) * 10;
+  for (let i = 0; i < n; i++) frames.push({ t: i * 100, data: frameAt(sig, i, rand) });
+  return { sampleRate: SR, frames };
+}
+export function measure(mod: typeof head, sig: Sig) {
+  const f = mod.analyzePitch(buffer(sig));
+  const checks = mod.pitchChecks(f, 0.03);
+  const ok = checks.every((c) => c.ok);
+  return { ok, f0: f.f0_hz, h2: f.f0_from_h2_hz, voiced: f.voiced_frames, snr: f.snr_db, failed: checks.filter((c) => !c.ok).map((c) => c.code) };
+}
+/** single-frame screening */
+export function frame1(mod: typeof head, sig: Sig, i = 10) {
+  const rand = rng(sig.seed ?? 1);
+  for (let j = 0; j < i; j++) for (let k = 0; k < N; k++) rand();
+  const d = frameAt(sig, i, rand);
+  const f0 = mod.f0Autocorr(d, SR);
+  const h = mod.f0FromSecondHarmonic(d, SR, f0);
+  const ok = Number.isFinite(f0) && Number.isFinite(h) && Math.abs(f0 - h) / f0 <= 0.03 && f0 >= 80 && f0 <= 2000;
+  return { ok, f0, h };
+}
