@@ -274,6 +274,23 @@ describe("背景を覚えて、弱い本当の基本は見逃さない（10/12 �
     expect(passes(withQuiet(100, [0.02, 1], bg))).toBe(false);
   });
 
+  it("ignores all-zero frames at the start (the mic just opened) for noise and background", () => {
+    const frames = [];
+    for (let i = 0; i < 50; i++) {
+      const data = new Float32Array(N);
+      for (let k = 0; k < N; k++) {
+        const s = (i * 4800 + k) / SR;
+        let v = 0;
+        for (const p of [0.6, 1.7, 2.8, 3.9]) if (s >= p) v += Math.exp(-(s - p) * 3) * [1, 0.5, 0.25, 0.12].reduce((x, a, h) => x + a * Math.sin(2 * Math.PI * 300 * (h + 1) * (s - p) + h), 0);
+        data[k] = i < 3 ? 0 : 0.2 * v + 0.006 * Math.sin(2 * Math.PI * 60 * s) + 0.003 * Math.sin(2 * Math.PI * 120 * s + 1) + 0.001 * Math.sin(9999 * k);
+      }
+      frames.push({ t: i * 100, data });
+    }
+    const f = analyzePitch({ sampleRate: SR, frames });
+    expect(f.snr_db).toBeLessThan(80);
+    expect(passes(f)).toBe(true);
+  });
+
   it("does not treat a single sound in the quiet part as background", () => {
     const frames = [];
     for (let i = 0; i < 50; i++) {

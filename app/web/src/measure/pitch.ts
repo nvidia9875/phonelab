@@ -148,11 +148,16 @@ export function analyzePitch(b: PitchBuffer): PitchFeatures {
   const frames = b.frames;
   const t0 = frames.length ? frames[0].t : 0;
   const levels = frames.map((f) => levelDb(f.data));
-  const quiet = levels.filter((_, i) => frames[i].t - t0 < QUIET_MS);
-  const noise = quiet.length ? median(quiet) : levels.length ? Math.min(...levels) : -120;
+  // マイクを開いた直後の、値が全部 0 のフレーム（iOS で出ることがある）は、雑音の大きさにも背景にも使わない。
+  // 使うと雑音が −240 dB、背景が 0 になり、雑音の検査が意味を失い、うなりのある部屋で全部保留になった（10/12 独立レビュー）
+  const live = frames.map((f) => f.data.some((v) => v !== 0));
+  const isQuiet = (i: number) => frames[i].t - t0 < QUIET_MS && live[i];
+  const quiet = levels.filter((_, i) => isQuiet(i));
+  const liveLevels = levels.filter((_, i) => live[i]);
+  const noise = quiet.length ? median(quiet) : liveLevels.length ? Math.min(...liveLevels) : -120;
   const voiced = frames.map((_, i) => i).filter((i) => frames[i].t - t0 >= QUIET_MS && levels[i] >= noise + VOICED_ABOVE_NOISE_DB);
   // 音を出す前（最初の 0.5 秒）の周波数の形を背景として覚える（電源のうなり・続いている声）
-  const background = backgroundSpectrum(frames.filter((f) => f.t - t0 < QUIET_MS).map((f) => f.data));
+  const background = backgroundSpectrum(frames.filter((_, i) => isQuiet(i)).map((f) => f.data));
   // 測定のあいだずっと大きさが変わらない帯域（うなり）。はじいた音の弱い基本は、音と一緒に大きさが変わる
   const steady = steadyBins(background, voiced.map((i) => windowedSpectrum(hann(frames[i].data))));
 
