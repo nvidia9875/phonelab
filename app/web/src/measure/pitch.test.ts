@@ -312,6 +312,23 @@ describe("背景を覚えて、弱い本当の基本は見逃さない（10/12 �
     expect(passes(analyzePitch({ sampleRate: SR, frames }))).toBe(false);
   });
 
+  it("compares with the plain reading over the same frames as the 10/9 version, even with all-zero frames (11th review)", () => {
+    const frames = [];
+    for (let i = 0; i < 50; i++) {
+      const data = new Float32Array(N);
+      for (let k = 0; k < N; k++) {
+        const s = (i * 4800 + k) / SR;
+        let v = 0;
+        for (const p of [0.6, 1.7, 2.8, 3.9]) if (s >= p) v += Math.exp(-(s - p) * 2) * [1, 0.5, 0.25, 0.12].reduce((x, a, h) => x + a * Math.sin(2 * Math.PI * 300 * (h + 1) * (s - p) + h), 0);
+        const extra = s >= 1 && s < 2 ? 0.1 * Math.sin(2 * Math.PI * 150 * s) : 0;
+        data[k] = i < 3 ? 0 : 0.0035 * v + extra + 0.004 * Math.sin(9999 * k + i);
+      }
+      frames.push({ t: i * 100, data });
+    }
+    const f = analyzePitch({ sampleRate: SR, frames });
+    expect(passes(f) && Math.abs(f.f0_hz - 150) / 150 < 0.03).toBe(false);
+  });
+
   it("holds when a brief swell of the sound an octave below takes the loudest frames (10th review)", () => {
     const frames = [];
     for (let i = 0; i < 50; i++) {

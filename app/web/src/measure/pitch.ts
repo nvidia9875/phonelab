@@ -173,6 +173,11 @@ export function analyzePitch(b: PitchBuffer): PitchFeatures {
   const liveLevels = levels.filter((_, i) => live[i]);
   const noise = quiet.length ? median(quiet) : liveLevels.length ? Math.min(...liveLevels) : -120;
   const voiced = frames.map((_, i) => i).filter((i) => frames[i].t - t0 >= QUIET_MS && levels[i] >= noise + VOICED_ABOVE_NOISE_DB);
+  // 照合用: 10/9 の版とまったく同じ雑音の見積もりとフレームの選び方（全部 0 のフレームも数える）。ここで違うと、
+  // 照合の読みが 10/9 の版の読みにならず、この版だけが別の音で通った（10/12 デプロイ前レビュー 11 回目）
+  const plainQuiet = levels.filter((_, i) => frames[i].t - t0 < QUIET_MS);
+  const plainNoise = plainQuiet.length ? median(plainQuiet) : levels.length ? Math.min(...levels) : -120;
+  const plainVoiced = frames.map((_, i) => i).filter((i) => frames[i].t - t0 >= QUIET_MS && levels[i] >= plainNoise + VOICED_ABOVE_NOISE_DB);
   // 音を出す前（最初の 0.5 秒）の周波数の形を背景として覚える（電源のうなり・続いている声）
   const background = backgroundSpectrum(frames.filter((_, i) => isQuiet(i)).map((f) => f.data));
   // 測定のあいだずっと大きさが変わらない帯域（うなり）。はじいた音の弱い基本は、音と一緒に大きさが変わる
@@ -182,13 +187,12 @@ export function analyzePitch(b: PitchBuffer): PitchFeatures {
   const f0s: number[] = [];
   const fromH2: number[] = [];
   const near: { f0: number; spectrum: Float64Array }[] = [];
-  const raws: number[] = [];
+  const raws = plainVoiced.map((i) => autocorrPitch(frames[i].data, b.sampleRate).raw).filter(Number.isFinite);
   let clipped = 0;
   let total = 0;
   voiced.forEach((i, n) => {
     const data = frames[i].data;
-    const { f0, raw } = autocorrPitch(data, b.sampleRate);
-    if (Number.isFinite(raw)) raws.push(raw);
+    const f0 = f0Autocorr(data, b.sampleRate);
     if (Number.isFinite(f0)) {
       f0s.push(f0);
       near.push({ f0, spectrum: spectra[n] });
