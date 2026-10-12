@@ -39,6 +39,8 @@ interface PitchCase {
   gain: number;
   neighbor?: number; // 隣の班の輪ゴムの高さの比（例 1.33）
   weakFundamental?: boolean;
+  pure?: boolean; // 倍音の無い音（ペットボトルに近い）
+  range?: [number, number]; // 基本周波数の範囲（既定 150〜600 Hz）
 }
 
 const PITCH_CASES: PitchCase[] = [
@@ -48,12 +50,14 @@ const PITCH_CASES: PitchCase[] = [
   { name: "音割れ（大きすぎる）", clean: false, noise: 0.003, gain: 2.5 },
   { name: "隣の班の音が同じくらい混ざる", clean: false, noise: 0.01, gain: 0.3, neighbor: 1.33 },
   { name: "基本の音が弱く倍音が強い", clean: false, noise: 0.003, gain: 0.3, weakFundamental: true },
+  { name: "倍音の無い音（ペットボトルに近い）", clean: true, noise: 0.003, gain: 0.3, pure: true },
+  { name: "低い音（80〜100 Hz）・基本の音が弱い", clean: false, noise: 0.003, gain: 0.3, weakFundamental: true, range: [80, 100] },
 ];
 
 function pluckedTone(f0: number, c: PitchCase, r: () => number, seconds = 5): PitchBuffer {
   const frames = [];
   const plucks = [0.8, 1.9, 3.0, 4.1].map((t) => t + 0.1 * r());
-  const amps = c.weakFundamental ? [0.15, 1, 0.5, 0.3] : [1, 0.5, 0.25, 0.12];
+  const amps = c.pure ? [1] : c.weakFundamental ? [0.15, 1, 0.5, 0.3] : [1, 0.5, 0.25, 0.12];
   for (let i = 0; i < (seconds * SAMPLE_RATE) / FRAME_STEP; i++) {
     const t = (i * FRAME_STEP * 1000) / SAMPLE_RATE;
     const data = new Float32Array(FFT_SIZE);
@@ -83,7 +87,8 @@ function benchPitch() {
     let falsePass = 0;
     const errors: number[] = [];
     for (let n = 0; n < TRIALS; n++) {
-      const f0 = 150 + 450 * r(); // 輪ゴムの音のあたり
+      const [lo, hi] = c.range ?? [150, 600]; // 既定は輪ゴムの音のあたり
+      const f0 = lo + (hi - lo) * r();
       const f = analyzePitch(pluckedTone(f0, c, r));
       const ok = pitchChecks(f, PITCH_TOLERANCE_REL).every((x) => x.ok);
       const err = Math.abs(f.f0_hz - f0) / f0;
@@ -120,11 +125,13 @@ function swing(lengthM: number, heightM: number, c: SpeedCase, r: () => number, 
   const release = 1.5 + 0.3 * r();
   const dt = 1000 / c.rateHz;
   const buf: RawBuffer = { t: [], ax: [], ay: [], az: [], gx: [], gy: [], gz: [], interval: dt };
+  let maxDth = 0; // 作った信号のいちばん速いところ（減衰も入れた信号と同じ式。10/12 デプロイ前レビュー: 減衰の無い値を正解にしていた）
   for (let i = 0; i < seconds * c.rateHz; i++) {
     const s = i / c.rateHz;
     const moving = s >= release;
     const th = moving ? theta0 * Math.cos(wn * (s - release)) * Math.exp(-0.03 * (s - release)) : theta0;
     const dth = moving ? -theta0 * wn * Math.sin(wn * (s - release)) * Math.exp(-0.03 * (s - release)) : 0;
+    maxDth = Math.max(maxDth, Math.abs(dth));
     buf.t.push(i * dt + (r() - 0.5) * 2); // 間隔の揺れ ±1 ms
     buf.ax.push(c.accelNoise * gauss(r));
     buf.ay.push(c.accelNoise * gauss(r));
@@ -133,7 +140,7 @@ function swing(lengthM: number, heightM: number, c: SpeedCase, r: () => number, 
     buf.gy.push((dth * 180) / Math.PI + c.gyroNoise * gauss(r));
     buf.gz.push(c.gyroNoise * gauss(r));
   }
-  return { buf, vTrue: lengthM * theta0 * wn };
+  return { buf, vTrue: lengthM * maxDth };
 }
 
 function benchSpeed() {
@@ -170,6 +177,7 @@ function summary(name: string, clean: boolean, passed: number, falsePass: number
     trials: TRIALS,
     passed,
     held: TRIALS - passed,
+    held_rate: `${Math.round(((TRIALS - passed) / TRIALS) * 100)}%`,
     false_pass: falsePass,
     median_error: Number.isFinite(median) ? fmt(median) : "—",
     worst_error: Number.isFinite(worst) ? fmt(worst) : "—",

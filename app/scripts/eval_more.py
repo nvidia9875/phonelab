@@ -255,7 +255,14 @@ SCENARIOS: dict[str, dict[str, float]] = {
         "instances": 1,
     },
     "混雑": {"plan": 2.5, "next": 2, "replan": 1, "tutor": 6, "insights": 30, "instances": 2},
-    "枠を使い切った場合": {"plan": 5, "next": 3, "replan": 3, "tutor": 10, "insights": 100, "instances": 3},
+    "枠を使い切った場合": {
+        "plan": 5,
+        "next": 3,
+        "replan": 3,
+        "tutor": 10,
+        "insights": 100,
+        "instances": 3,
+    },
 }
 LESSON = {
     "students": 31,
@@ -341,13 +348,16 @@ def render_more(out: dict[str, Any], yen) -> list[str]:
     rp = out.get("replan", {}).get("rows", [])
     if rp:
         ok = sum(r["action"] == r["expected"] for r in rp)
-        kept = sum(r.get("condition_term") is None for r in rp)
-        both = sum(r["action"] == r["expected"] and r.get("condition_term") is None for r in rp)
+        retries = [r for r in rp if r["action"] == "retry"]
+        kept = sum(r.get("condition_term") is None for r in retries)
         lines += [
             f"## 6. 保留のあとの再計画（Replanner、{len(rp)} 場面）",
             "",
             f"保留が 2 回未満なら同じ実験で直す、2 回以上で直しようが無ければ別の実験へ、と合った: **{ok} / {len(rp)}**。",
-            f"測り直しの助言が実験の条件の値（放す高さ・はじく強さ など）を変えさせていない: **{kept} / {len(rp)}**。両方を満たした（助言として有効）: **{both} / {len(rp)}**。",
+            (
+                f"測り直し（retry）の助言 {len(retries)} 件のうち、条件の値（放す高さ・はじく強さ など）を変える言い方が見つからなかった: **{kept} / {len(retries)}**"
+                "（言い方の検出で、助言が実際に役立つかは評価していない。別の実験への切り替えは対象外）。"
+            ),
             f"統制層が条件を変える助言を見つけて作り直させた: {sum('condition_changed' in r.get('fix_reasons', []) for r in rp)} 件（作り直しで通った {sum('condition_changed' in r.get('fix_reasons', []) and r.get('self_corrected') for r in rp)} 件）。",
             "",
             "| 実験 | 保留の理由 | 同じ条件の保留 | 選んだ手 | 期待 | 条件 | 助言 |",

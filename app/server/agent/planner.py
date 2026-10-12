@@ -228,8 +228,8 @@ CONDITION_TERMS: dict[str, tuple[str, ...]] = {
     # 音は「弱く」「強く」だけで条件（はじく強さ）を変えさせる（例:「さっきよりも弱くして」）
     "sound_pluck_strength": ("はじく強さ", "強さ", "弱く", "強く", "輪ゴムの長さ", "張り"),
     "sound_string_length": ("震える長さ", "長さ", "はじく強さ", "強さ", "弱く", "強く"),
-    "sound_tension": ("張り", "震える長さ", "長さ", "はじく強さ", "強さ", "弱く", "強く"),
-    "energy_length": ("糸の長さ", "長さ", "放す高さ", "高さ", "重さ"),
+    "sound_tension": ("張り", "張る", "張って", "ゆるめ", "ゆるく", "震える長さ", "長さ", "はじく強さ", "強さ", "弱く", "強く"),
+    "energy_length": ("糸の長さ", "糸", "長さ", "放す高さ", "高さ", "重さ"),
     "bottle_water": ("水の量", "水"),
     "pendulum_mass": ("重さ", "糸の長さ", "振れ幅"),
     "pendulum_length": ("糸の長さ", "長さ", "重さ", "振れ幅"),
@@ -239,7 +239,8 @@ CHANGE_VERBS = re.compile(
     r"変え|低く|高く|短く|長く|増や|減ら|小さく|大きく|弱く|強く|ゆるめ|足し|抜い|少なく|多く"
 )
 KEEP_WORDS = re.compile(r"同じ|そのまま|変えず|変えない|そろえ")
-SENTENCE_SPLIT = re.compile(r"[。！？!?\n]")
+# 文を節に分けて見る（「重さは同じにして、放す高さを低くしよう」の後ろ半分を、前半の「同じ」で見逃していた。10/12）
+SENTENCE_SPLIT = re.compile(r"[。！？!?\n、,]")
 
 
 def changes_condition(advice: str, variant_id: str) -> str | None:

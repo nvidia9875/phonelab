@@ -11,6 +11,7 @@
       "trials": 40,
       "passed": 40,
       "held": 0,
+      "held_rate": "0%",
       "false_pass": 0,
       "median_error": "0.04%",
       "worst_error": "0.13%"
@@ -21,6 +22,7 @@
       "trials": 40,
       "passed": 40,
       "held": 0,
+      "held_rate": "0%",
       "false_pass": 0,
       "median_error": "0.04%",
       "worst_error": "0.18%"
@@ -31,6 +33,7 @@
       "trials": 40,
       "passed": 0,
       "held": 40,
+      "held_rate": "100%",
       "false_pass": 0,
       "median_error": "—",
       "worst_error": "—"
@@ -41,6 +44,7 @@
       "trials": 40,
       "passed": 0,
       "held": 40,
+      "held_rate": "100%",
       "false_pass": 0,
       "median_error": "—",
       "worst_error": "—"
@@ -51,6 +55,7 @@
       "trials": 40,
       "passed": 0,
       "held": 40,
+      "held_rate": "100%",
       "false_pass": 0,
       "median_error": "—",
       "worst_error": "—"
@@ -61,9 +66,32 @@
       "trials": 40,
       "passed": 40,
       "held": 0,
+      "held_rate": "0%",
       "false_pass": 0,
       "median_error": "0.04%",
       "worst_error": "0.11%"
+    },
+    {
+      "case": "倍音の無い音（ペットボトルに近い）",
+      "clean": true,
+      "trials": 40,
+      "passed": 40,
+      "held": 0,
+      "held_rate": "0%",
+      "false_pass": 0,
+      "median_error": "0.09%",
+      "worst_error": "0.20%"
+    },
+    {
+      "case": "低い音（80〜100 Hz）・基本の音が弱い",
+      "clean": false,
+      "trials": 40,
+      "passed": 40,
+      "held": 0,
+      "held_rate": "0%",
+      "false_pass": 0,
+      "median_error": "0.22%",
+      "worst_error": "0.60%"
     }
   ],
   "speed": [
@@ -73,9 +101,10 @@
       "trials": 40,
       "passed": 40,
       "held": 0,
+      "held_rate": "0%",
       "false_pass": 0,
-      "median_error": "0.022 m/s",
-      "worst_error": "0.033 m/s"
+      "median_error": "0.004 m/s",
+      "worst_error": "0.010 m/s"
     },
     {
       "case": "60 Hz・センサーの雑音 中",
@@ -83,9 +112,10 @@
       "trials": 40,
       "passed": 40,
       "held": 0,
+      "held_rate": "0%",
       "false_pass": 0,
-      "median_error": "0.017 m/s",
-      "worst_error": "0.037 m/s"
+      "median_error": "0.011 m/s",
+      "worst_error": "0.054 m/s"
     },
     {
       "case": "30 Hz（遅い端末）",
@@ -93,9 +123,10 @@
       "trials": 40,
       "passed": 40,
       "held": 0,
+      "held_rate": "0%",
       "false_pass": 0,
-      "median_error": "0.039 m/s",
-      "worst_error": "0.057 m/s"
+      "median_error": "0.018 m/s",
+      "worst_error": "0.031 m/s"
     },
     {
       "case": "センサーの雑音 大",
@@ -103,9 +134,149 @@
       "trials": 40,
       "passed": 36,
       "held": 4,
-      "false_pass": 4,
-      "median_error": "0.053 m/s",
-      "worst_error": "0.189 m/s"
+      "held_rate": "10%",
+      "false_pass": 7,
+      "median_error": "0.073 m/s",
+      "worst_error": "0.210 m/s"
     }
-  ]
+  ],
+  "before_fix": {
+    "note": "同じ信号・同じ数え方で、10/9 に本番に出した測定コード（コミット dfea9c2）を通した結果",
+    "pitch": [
+      {
+        "case": "きれいな音（雑音 小）",
+        "clean": true,
+        "trials": 40,
+        "passed": 40,
+        "held": 0,
+        "held_rate": "0%",
+        "false_pass": 0,
+        "median_error": "0.04%",
+        "worst_error": "0.13%"
+      },
+      {
+        "case": "教室ほどの雑音",
+        "clean": true,
+        "trials": 40,
+        "passed": 40,
+        "held": 0,
+        "held_rate": "0%",
+        "false_pass": 0,
+        "median_error": "0.04%",
+        "worst_error": "0.18%"
+      },
+      {
+        "case": "雑音が大きい（音が小さい）",
+        "clean": false,
+        "trials": 40,
+        "passed": 0,
+        "held": 40,
+        "held_rate": "100%",
+        "false_pass": 0,
+        "median_error": "—",
+        "worst_error": "—"
+      },
+      {
+        "case": "音割れ（大きすぎる）",
+        "clean": false,
+        "trials": 40,
+        "passed": 0,
+        "held": 40,
+        "held_rate": "100%",
+        "false_pass": 0,
+        "median_error": "—",
+        "worst_error": "—"
+      },
+      {
+        "case": "隣の班の音が同じくらい混ざる",
+        "clean": false,
+        "trials": 40,
+        "passed": 0,
+        "held": 40,
+        "held_rate": "100%",
+        "false_pass": 0,
+        "median_error": "—",
+        "worst_error": "—"
+      },
+      {
+        "case": "基本の音が弱く倍音が強い",
+        "clean": false,
+        "trials": 40,
+        "passed": 40,
+        "held": 0,
+        "held_rate": "0%",
+        "false_pass": 40,
+        "median_error": "100.07%",
+        "worst_error": "100.25%"
+      },
+      {
+        "case": "倍音の無い音（ペットボトルに近い）",
+        "clean": true,
+        "trials": 40,
+        "passed": 37,
+        "held": 3,
+        "held_rate": "8%",
+        "false_pass": 0,
+        "median_error": "0.09%",
+        "worst_error": "0.20%"
+      },
+      {
+        "case": "低い音（80〜100 Hz）・基本の音が弱い",
+        "clean": false,
+        "trials": 40,
+        "passed": 40,
+        "held": 0,
+        "held_rate": "0%",
+        "false_pass": 40,
+        "median_error": "100.44%",
+        "worst_error": "101.07%"
+      }
+    ],
+    "speed": [
+      {
+        "case": "60 Hz・センサーの雑音 小",
+        "clean": true,
+        "trials": 40,
+        "passed": 40,
+        "held": 0,
+        "held_rate": "0%",
+        "false_pass": 0,
+        "median_error": "0.005 m/s",
+        "worst_error": "0.021 m/s"
+      },
+      {
+        "case": "60 Hz・センサーの雑音 中",
+        "clean": true,
+        "trials": 40,
+        "passed": 40,
+        "held": 0,
+        "held_rate": "0%",
+        "false_pass": 0,
+        "median_error": "0.033 m/s",
+        "worst_error": "0.112 m/s"
+      },
+      {
+        "case": "30 Hz（遅い端末）",
+        "clean": true,
+        "trials": 40,
+        "passed": 40,
+        "held": 0,
+        "held_rate": "0%",
+        "false_pass": 0,
+        "median_error": "0.007 m/s",
+        "worst_error": "0.049 m/s"
+      },
+      {
+        "case": "センサーの雑音 大",
+        "clean": false,
+        "trials": 40,
+        "passed": 37,
+        "held": 3,
+        "held_rate": "8%",
+        "false_pass": 20,
+        "median_error": "0.158 m/s",
+        "worst_error": "0.366 m/s"
+      }
+    ]
+  }
 }

@@ -19,6 +19,8 @@ const AUTOCORR_THRESHOLD = 0.5;
 /** 2 倍の周期の繰り返しが、これだけはっきりしていたら 1 オクターブ下を基本とする */
 const OCTAVE_MARGIN = 0.1;
 const HARMONIC_STEPS = 160;
+/** 第 2 倍音の強さが基本のこれ未満なら、倍音は無いとみなす（約 −25 dB） */
+const MIN_HARMONIC_RATIO = 0.003;
 const CLIP_LEVEL = 0.99;
 const MIN_VOICED_FRAMES = 5;
 const MIN_SNR_DB = 10;
@@ -64,9 +66,12 @@ export function f0Autocorr(data: Float32Array, sampleRate: number): number {
   const x = Array.from(data, (v) => v - m);
   const { tau, r } = firstAutocorrPeak(x, 1 / sampleRate, 1 / MAX_HZ, 1 / MIN_HZ, AUTOCORR_THRESHOLD);
   if (!(Number.isFinite(tau) && tau > 0)) return NaN;
-  const double = 2 * tau;
-  if (double <= 1 / MIN_HZ && autocorrAt(x, Math.round(double * sampleRate)) > r + OCTAVE_MARGIN) return 1 / double;
-  return 1 / tau;
+  const lag = Math.round(2 * tau * sampleRate);
+  if (lag >= x.length / 2 || autocorrAt(x, lag) <= r + OCTAVE_MARGIN) return 1 / tau;
+  // 1 オクターブ下が基本。ただし測れる下限より低ければ、どちらか決められないので値を出さない（保留にする）。
+  // 下限の手前で片方の条件だけ補正されると、比べた向きが逆になった（10/12 Codex のデプロイ前レビュー）
+  const lower = 1 / (2 * tau);
+  return lower >= MIN_HZ ? lower : NaN;
 }
 
 function autocorrAt(x: readonly number[], k: number): number {
@@ -77,15 +82,24 @@ function autocorrAt(x: readonly number[], k: number): number {
   return e0 > 0 ? s / e0 : 0;
 }
 
-/** f0 の 1.8〜2.2 倍で最も強い周波数（Goertzel 法で走査）の半分 */
+/** 二つ目の測り方: f0 の 1.8〜2.2 倍で最も強い周波数（Goertzel 法で走査）の半分。
+ * 倍音がほとんど無い音（ペットボトルの音のような純音に近い音）では、倍音の位置の雑音を拾って一致しなくなるので、
+ * f0 の 0.9〜1.1 倍の周波数の山（周波数の側から見た基本）を使う。自己相関とは別の計算（10/12 Codex のデプロイ前レビュー） */
 export function f0FromSecondHarmonic(data: Float32Array, sampleRate: number, f0: number): number {
   if (!Number.isFinite(f0)) return NaN;
   const n = data.length;
-  const lo = 1.8 * f0;
-  const hi = Math.min(2.2 * f0, sampleRate / 2 - 1);
-  if (hi <= lo) return NaN;
   const windowed = new Float64Array(n);
   for (let i = 0; i < n; i++) windowed[i] = data[i] * (0.5 - 0.5 * Math.cos((2 * Math.PI * i) / (n - 1)));
+  const hi = Math.min(2.2 * f0, sampleRate / 2 - 1);
+  if (hi <= 1.8 * f0) return NaN;
+  const harmonic = goertzelPeak(windowed, sampleRate, 1.8 * f0, hi);
+  const fundamental = goertzelPeak(windowed, sampleRate, 0.9 * f0, 1.1 * f0);
+  if (harmonic.power < MIN_HARMONIC_RATIO * fundamental.power) return fundamental.freq;
+  return harmonic.freq / 2;
+}
+
+function goertzelPeak(windowed: Float64Array, sampleRate: number, lo: number, hi: number): { freq: number; power: number } {
+  const n = windowed.length;
   const power = new Float64Array(HARMONIC_STEPS + 1);
   for (let step = 0; step <= HARMONIC_STEPS; step++) {
     const w = (2 * Math.PI * (lo + ((hi - lo) * step) / HARMONIC_STEPS)) / sampleRate;
@@ -106,7 +120,7 @@ export function f0FromSecondHarmonic(data: Float32Array, sampleRate: number, f0:
     const denom = a - 2 * b + c;
     offset = denom !== 0 ? (0.5 * (a - c)) / denom : 0;
   }
-  return (lo + (best + offset) * ((hi - lo) / HARMONIC_STEPS)) / 2;
+  return { freq: lo + (best + offset) * ((hi - lo) / HARMONIC_STEPS), power: power[best] };
 }
 
 export function analyzePitch(b: PitchBuffer): PitchFeatures {
@@ -164,7 +178,7 @@ export function pitchChecks(f: PitchFeatures, toleranceRel: number): LocalCheck[
     {
       code: "two_clocks_disagree",
       ok: agree,
-      text: Number.isFinite(d) ? `基本周波数と倍音から求めた高さが${agree ? "一致" : "一致しない"}（差 ${(d * 100).toFixed(1)}%、許容 ${Math.round(toleranceRel * 100)}%）` : "高さを決められません",
+      text: Number.isFinite(d) ? `二つの計算で求めた高さが${agree ? "一致" : "一致しない"}（差 ${(d * 100).toFixed(1)}%、許容 ${Math.round(toleranceRel * 100)}%）` : "高さを決められません",
     },
     { code: "out_of_range", ok: inRange, text: inRange ? `${Math.round(f.f0_hz)} Hz` : "音の高さとして考えにくい値です" },
   ];

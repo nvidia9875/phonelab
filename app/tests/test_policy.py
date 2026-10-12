@@ -88,3 +88,14 @@ def test_unsafe_instruction_catches_advice_but_not_warnings():
     assert unsafe_instruction("端末を落とさないように袋を結ぼう。") is None
     assert unsafe_instruction("窓から投げるのは危ないのでやめよう。") is None
     assert unsafe_instruction("1.98 m/s だったね。同じ高さから放そう") is None
+
+
+def test_changes_condition_covers_the_new_experiments_and_reads_clause_by_clause():
+    """10/12 デプロイ前レビュー: 新しい 2 実験の言い換えと、「同じ」が前半にあるだけで後半を見逃していた"""
+    from server.agent.planner import changes_condition
+
+    assert changes_condition("輪ゴムをゆるめて、もう一度測ろう", "sound_tension")
+    assert changes_condition("糸を短くして、もう一度放そう", "energy_length")
+    assert changes_condition("重さは同じにして、放す高さを低くしよう", "energy_length")
+    assert changes_condition("張りはそのまま、まわりを静かにしてもう一度", "sound_tension") is None
+    assert changes_condition("同じ高さから、そっと放そう", "energy_length") is None

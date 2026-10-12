@@ -93,3 +93,37 @@ describe("1 オクターブ上の取り違え（10/12 合成ベンチマーク�
     expect(Math.abs(f.f0_hz - 330) / 330).toBeLessThan(0.03);
   });
 });
+
+describe("下限の近くで比べた向きが逆にならない（10/12 デプロイ前レビュー）", () => {
+  function weakFundamental(f0: number) {
+    const amps = [0.15, 1, 0.5, 0.3];
+    const frames = [];
+    for (let i = 0; i < 50; i++) {
+      const data = new Float32Array(N);
+      for (let k = 0; k < N; k++) {
+        const s = (i * 4800 + k) / SR;
+        data[k] = i < 5 ? 0.001 * Math.sin(9999 * k) : 0.2 * amps.reduce((v, a, h) => v + a * Math.sin(2 * Math.PI * f0 * (h + 1) * s), 0);
+      }
+      frames.push({ t: i * 100, data });
+    }
+    return analyzePitch({ sampleRate: SR, frames });
+  }
+
+  it("never reports 80 Hz → 85 Hz as going down", () => {
+    const a = weakFundamental(80);
+    const b = weakFundamental(85);
+    const aOk = pitchChecks(a, 0.03).every((c) => c.ok);
+    const bOk = pitchChecks(b, 0.03).every((c) => c.ok);
+    // 両方とも検査を通ったなら、向きは「高くなった」でなければならない（決められない側は保留でよい）
+    if (aOk && bOk) expect(b.f0_hz).toBeGreaterThan(a.f0_hz);
+  });
+});
+
+describe("倍音の無い音（ペットボトルのような純音に近い音）", () => {
+  it("passes the two-clock check when the fundamental is right", () => {
+    const f = analyzePitch(tone({ f0: 180, harmonic: 0 }));
+
+    expect(Math.abs(f.f0_hz - 180) / 180).toBeLessThan(0.03);
+    expect(pitchChecks(f, 0.03).find((c) => c.code === "two_clocks_disagree")?.ok).toBe(true);
+  });
+});
