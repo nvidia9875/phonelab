@@ -52,6 +52,8 @@ export function Plan({ theme, variant, predictionText, why, source, trail = [], 
         {source && <p className="card__hint">{SOURCE_NOTE[source]}</p>}
         <Trail steps={trail} selfCorrected={selfCorrected} traceId={traceId} />
         <Pair items={[{ k: "変えるもの", v: variant.changes }, { k: "一定にするもの", v: variant.holds }]} />
+        {/* 条件をそろえる考え方は、問いかけだけでは身につきにくく、はっきり言うと身につく（Chen & Klahr 1999。10/12） */}
+        <p className="card__hint">変えるのは 1 つだけ。ほかはそろえます。いくつも変えると、どれが効いたのか分からなくなるから。</p>
         <PermitChip sensors={sensors} seconds={theme.seconds} denied={deniedText} />
         <InfoRow icon="box-check">
           <strong>手元にある？</strong>　{theme.materials}。なければ「ほかの実験を見る」

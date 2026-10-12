@@ -25,6 +25,7 @@ import { demoFeatures } from "./measure/demo";
 import { probeMotionEvents } from "./measure/pendulum";
 import * as flow from "./flow/useFlow";
 import { askNext, isNextStale } from "./flow/nextStep";
+import { evidenceOf } from "./flow/evidence";
 
 const goHome = () => nav("/");
 
@@ -409,6 +410,7 @@ export function App() {
         <Result
           key={r.id}
           sample={r.measurements.some((x) => x.demo)}
+          evidence={evidenceOf(r)}
           variant={variant!}
           judgement={r.result!}
           explain={r.explain}

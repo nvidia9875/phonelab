@@ -3,6 +3,7 @@ import { Button, Card, CardBody, CardLabel, CardTitle, Choices, Eyebrow, Field, 
 import { QUANTITY, formatNumber } from "../catalog/quantity";
 import type { Variant } from "../catalog/themes";
 import type { CondKey, Direction, Judgement, NextSuggestion } from "../store/records";
+import type { Evidence } from "../flow/evidence";
 
 export interface ResultProps {
   variant: Variant;
@@ -25,9 +26,15 @@ export interface ResultProps {
   repeats: number;
   /** テストモードのサンプル値で進めた記録 */
   sample?: boolean;
+  /** 音の大きさと、判定に使った測定が通った検査（無ければ出さない） */
+  evidence?: Evidence;
   maxRetry: number;
   onRemeasure: (cond: CondKey) => void;
   onHome: () => void;
+}
+
+function signed(n: number): string {
+  return n > 0 ? `+${n}` : `${n}`;
 }
 
 /** 画面 3: 結果と次の予測。「正解」と言わない。「測定が言っていること」と言う */
@@ -37,7 +44,7 @@ const NEXT_SOURCE: Record<NextSuggestion["source"], string> = {
   stub: "いまはラボ先生につながらないので、カタログの順です",
 };
 
-export function Result({ variant, judgement, explain, nextVariant, nextDirection, suggestion, stale, onLoadNext, onExplain, onNext, onGoNext, onFinish, onRecord, onChat, retries, maxRetry, repeats, sample = false, onRemeasure, onHome }: ResultProps) {
+export function Result({ variant, judgement, explain, nextVariant, nextDirection, suggestion, stale, onLoadNext, onExplain, onNext, onGoNext, onFinish, onRecord, onChat, retries, maxRetry, repeats, sample = false, evidence, onRemeasure, onHome }: ResultProps) {
   const [text, setText] = useState(explain);
   const [loading, setLoading] = useState(stale);
   useEffect(() => {
@@ -77,10 +84,28 @@ export function Result({ variant, judgement, explain, nextVariant, nextDirection
         <Eyebrow>{j.undecided ? "保留 ― 測定が言っていること" : j.consistent === false ? "予想とちがった！ ここが発見" : j.consistent ? "予想どおり！ 測定が言っていること" : "測定が言っていること"}</Eyebrow>
         <CardTitle>{j.statement}</CardTitle>
         <CardBody>{j.detail}</CardBody>
+        {j.consistent === false && !j.undecided && evidence && evidence.passedChecks.length > 0 && (
+          <p className="card__hint" style={{ color: "inherit", opacity: 0.85 }}>
+            この測定は、機械の検査（{evidence.passedChecks.join("・")}）を通っています。測り方のせいにする前に、なぜかを考えてみよう
+          </p>
+        )}
       </Card>
       </div>
 
-      <Section label="なぜそうなったと思う？　自分の言葉で">
+      {evidence?.loudness && !j.undecided && (
+        <Card variant="line">
+          <Eyebrow>音の大きさも見てみよう</Eyebrow>
+          <p className="card__text">
+            {variant.conditions[0].label} {Math.round(evidence.loudness.A)} dB → {variant.conditions[1].label} {Math.round(evidence.loudness.B)} dB（
+            {signed(Math.round(evidence.loudness.B - evidence.loudness.A))} dB）
+          </p>
+          <p className="card__hint">
+            音には「大きさ」と「高さ」があります。{variant.variable === "strength" ? "強くはじいて変わったのはどちらかな？ " : ""}大きさは震えの幅、高さは 1 秒に震える回数で決まります（dB はマイクで測った相対的な大きさ）
+          </p>
+        </Card>
+      )}
+
+      <Section label={j.consistent ? "予想どおりだった理由も、自分の言葉で書いてみよう" : "なぜそうなったと思う？　自分の言葉で"}>
         <Field value={text} onChange={(e) => setText(e.target.value)} onBlur={() => onExplain(text)} placeholder="たとえば：変えたのは〇〇だけなのに、△△が変わらなかったのは…" />
       </Section>
 

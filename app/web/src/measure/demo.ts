@@ -48,7 +48,7 @@ function periodSwing(periodS: number, seconds: number): RawBuffer {
   });
 }
 
-function tone(f0: number, seconds: number): PitchBuffer {
+function tone(f0: number, seconds: number, amp = 0.3): PitchBuffer {
   const frames = [];
   for (let i = 0; i < seconds * 10; i++) {
     const t = i * 100;
@@ -57,7 +57,7 @@ function tone(f0: number, seconds: number): PitchBuffer {
     for (let k = 0; k < FFT_SIZE; k++) {
       const s = (i * 4800 + k) / SAMPLE_RATE;
       const noise = 0.002 * Math.sin(12345.678 * (i * FFT_SIZE + k));
-      data[k] = (voiced ? 0.3 * (Math.sin(2 * Math.PI * f0 * s) + 0.5 * Math.sin(4 * Math.PI * f0 * s)) : 0) + noise;
+      data[k] = (voiced ? amp * (Math.sin(2 * Math.PI * f0 * s) + 0.5 * Math.sin(4 * Math.PI * f0 * s)) : 0) + noise;
     }
     frames.push({ t, data });
   }
@@ -84,7 +84,9 @@ export function demoFeatures(theme: Theme, variant: Variant, idx: 0 | 1): Featur
                 ? 180
                 : 250
               : base * (1 + idx * 0.005);
-      return analyzePitch(tone(f0, theme.seconds));
+      // 強くはじくと大きさだけが変わる（テストモードでも「音の大きさも見てみよう」が意味を持つように）
+      const amp = variant.variable === "strength" && idx === 1 ? 0.6 : 0.3;
+      return analyzePitch(tone(f0, theme.seconds, amp));
     }
     default: {
       const periodS = variant.variable === "length" && idx === 1 ? 2.01 : variant.variable === "amplitude" && idx === 1 ? 1.44 : idx === 1 ? 1.43 : 1.42;
