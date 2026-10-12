@@ -11,7 +11,7 @@ import { QUANTITY, formatQuantity, type Unit } from "../catalog/quantity";
 import { SENSOR_LABEL, repeatsOf, themeById, variantById, variantsOf, type Theme } from "../catalog/themes";
 import type { LocalCheck } from "../measure/checks";
 import { clocksSummary, measuredValue, type Features } from "../measure/features";
-import { activeRecordForTheme, addEvent, withTrace, getState, setClassState, setHalted, createRecord, currentClassCode, currentNumber, currentSecret, recordById, recordsForTheme, updateRecord, type ChatLog, type Claim, type CondKey, type Direction, type HoldAdvice, type PlanInfo, type Rejection, type StudyRecord } from "../store/records";
+import { activeRecordForTheme, addEvent, withTrace, getState, setClassState, setHalted, createRecord, currentClassCode, currentNumber, currentSecret, recordById, recordsForTheme, updateRecord, type ChatLog, type Claim, type CondKey, type Direction, type HoldAdvice, type PlanInfo, type Rejection, type StudyRecord, type Cer, type Confidence } from "../store/records";
 
 export const MAX_RETRY = 3;
 const EMPTY_TRIES: Record<CondKey, number> = { A: 0, B: 0 };
@@ -385,10 +385,24 @@ export function nextVariantFor(rec: StudyRecord, theme: Theme) {
 
 export function chooseNext(rec: StudyRecord, theme: Theme, direction: Direction): void {
   const nv = nextVariantFor(rec, theme);
-  updateRecord(rec.id, (r) => ({ ...r, nextPrediction: { variantId: nv?.id ?? null, direction } }));
+  updateRecord(rec.id, (r) => ({ ...r, nextPrediction: { ...r.nextPrediction, variantId: nv?.id ?? null, direction } }));
 }
 
 /** 記録を閉じて（端末ハッシュを付けて）、次の実験の記録を作る */
+/** 次の予想の理由と自信（POE: 2 回目以降の予想にも理由を。自信をもって外れたことほど直りやすい: Butterfield & Metcalfe 2001） */
+export function setNextReason(rec: StudyRecord, reason: string, confidence: Confidence | undefined): void {
+  updateRecord(rec.id, (r) => (r.nextPrediction ? { ...r, nextPrediction: { ...r.nextPrediction, reason: reason.slice(0, 200), confidence } } : r));
+}
+
+/** 主張・証拠・理由。explain には三つをつないだ文を入れる（次の一手・会話はこれを読む） */
+export function setCer(rec: StudyRecord, cer: Cer): void {
+  const parts = [cer.claim && `主張: ${cer.claim}`, cer.evidence && `証拠: ${cer.evidence}`, cer.reasoning && `理由: ${cer.reasoning}`].filter(Boolean);
+  const explain = cer.claim || cer.evidence ? parts.join("／") : cer.reasoning;
+  updateRecord(rec.id, (r) => ({ ...r, cer, explain }));
+}
+
+export const CONFIDENCE_WORDS: Record<Confidence, string> = { sure: "自信あり", half: "半々", unsure: "自信なし" };
+
 export async function closeAndNext(rec: StudyRecord, theme: Theme): Promise<StudyRecord | null> {
   await sealRecord(rec);
   const nv = nextVariantFor(rec, theme);
@@ -396,7 +410,8 @@ export async function closeAndNext(rec: StudyRecord, theme: Theme): Promise<Stud
   const direction = rec.nextPrediction.direction;
   const next = createRecord(theme.id);
   updateRecord(next.id, (r) => {
-    const text = `${nv.changes.split("（")[0]}を変えたら、${directionWord(nv.unit, direction)}と思う`;
+    const reason = rec.nextPrediction?.reason?.trim();
+    const text = `${nv.changes.split("（")[0]}を変えたら、${directionWord(nv.unit, direction)}と思う${reason ? `。${reason}` : ""}`;
     const s = rec.nextSuggestion;
     const fromAgent = s?.action === "next" && s.variantId === nv.id;
     const plan: PlanInfo = fromAgent
@@ -420,7 +435,8 @@ export async function sealRecord(rec: StudyRecord): Promise<void> {
     if (r.nextPrediction) {
       const theme = themeById(r.themeId);
       const unit = (theme && variantById(theme, r.nextPrediction.variantId ?? r.variantId)?.unit) ?? "s";
-      n = addEvent(n, "次の予測", `「${directionWord(unit, r.nextPrediction.direction)}」と記入。次の実験へ`, "orange");
+      const conf = r.nextPrediction.confidence ? `・${CONFIDENCE_WORDS[r.nextPrediction.confidence]}` : "";
+      n = addEvent(n, "次の予測", `「${directionWord(unit, r.nextPrediction.direction)}」と記入${conf}。次の実験へ`, "orange");
     }
     return n;
   });

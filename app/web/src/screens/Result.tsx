@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Button, Card, CardBody, CardLabel, CardTitle, Choices, Eyebrow, Field, Foot, FootNote, Grid2, Link, LinkRow, Screen, Section, Stat } from "../components/ui";
 import { QUANTITY, formatNumber } from "../catalog/quantity";
 import type { Variant } from "../catalog/themes";
-import type { CondKey, Direction, Judgement, NextSuggestion } from "../store/records";
+import type { Cer, CondKey, Confidence, Direction, Judgement, NextSuggestion } from "../store/records";
 import type { Evidence } from "../flow/evidence";
 
 export interface ResultProps {
@@ -28,6 +28,14 @@ export interface ResultProps {
   sample?: boolean;
   /** 音の大きさと、判定に使った測定が通った検査（無ければ出さない） */
   evidence?: Evidence;
+  /** 主張・証拠・理由（古い記録は null） */
+  cer?: Cer | null;
+  /** テーマの最初の実験は三つの欄を全部、慣れたら理由だけ（足場を外していく: McNeill ら 2006） */
+  fullCer?: boolean;
+  onCer?: (cer: Cer) => void;
+  nextReason?: string;
+  nextConfidence?: Confidence | null;
+  onNextReason?: (reason: string, confidence: Confidence | undefined) => void;
   maxRetry: number;
   onRemeasure: (cond: CondKey) => void;
   onHome: () => void;
@@ -44,8 +52,13 @@ const NEXT_SOURCE: Record<NextSuggestion["source"], string> = {
   stub: "いまはラボ先生につながらないので、カタログの順です",
 };
 
-export function Result({ variant, judgement, explain, nextVariant, nextDirection, suggestion, stale, onLoadNext, onExplain, onNext, onGoNext, onFinish, onRecord, onChat, retries, maxRetry, repeats, sample = false, evidence, onRemeasure, onHome }: ResultProps) {
+export function Result({ variant, judgement, explain, nextVariant, nextDirection, suggestion, stale, onLoadNext, onExplain, onNext, onGoNext, onFinish, onRecord, onChat, retries, maxRetry, repeats, sample = false, evidence, cer: savedCer = null, fullCer = false, onCer, nextReason = "", nextConfidence = null, onNextReason, onRemeasure, onHome }: ResultProps) {
   const [text, setText] = useState(explain);
+  const [cer, setCer] = useState<Cer>(savedCer ?? { claim: "", evidence: "", reasoning: savedCer === null && explain ? explain : "" });
+  const [reason, setReason] = useState(nextReason);
+  const [confidence, setConfidence] = useState<Confidence | null>(nextConfidence);
+  // 主張・証拠・理由を記録へ（理由だけのときは今までどおり explain に）
+  const commit = () => (onCer ? onCer(cer) : onExplain(text));
   const [loading, setLoading] = useState(stale);
   useEffect(() => {
     if (!stale) {
@@ -105,9 +118,20 @@ export function Result({ variant, judgement, explain, nextVariant, nextDirection
         </Card>
       )}
 
-      <Section label={j.consistent ? "予想どおりだった理由も、自分の言葉で書いてみよう" : "なぜそうなったと思う？　自分の言葉で"}>
-        <Field value={text} onChange={(e) => setText(e.target.value)} onBlur={() => onExplain(text)} placeholder="たとえば：変えたのは〇〇だけなのに、△△が変わらなかったのは…" />
-      </Section>
+      {onCer ? (
+        <CerFields
+          cer={cer}
+          full={fullCer}
+          consistent={j.consistent}
+          measured={`${variant.conditions[0].label} ${formatNumber(j.a, unit)} ${unit} → ${variant.conditions[1].label} ${formatNumber(j.b, unit)} ${unit}${evidence?.loudness ? `（大きさ ${signed(Math.round(evidence.loudness.B - evidence.loudness.A))} dB）` : ""}`}
+          onChange={setCer}
+          onCommit={(next) => onCer(next)}
+        />
+      ) : (
+        <Section label={j.consistent ? "予想どおりだった理由も、自分の言葉で書いてみよう" : "なぜそうなったと思う？　自分の言葉で"}>
+          <Field value={text} onChange={(e) => setText(e.target.value)} onBlur={() => onExplain(text)} placeholder="たとえば：変えたのは〇〇だけなのに、△△が変わらなかったのは…" />
+        </Section>
+      )}
 
       {loading && (
         <Card variant="line">
@@ -157,6 +181,30 @@ export function Result({ variant, judgement, explain, nextVariant, nextDirection
             value={nextDirection}
             onChange={onNext}
           />
+          {nextDirection && onNextReason && (
+            <>
+              <Field
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                onBlur={() => onNextReason(reason, confidence ?? undefined)}
+                placeholder="そう思う理由をひとこと（たとえば：短いと速く震えそうだから）"
+                rows={2}
+              />
+              <p className="card__hint">どのくらい自信がある？</p>
+              <Choices
+                options={[
+                  { v: "sure" as const, label: "自信あり" },
+                  { v: "half" as const, label: "半々" },
+                  { v: "unsure" as const, label: "自信なし" },
+                ]}
+                value={confidence}
+                onChange={(v) => {
+                  setConfidence(v);
+                  onNextReason(reason, v);
+                }}
+              />
+            </>
+          )}
           <p className="card__hint">予測を選んでから、次の実験へ進めます</p>
         </Card>
       ) : (
@@ -171,7 +219,7 @@ export function Result({ variant, judgement, explain, nextVariant, nextDirection
         <p className="card__hint">気になる条件をもう一度測れます。前の測定も記録に残り、判定は新しい測定でやり直します（1 条件 {maxRetry} 回まで）</p>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
           {(["A", "B"] as CondKey[]).map((cond, i) => (
-            <Button key={cond} sm secondary disabled={retries[cond] >= maxRetry} onClick={() => { onExplain(text); onRemeasure(cond); }}>
+            <Button key={cond} sm secondary disabled={retries[cond] >= maxRetry} onClick={() => { commit(); onRemeasure(cond); }}>
               {variant.conditions[i].label}を測り直す{retries[cond] > 0 ? `（${retries[cond]} / ${maxRetry}）` : ""}
             </Button>
           ))}
@@ -182,7 +230,7 @@ export function Result({ variant, judgement, explain, nextVariant, nextDirection
         {/* ふり返りが先なら、話すボタンを主に（主のボタンは 1 つだけ） */}
         {reflect ? (
           <>
-            <Button onClick={() => { onExplain(text); onChat(); }}>ラボ先生と、なぜそうなったか話す</Button>
+            <Button onClick={() => { commit(); onChat(); }}>ラボ先生と、なぜそうなったか話す</Button>
             <Button secondary onClick={() => { onExplain(text); onFinish(); }}>トップへ</Button>
           </>
         ) : (
@@ -192,7 +240,7 @@ export function Result({ variant, judgement, explain, nextVariant, nextDirection
             ) : (
               <Button onClick={() => { onExplain(text); onFinish(); }}>トップへ</Button>
             )}
-            <Button secondary onClick={() => { onExplain(text); onChat(); }}>ラボ先生と、なぜそうなったか話す</Button>
+            <Button secondary onClick={() => { commit(); onChat(); }}>ラボ先生と、なぜそうなったか話す</Button>
           </>
         )}
         <LinkRow>
@@ -203,5 +251,38 @@ export function Result({ variant, judgement, explain, nextVariant, nextDirection
         <FootNote>この結果は記録に残ります。</FootNote>
       </Foot>
     </Screen>
+  );
+}
+
+/** 主張・証拠・理由。最初の実験は三つとも、慣れたら理由だけ（主張と証拠は開けば書ける） */
+function CerFields({ cer, full, consistent, measured, onChange, onCommit }: { cer: Cer; full: boolean; consistent: boolean | null; measured: string; onChange: (c: Cer) => void; onCommit: (c: Cer) => void }) {
+  const set = (k: keyof Cer) => (e: { target: { value: string } }) => onChange({ ...cer, [k]: e.target.value });
+  const blur = () => onCommit(cer);
+  const claimAndEvidence = (
+    <>
+      <Section label="主張: 測ってわかったことは？">
+        <Field value={cer.claim} onChange={set("claim")} onBlur={blur} rows={2} placeholder="たとえば：はじく強さを変えても、音の高さは〇〇" />
+      </Section>
+      <Section label="証拠: どの数字からそう言える？">
+        <Field value={cer.evidence} onChange={set("evidence")} onBlur={blur} rows={2} placeholder={`たとえば：${measured}`} />
+        <Button sm secondary onClick={() => { const next = { ...cer, evidence: measured }; onChange(next); onCommit(next); }}>
+          測った値を入れる
+        </Button>
+      </Section>
+    </>
+  );
+  return (
+    <>
+      {full ? claimAndEvidence : null}
+      <Section label={consistent ? "理由: 予想どおりだったのはなぜ？" : "理由: なぜそうなったと思う？"}>
+        <Field value={cer.reasoning} onChange={set("reasoning")} onBlur={blur} placeholder="たとえば：変えたのは〇〇だけなのに、△△が変わらなかったのは…" />
+      </Section>
+      {!full && (
+        <details className="remeasure">
+          <summary className="remeasure__summary">主張と証拠も書く</summary>
+          {claimAndEvidence}
+        </details>
+      )}
+    </>
   );
 }

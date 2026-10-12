@@ -15,7 +15,7 @@ import { Settings } from "./screens/Settings";
 import { Chat } from "./screens/Chat";
 import { repeatsOf, themeById, variantById, type Theme } from "./catalog/themes";
 import { matchRoute, nav, usePath, type Route } from "./router";
-import { activeRecordForTheme, createRecord, getState, wipeDevice, myRecordById, setClassState, setHalted, setSettings, setStudent, useStore, type ClassState, type StudyRecord } from "./store/records";
+import { activeRecordForTheme, createRecord, getState, recordsForTheme, wipeDevice, myRecordById, setClassState, setHalted, setSettings, setStudent, useStore, type ClassState, type StudyRecord } from "./store/records";
 import { DEFAULT_CLASS_POLICY, detectCaps, themeStatus, type ClassPolicy, type DeviceCaps } from "./store/status";
 import { ClassError, fetchClass, joinClass, resetStudent, setClassHalt, setClassPolicyOnServer, type ClassInfo } from "./agent/classroom";
 import { startRecordSync } from "./agent/sync";
@@ -411,6 +411,12 @@ export function App() {
           key={r.id}
           sample={r.measurements.some((x) => x.demo)}
           evidence={evidenceOf(r)}
+          cer={r.cer ?? null}
+          fullCer={recordsForTheme(t.id).filter((x) => x.id !== r.id && x.status === "signed").length === 0}
+          onCer={(c) => flow.setCer(r, c)}
+          nextReason={r.nextPrediction?.reason ?? ""}
+          nextConfidence={r.nextPrediction?.confidence ?? null}
+          onNextReason={(reason, confidence) => flow.setNextReason(r, reason, confidence)}
           variant={variant!}
           judgement={r.result!}
           explain={r.explain}

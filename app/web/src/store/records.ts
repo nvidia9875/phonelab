@@ -96,6 +96,13 @@ export interface TraceRef {
 /** 1 記録で持つトレースの数。計画 5・再計画 3・次の一手 3・会話 10 の上限を足した 21 より少し多く */
 export const MAX_TRACES = 24;
 
+export type Confidence = "sure" | "half" | "unsure";
+export interface Cer {
+  claim: string;
+  evidence: string;
+  reasoning: string;
+}
+
 export interface Rejection {
   title: string;
   reasons: string[];
@@ -127,7 +134,11 @@ export interface StudyRecord {
   holdCodes: string[];
   result: Judgement | null;
   explain: string;
-  nextPrediction: { variantId: string | null; direction: Direction } | null;
+  nextPrediction: { variantId: string | null; direction: Direction; reason?: string; confidence?: Confidence } | null;
+  /** 主張・証拠・理由に分けたふり返り（McNeill ら 2006）。explain には三つをつないだ文を入れる。古い記録には無い */
+  cer?: Cer | null;
+  /** 生徒が先に立てた計画（変えるものの選択）。ラボ先生の計画と比べる。古い記録には無い */
+  studentPlan?: { variantId: string } | null;
   /** ラボ先生が選んだ次の一手（古い記録には無い） */
   nextSuggestion?: NextSuggestion | null;
   /** 次の一手を聞いた回数（サーバの上限 3 回 / 記録） */
