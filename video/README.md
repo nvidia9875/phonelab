@@ -1,6 +1,6 @@
 # デモ動画（3 分）のサンプル
 
-台本は [`docs/storyboard.md`](../docs/storyboard.md)。Remotion（React で動画を作る）で組んだサンプルで、画面のスクショ・図・字幕は入っている。**実写と、まだ撮っていない画面録画は「ここに実写（○秒）」の枠**になっているので、撮ったものに差し替える。
+台本は [`docs/storyboard.md`](../docs/storyboard.md)。Remotion（React で動画を作る）で組んだサンプル。画面のスクショの上に、文字を打つ・問い返しがぽんと出る・枠で囲む・タップの波紋・3, 2, 1 と波形・数字の数え上げ・判子・統制の流れを文が通っていく、などの動きを重ねている。**実写と、まだ撮っていない画面録画の場面には、右上に「実写／画面録画に差し替え」の札**がある（いまは代わりのアニメーション）。
 
 ## 動かす
 
@@ -13,30 +13,29 @@ npm run render      # out/phonelab-demo-sample.mp4（1920×1080、30fps）
 
 Chrome のダウンロードが通らないときは、`--browser-executable` に手元の Chrome を渡す。
 
-## 差し替える枠（撮るもの）
+## 差し替える場面（撮るもの）
 
-| 時刻（目安） | 枠 | 撮るもの |
+| 時刻（目安） | 場面（`src/scenes/`） | 撮るもの |
 |---|---|---|
-| 0:00 | 実写 8 秒 | 机の上の輪ゴムと箱、横にスマホ。指で輪ゴムをはじく（音も入れる） |
-| 0:36 | 実写 5 秒 | 「3, 2, 1」のあと、輪ゴムを弱く・強くはじく手元 |
-| 1:07 | 実写 5 秒 | 隣の班が騒がしい（音楽を流して代用） |
-| 1:07 | 画面録画 10 秒 | 保留「音が小さく、まわりの雑音と区別できない」→ ラボ先生の測り直しの提案 |
-| 2:06 | 実写 15 秒 | 家。スマホを袋に入れて振り子（下にクッション）→ 結果の画面 |
-| 2:42 | 画面録画 6 秒 | Cloud Trace：`phonelab.plan → invoke_agent → phonelab.policy → phonelab.self_correct` |
+| 0:00 | つかみ `Opening` | 机の上の輪ゴムと箱、横にスマホ。指で輪ゴムをはじく（音も入れる）8 秒 |
+| 0:36 | 許可と測定 `Permit` の後半 | 「3, 2, 1」のあと、輪ゴムを弱く・強くはじく手元 5 秒 |
+| 1:07 | 保留 `Hold` | 隣の班が騒がしい 5 秒（音楽で代用可）＋ 保留の画面録画 10 秒 |
+| 2:06 | 家で `Home` | 家。スマホを袋に入れて振り子（下にクッション）15 秒 |
+| 2:42 | 記録 `Trace` | 実際の Cloud Trace の画面録画 6 秒 |
 
-スクショの場面（予想・計画・結果・会話・却下・教員画面・停止）も、本物の画面録画があれば差し替えたほうがよい（スクショは手元で、マイクに合成の音を流して撮ったもの）。
+スクショの場面（予想・計画・結果・ふり返り・却下・教員画面・停止）も、本物の画面録画があれば差し替えたほうがよい（スクショは手元で、マイクに合成の音を流して撮ったもの）。
 
 ## 差し替え方
 
 1. 撮った動画を `public/` に置く（例 `public/pluck.mp4`）
-2. `src/Demo.tsx` の該当する `<Slot ... />` を、次に置き換える
+2. 該当する場面（`src/scenes/*.tsx`）の中身を、動画に置き換える（字幕の `Caption` は残す）
 
 ```tsx
 import { OffthreadVideo, staticFile } from "remotion";
 
-<OffthreadVideo src={staticFile("pluck.mp4")} style={{ position: "absolute", left: 80, top: 110, width: 1760, height: 740, objectFit: "cover", borderRadius: 26 }} />
+<OffthreadVideo src={staticFile("pluck.mp4")} style={{ position: "absolute", inset: 0, width: 1920, height: 1080, objectFit: "cover" }} />
 ```
 
-- 長さはシーンの `sec` に合わせる。動画の途中から使うなら `startFrom`（フレーム）を付ける
+- 長さは `src/Demo.tsx` のシーンの `sec` に合わせる。動画の途中から使うなら `startFrom`（フレーム）を付ける
 - 音を消すなら `muted`、小さくするなら `volume={0.4}`
-- 字幕（`Caption` / `Side`）はそのまま上に重なる
+- 字幕（`Caption`）は動画の上に重なる。右上の `SwapTag` は消す
