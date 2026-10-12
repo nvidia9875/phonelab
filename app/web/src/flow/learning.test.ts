@@ -68,3 +68,28 @@ describe("食い違ったあとの測り直し", () => {
     expect(ev.body).toContain("強くはじいたつもりが弱かった");
   });
 });
+
+describe("計画を先に自分で立てる", () => {
+  beforeEach(() => clearAll());
+
+  it("records whether the student's plan matched the lab teacher's", async () => {
+    const { setStudentPlan } = await import("./useFlow");
+    const rec = createRecord(sound.id);
+    updateRecord(rec.id, (r) => ({ ...r, variantId: "sound_pluck_strength", stage: "plan" }));
+
+    setStudentPlan(recordById(rec.id)!, sound, "sound_string_length");
+
+    const after = recordById(rec.id)!;
+    expect(after.studentPlan?.variantId).toBe("sound_string_length");
+    expect(after.events.at(-1)?.body).toContain("ちがう");
+  });
+
+  it("skips the step for the next experiment the student already chose", async () => {
+    const rec = judged();
+    updateRecord(rec.id, (r) => ({ ...r, nextPrediction: { variantId: "sound_string_length", direction: "faster" } }));
+
+    const next = await closeAndNext(recordById(rec.id)!, sound);
+
+    expect(next?.studentPlan?.variantId).toBe("sound_string_length");
+  });
+});

@@ -312,6 +312,9 @@ export function App() {
           traceId={r.plan?.traceId}
           alternatives={flow.alternativesFor(r, t)}
           onPick={(id) => flow.pickVariant(r, t, id)}
+          studentPlan={r.studentPlan?.variantId ?? null}
+          allVariants={t.variants}
+          onStudentPlan={(id) => flow.setStudentPlan(r, t, id)}
           onApprove={() => { flow.approve(r, t); nav(`/x/${t.id}/setup/A`); }}
           onOther={goHome}
           onHome={goHome}

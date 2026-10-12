@@ -25,14 +25,22 @@ export interface PlanProps {
   /** このテーマのほかの実験（自分で選び直せる） */
   alternatives: Variant[];
   onPick: (variantId: string) => void;
+  /** 生徒が先に立てた計画（変えるもの）。"skip" はラボ先生にまかせた。未定なら null（古い記録・自分で選んだ実験は出さない） */
+  studentPlan?: string | null;
+  /** このテーマの実験すべて（先に自分で選ぶときの選択肢） */
+  allVariants?: Variant[];
+  onStudentPlan?: (variantId: string) => void;
   onApprove: () => void;
   onOther: () => void;
   onHome: () => void;
 }
 
 /** 画面 1: 計画と承認。許可チップは承認ボタンの真上 */
-export function Plan({ theme, variant, predictionText, why, source, trail = [], selfCorrected = false, traceId = null, alternatives, onPick, onApprove, onOther, onHome }: PlanProps) {
+export function Plan({ theme, variant, predictionText, why, source, trail = [], selfCorrected = false, traceId = null, alternatives, onPick, studentPlan = null, allVariants = [], onStudentPlan, onApprove, onOther, onHome }: PlanProps) {
   const [showOthers, setShowOthers] = useState(false);
+  // 計画を先に生徒が立てる（学習指導要領の「検証計画の立案」。ラボ先生の計画はそのあとで見くらべる）
+  const asking = !!onStudentPlan && studentPlan === null && source !== "student" && allVariants.length > 1;
+  const mine = studentPlan && studentPlan !== "skip" ? allVariants.find((v) => v.id === studentPlan) : undefined;
   const sensors = theme.sensors.map((s) => SENSOR_LABEL[s]).join("・");
   const denied = ["microphone", "camera"].filter((s) => !theme.sensors.includes(s as never)).map((s) => SENSOR_LABEL[s as "microphone" | "camera"]);
   const deniedText = `${[...denied, "位置"].join("、")}は使わない`;
@@ -45,6 +53,41 @@ export function Plan({ theme, variant, predictionText, why, source, trail = [], 
         </Card>
       </Section>
 
+      {asking && (
+        <Card panel>
+          <CardLabel icon="target">先に自分で決めてみよう</CardLabel>
+          <p className="card__text">あなたの予想を確かめるには、何を変えて、何をそろえる？</p>
+          {allVariants.map((v) => (
+            <button type="button" key={v.id} className="alt" onClick={() => onStudentPlan?.(v.id)}>
+              <span className="alt__title">{v.changes.split("（")[0]}を変える</span>
+              <span className="alt__sub">そろえるもの: {v.holds}</span>
+            </button>
+          ))}
+          <button type="button" className="alt" onClick={() => onStudentPlan?.("skip")}>
+            <span className="alt__title">わからない。ラボ先生にまかせる</span>
+          </button>
+          <p className="card__hint">選ぶと、ラボ先生の考えた実験が出ます。見くらべてから決めよう。</p>
+        </Card>
+      )}
+
+      {!asking && mine && (
+        <Card variant="line">
+          <CardLabel icon="list">あなたの計画とくらべると</CardLabel>
+          {mine.id === variant.id ? (
+            <p className="card__text">ラボ先生も同じ「{mine.changes.split("（")[0]}を変える」計画でした。</p>
+          ) : (
+            <>
+              <p className="card__text">
+                あなたは「{mine.changes.split("（")[0]}を変える」、ラボ先生は「{variant.changes.split("（")[0]}を変える」。あなたの予想を確かめるのに合っているのはどちら？
+              </p>
+              <p className="card__hint">自分の計画で測りたいときは「ほかの実験を見る」から選べます。</p>
+            </>
+          )}
+        </Card>
+      )}
+
+      {!asking && (
+      <>
       <Card panel>
         <CardLabel icon="target">ラボ先生が考えた実験</CardLabel>
         <CardTitle>{variant.title}</CardTitle>
@@ -82,6 +125,8 @@ export function Plan({ theme, variant, predictionText, why, source, trail = [], 
         )}
         <FootNote>押すと、{sensors}を {theme.seconds} 秒だけ読みます（あなたが決めます）。答えは、測って見つける。</FootNote>
       </Foot>
+      </>
+      )}
     </Screen>
   );
 }

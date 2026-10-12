@@ -410,6 +410,17 @@ export function setCer(rec: StudyRecord, cer: Cer): void {
   updateRecord(rec.id, (r) => ({ ...r, cer, explain }));
 }
 
+/** 生徒が先に立てた計画（"skip" はラボ先生にまかせた）。ラボ先生の計画と同じかを出来事に残す */
+export function setStudentPlan(rec: StudyRecord, theme: Theme, variantId: string): void {
+  updateRecord(rec.id, (r) => {
+    const n: StudyRecord = { ...r, studentPlan: { variantId } };
+    if (variantId === "skip") return addEvent(n, "自分の計画", "ラボ先生にまかせた");
+    const mine = variantById(theme, variantId);
+    const same = variantId === r.variantId;
+    return addEvent(n, "自分の計画", `${mine?.changes.split("（")[0] ?? variantId}を変える（ラボ先生の計画と${same ? "同じ" : "ちがう"}）`);
+  });
+}
+
 export const CONFIDENCE_WORDS: Record<Confidence, string> = { sure: "自信あり", half: "半々", unsure: "自信なし" };
 
 export async function closeAndNext(rec: StudyRecord, theme: Theme): Promise<StudyRecord | null> {
@@ -426,7 +437,8 @@ export async function closeAndNext(rec: StudyRecord, theme: Theme): Promise<Stud
     const plan: PlanInfo = fromAgent
       ? { source: s.source === "stub" ? "stub" : s.source, why: s.why || `前の実験の続きとして、次は${nv.changes.split("（")[0]}だけを変えます`, traceId: s.traceId, trail: s.trail }
       : { source: "catalog", why: `前の実験の続きとして、次は${nv.changes.split("（")[0]}だけを変えます`, traceId: null };
-    let n: StudyRecord = { ...r, variantId: nv.id, stage: "plan", plan, prediction: { ...r.prediction, text, claim: { variable: nv.variable, direction }, questionBack: null } };
+    // 次の実験は、前の結果を見て生徒が「次はこれを変えたらどうなる」と選んだものなので、計画を先に立てる段は飛ばす
+    let n: StudyRecord = { ...r, variantId: nv.id, stage: "plan", plan, studentPlan: { variantId: nv.id }, prediction: { ...r.prediction, text, claim: { variable: nv.variable, direction }, questionBack: null } };
     n = addEvent(n, "予想", `${text}（前の実験の結果を見て記入）`, "orange");
     n = addEvent(n, "計画", `${nv.title}。${fromAgent ? "前の結果を読んだラボ先生（AI）が次の一手として選んだ" : PLAN_SOURCE_LABEL.catalog}`);
     return n;
