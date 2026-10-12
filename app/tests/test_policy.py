@@ -99,3 +99,10 @@ def test_changes_condition_covers_the_new_experiments_and_reads_clause_by_clause
     assert changes_condition("重さは同じにして、放す高さを低くしよう", "energy_length")
     assert changes_condition("張りはそのまま、まわりを静かにしてもう一度", "sound_tension") is None
     assert changes_condition("同じ高さから、そっと放そう", "energy_length") is None
+    # 読点の無い文でも、「同じ」がかかるのは重さだけ（2 回目のレビュー）
+    assert changes_condition("重さは同じにして放す高さを低くしよう", "energy_length")
+    assert changes_condition("輪ゴムをゆるくして、もう一度測ろう", "sound_tension")
+    assert (
+        changes_condition("放す高さや重さは変えず、端末の置き場所を少し変えよう", "energy_height")
+        is None
+    )

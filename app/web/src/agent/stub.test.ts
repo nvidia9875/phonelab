@@ -99,5 +99,7 @@ describe("張りの予想（10/12 デプロイ前レビュー）", () => {
 
     expect(readClaim("輪ゴムの張りを強くすると音が高くなると思う。速く震えそうだから", sound).variable).toBe("tension");
     expect(readClaim("張りはそのまま、強くはじくと高くなると思う", sound).variable).toBe("strength");
+    expect(readClaim("張りを同じにして、強くはじくと高くなると思う", sound).variable).toBe("strength");
+    expect(readClaim("張りが強くなると高い音になると思う", sound).variable).toBe("tension");
   });
 });

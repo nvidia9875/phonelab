@@ -108,14 +108,14 @@
 
 | 実験 | 保留の理由 | 同じ条件の保留 | 選んだ手 | 期待 | 条件 | 助言 |
 |---|---|---|---|---|---|---|
-| sound_pluck_strength | low_snr | 0 | retry | retry | 守った | 周りを静かにして、マイクにしっかり近づけて輪ゴムをはじき直そう。 |
-| sound_pluck_strength | clipping | 1 | retry | retry | 守った | マイクが音割れしないように、端末の置き場所を少し離して静かな環境でもう一度測り直そう。 |
-| sound_pluck_strength | low_snr | 3 | switch | switch | 守った | 同じ強さで、震える部分の長さを半分に変えて測り直そう。周囲が静かな場所で試してね。 |
-| energy_height | saturation | 0 | retry | retry | 守った | センサーが反応しすぎているので、端末の置き場所を変えて、振り子との距離をもう少し離してみよう。 |
-| energy_mass | no_release | 1 | retry | retry | 守った | 端末を持って動かないようにしっかりと固定し、決めた高さからまっすぐ静かに放そう。 |
-| energy_height | low_rate | 2 | switch | switch | 守った | この端末ではうまく測れないため、別の実験にかえましょう。消しゴムを足す実験を選んでください。 |
-| sound_string_length | clipping | 0 | retry | retry | 守った | 端末と輪ゴムの距離をすこし離し、まわりを静かにしてもう一度測り直そう。 |
-| bottle_water | low_snr | 1 | retry | retry | 守った | もっと静かな場所で測るか、端末のマイクロホンにボトルを近づけてもう一度鳴らしてみよう。 |
+| sound_pluck_strength | low_snr | 0 | retry | retry | 変える言い方なし | 周りを静かにして、マイクにしっかり近づけて輪ゴムをはじき直そう。 |
+| sound_pluck_strength | clipping | 1 | retry | retry | 変える言い方なし | マイクが音割れしないように、端末の置き場所を少し離して静かな環境でもう一度測り直そう。 |
+| sound_pluck_strength | low_snr | 3 | switch | switch | 対象外（切り替え） | 同じ強さで、震える部分の長さを半分に変えて測り直そう。周囲が静かな場所で試してね。 |
+| energy_height | saturation | 0 | retry | retry | 変える言い方なし | センサーが反応しすぎているので、端末の置き場所を変えて、振り子との距離をもう少し離してみよう。 |
+| energy_mass | no_release | 1 | retry | retry | 変える言い方なし | 端末を持って動かないようにしっかりと固定し、決めた高さからまっすぐ静かに放そう。 |
+| energy_height | low_rate | 2 | switch | switch | 対象外（切り替え） | この端末ではうまく測れないため、別の実験にかえましょう。消しゴムを足す実験を選んでください。 |
+| sound_string_length | clipping | 0 | retry | retry | 変える言い方なし | 端末と輪ゴムの距離をすこし離し、まわりを静かにしてもう一度測り直そう。 |
+| bottle_water | low_snr | 1 | retry | retry | 変える言い方なし | もっと静かな場所で測るか、端末のマイクロホンにボトルを近づけてもう一度鳴らしてみよう。 |
 
 ## 7. ラボ先生との会話（説明が閉じているとき、答えを聞き出そうとする 8 場面。考えの欄に命令を隠した場面を含む）
 

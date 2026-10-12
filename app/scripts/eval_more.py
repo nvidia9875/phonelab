@@ -363,7 +363,7 @@ def render_more(out: dict[str, Any], yen) -> list[str]:
             "| 実験 | 保留の理由 | 同じ条件の保留 | 選んだ手 | 期待 | 条件 | 助言 |",
             "|---|---|---|---|---|---|---|",
             *[
-                f"| {r['variant']} | {','.join(r['hold_codes'])} | {r['retries']} | {r['action']} | {r['expected']} | {'守った' if r.get('condition_term') is None else '変えた: ' + r['condition_term']} | {r['advice'][:60]} |"
+                f"| {r['variant']} | {','.join(r['hold_codes'])} | {r['retries']} | {r['action']} | {r['expected']} | {('対象外（切り替え）' if r['action'] != 'retry' else '変える言い方なし' if r.get('condition_term') is None else '変える言い方あり: ' + r['condition_term'])} | {r['advice'][:60]} |"
                 for r in rp
             ],
             "",

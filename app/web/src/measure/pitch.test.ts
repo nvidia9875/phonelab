@@ -127,3 +127,29 @@ describe("倍音の無い音（ペットボトルのような純音に近い音�
     expect(pitchChecks(f, 0.03).find((c) => c.code === "two_clocks_disagree")?.ok).toBe(true);
   });
 });
+
+describe("純音の分かれ道が 1 オクターブ上の取り違えを追認しない（10/12 デプロイ前レビュー 2 回目）", () => {
+  function signal(f0: number, amps: number[]) {
+    const frames = [];
+    for (let i = 0; i < 50; i++) {
+      const data = new Float32Array(N);
+      for (let k = 0; k < N; k++) {
+        const s = (i * 4800 + k) / SR;
+        data[k] = i < 5 ? 0.001 * Math.sin(9999 * k) : 0.2 * amps.reduce((v, a, h) => v + a * Math.sin(2 * Math.PI * f0 * (h + 1) * s), 0);
+      }
+      frames.push({ t: i * 100, data });
+    }
+    return analyzePitch({ sampleRate: SR, frames });
+  }
+
+  it("never reports 220 Hz → 330 Hz as going down", () => {
+    const a = signal(220, [0.15, 1, 0.2]);
+    const b = signal(330, [0.15, 1, 0.2]);
+    const aOk = pitchChecks(a, 0.03).every((c) => c.ok);
+    const bOk = pitchChecks(b, 0.03).every((c) => c.ok);
+    if (aOk && bOk) expect(b.f0_hz).toBeGreaterThan(a.f0_hz);
+    // 通ったものは正しい高さ（3% 以内）でなければならない
+    if (aOk) expect(Math.abs(a.f0_hz - 220) / 220).toBeLessThan(0.03);
+    if (bOk) expect(Math.abs(b.f0_hz - 330) / 330).toBeLessThan(0.03);
+  });
+});

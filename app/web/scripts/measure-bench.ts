@@ -40,6 +40,7 @@ interface PitchCase {
   neighbor?: number; // 隣の班の輪ゴムの高さの比（例 1.33）
   weakFundamental?: boolean;
   pure?: boolean; // 倍音の無い音（ペットボトルに近い）
+  amps?: number[]; // 倍音の強さを直接決める
   range?: [number, number]; // 基本周波数の範囲（既定 150〜600 Hz）
 }
 
@@ -52,12 +53,14 @@ const PITCH_CASES: PitchCase[] = [
   { name: "基本の音が弱く倍音が強い", clean: false, noise: 0.003, gain: 0.3, weakFundamental: true },
   { name: "倍音の無い音（ペットボトルに近い）", clean: true, noise: 0.003, gain: 0.3, pure: true },
   { name: "低い音（80〜100 Hz）・基本の音が弱い", clean: false, noise: 0.003, gain: 0.3, weakFundamental: true, range: [80, 100] },
+  { name: "基本の音が弱く、第 3 倍音も弱い", clean: false, noise: 0.003, gain: 0.3, amps: [0.15, 1, 0.2] },
+  { name: "基本の音がとても弱い（−26 dB）", clean: false, noise: 0.003, gain: 0.3, amps: [0.05, 1, 0.1] },
 ];
 
 function pluckedTone(f0: number, c: PitchCase, r: () => number, seconds = 5): PitchBuffer {
   const frames = [];
   const plucks = [0.8, 1.9, 3.0, 4.1].map((t) => t + 0.1 * r());
-  const amps = c.pure ? [1] : c.weakFundamental ? [0.15, 1, 0.5, 0.3] : [1, 0.5, 0.25, 0.12];
+  const amps = c.amps ?? (c.pure ? [1] : c.weakFundamental ? [0.15, 1, 0.5, 0.3] : [1, 0.5, 0.25, 0.12]);
   for (let i = 0; i < (seconds * SAMPLE_RATE) / FRAME_STEP; i++) {
     const t = (i * FRAME_STEP * 1000) / SAMPLE_RATE;
     const data = new Float32Array(FFT_SIZE);

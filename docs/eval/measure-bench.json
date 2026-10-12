@@ -92,6 +92,28 @@
       "false_pass": 0,
       "median_error": "0.22%",
       "worst_error": "0.60%"
+    },
+    {
+      "case": "基本の音が弱く、第 3 倍音も弱い",
+      "clean": false,
+      "trials": 40,
+      "passed": 17,
+      "held": 23,
+      "held_rate": "57%",
+      "false_pass": 0,
+      "median_error": "0.06%",
+      "worst_error": "0.12%"
+    },
+    {
+      "case": "基本の音がとても弱い（−26 dB）",
+      "clean": false,
+      "trials": 40,
+      "passed": 0,
+      "held": 40,
+      "held_rate": "100%",
+      "false_pass": 0,
+      "median_error": "—",
+      "worst_error": "—"
     }
   ],
   "speed": [
@@ -230,6 +252,28 @@
         "false_pass": 40,
         "median_error": "100.44%",
         "worst_error": "101.07%"
+      },
+      {
+        "case": "基本の音が弱く、第 3 倍音も弱い",
+        "clean": false,
+        "trials": 40,
+        "passed": 38,
+        "held": 2,
+        "held_rate": "5%",
+        "false_pass": 38,
+        "median_error": "100.08%",
+        "worst_error": "100.20%"
+      },
+      {
+        "case": "基本の音がとても弱い（−26 dB）",
+        "clean": false,
+        "trials": 40,
+        "passed": 37,
+        "held": 3,
+        "held_rate": "8%",
+        "false_pass": 37,
+        "median_error": "100.08%",
+        "worst_error": "100.19%"
       }
     ],
     "speed": [
