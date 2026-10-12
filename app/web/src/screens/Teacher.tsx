@@ -190,7 +190,7 @@ export function Teacher({ classCode, cls, halted, onHalt, onPolicy, onResetStude
 
           <div className="tpanel__head" style={{ marginTop: 18 }}>
             <h2>いま見に行く子</h2>
-            <p className="tpanel__hint">保留 → 却下 → 予想で止まっている、の順</p>
+            <p className="tpanel__hint">保留 → 却下 → 予想と食い違って測り直した → 予想で止まっている、の順</p>
           </div>
           {attention.length === 0 ? (
             <p className="tpanel__hint">いまはいません</p>

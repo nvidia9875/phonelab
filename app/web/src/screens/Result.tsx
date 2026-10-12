@@ -37,7 +37,7 @@ export interface ResultProps {
   nextConfidence?: Confidence | null;
   onNextReason?: (reason: string, confidence: Confidence | undefined) => void;
   maxRetry: number;
-  onRemeasure: (cond: CondKey) => void;
+  onRemeasure: (cond: CondKey, why?: string) => void;
   onHome: () => void;
 }
 
@@ -56,6 +56,7 @@ export function Result({ variant, judgement, explain, nextVariant, nextDirection
   const [text, setText] = useState(explain);
   const [cer, setCer] = useState<Cer>(savedCer ?? { claim: "", evidence: "", reasoning: savedCer === null && explain ? explain : "" });
   const [reason, setReason] = useState(nextReason);
+  const [why, setWhy] = useState("");
   const [confidence, setConfidence] = useState<Confidence | null>(nextConfidence);
   // 主張・証拠・理由を記録へ（理由だけのときは今までどおり explain に）
   const commit = () => (onCer ? onCer(cer) : onExplain(text));
@@ -217,9 +218,12 @@ export function Result({ variant, judgement, explain, nextVariant, nextDirection
       <details className="remeasure" open={j.undecided}>
         <summary className="remeasure__summary">うまく取れていなかった？ 測り直す</summary>
         <p className="card__hint">気になる条件をもう一度測れます。前の測定も記録に残り、判定は新しい測定でやり直します（1 条件 {maxRetry} 回まで）</p>
+        {j.consistent === false && !j.undecided && (
+          <Field value={why} onChange={(e) => setWhy(e.target.value)} rows={2} placeholder="測り直す前に: どこがうまくいかなかったと思う？（たとえば：強くはじいたつもりが弱かった）" />
+        )}
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
           {(["A", "B"] as CondKey[]).map((cond, i) => (
-            <Button key={cond} sm secondary disabled={retries[cond] >= maxRetry} onClick={() => { commit(); onRemeasure(cond); }}>
+            <Button key={cond} sm secondary disabled={retries[cond] >= maxRetry} onClick={() => { commit(); onRemeasure(cond, why); }}>
               {variant.conditions[i].label}を測り直す{retries[cond] > 0 ? `（${retries[cond]} / ${maxRetry}）` : ""}
             </Button>
           ))}

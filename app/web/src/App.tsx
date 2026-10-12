@@ -428,7 +428,7 @@ export function App() {
           retries={r.retries}
           maxRetry={flow.MAX_RETRY}
           repeats={repeatsOf(variant!)}
-          onRemeasure={(cond) => { if (flow.remeasure(r, cond)) nav(`/x/${t.id}/setup/${cond}`); }}
+          onRemeasure={(cond, why) => { if (flow.remeasure(r, cond, why)) nav(`/x/${t.id}/setup/${cond}`); }}
           onExplain={(x) => flow.setExplain(r, x)}
           onNext={(d) => flow.chooseNext(r, t, d)}
           onGoNext={async () => { const next = await flow.closeAndNext(r, t); nav(next ? `/x/${t.id}/plan` : "/"); }}

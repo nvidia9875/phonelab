@@ -311,7 +311,12 @@ export function retry(rec: StudyRecord, cond: CondKey): void {
  * 前の測定は消さずに残し（記録に全部並ぶ）、判定は最後に検査を通った測定でやり直す。
  * 予想に合う結果が出るまで測り続けられないように、保留の再測定と同じ上限（1 条件 3 回）を使う。
  */
-export function remeasure(rec: StudyRecord, cond: CondKey): boolean {
+/** 予想と食い違ったあとに測り直した出来事の名前（先生の画面が拾う） */
+export const MISMATCH_REMEASURE = "食い違いのあと測り直し";
+
+/** 測り直す。予想と食い違ったあとなら「どこがうまくいかなかったと思う？」も残す
+ * （反するデータを測り方のせいにして捨てる反応を、先生が見て声をかけられるように: Chinn & Brewer 1993） */
+export function remeasure(rec: StudyRecord, cond: CondKey, why = ""): boolean {
   if (rec.retries[cond] >= MAX_RETRY) return false;
   updateRecord(rec.id, (r) => {
     const n: StudyRecord = {
@@ -323,7 +328,11 @@ export function remeasure(rec: StudyRecord, cond: CondKey): boolean {
       retries: { ...r.retries, [cond]: r.retries[cond] + 1 },
       tries: { ...(r.tries ?? EMPTY_TRIES), [cond]: 0 },
     };
-    return addEvent(n, "測り直し", `測定 ${cond} をもう一度（${r.retries[cond] + 1} / ${MAX_RETRY} 回目）`);
+    const count = `測定 ${cond} をもう一度（${r.retries[cond] + 1} / ${MAX_RETRY} 回目）`;
+    if (r.result?.consistent === false) {
+      return addEvent(n, MISMATCH_REMEASURE, `${count}。どこがうまくいかなかったと思う？ → ${why.trim().slice(0, 150) || "（書かなかった）"}`, "orange");
+    }
+    return addEvent(n, "測り直し", count);
   });
   return true;
 }

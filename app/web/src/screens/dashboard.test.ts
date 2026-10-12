@@ -58,3 +58,17 @@ describe("beliefsOf（学級の考えの集まり）", () => {
     expect(beliefs).toHaveLength(3);
   });
 });
+
+describe("食い違い → 測り直しの子も見に行く", () => {
+  it("lists a student who re-measured after a mismatch, after held and rejected ones", () => {
+    const base = { theme_id: "sound", stage: "setup_B", status: "open", retries: {}, chat_turns: 0, rejection_title: null, result: null, hold_codes: [] };
+    const rows = [
+      { number: "S-02", last_seen_at: "", current: { ...base, events: [{ t: "10:00", k: "食い違いのあと測り直し", body: "…" }] } },
+      { number: "S-01", last_seen_at: "", current: { ...base, status: "held", events: [] } },
+      { number: "S-03", last_seen_at: "", current: { ...base, events: [] } },
+    ] as unknown as StudentRow[];
+
+    expect(attentionOf(rows).map((r) => r.number)).toEqual(["S-01", "S-02"]);
+    expect(checkTextOf(rows[0].current).text).toBe("食い違い → 測り直し中");
+  });
+});

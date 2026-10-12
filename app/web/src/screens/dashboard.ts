@@ -52,6 +52,7 @@ export function checkTextOf(r: RecordSummary | null): { text: string; strong: bo
   if (!r) return { text: "—", strong: false };
   if (r.hold_codes.length) return { text: r.hold_codes.map((c) => (CHECK_WORDS as Record<string, string>)[c] ?? "保留").join("・"), strong: true };
   if (r.rejection_title) return { text: "代替実験を提示", strong: false };
+  if (remeasuredAfterMismatch(r) && !r.result) return { text: "食い違い → 測り直し中", strong: true };
   if (r.result) return { text: "二系統一致", strong: false };
   if (r.stage === "predict" || r.stage === "plan") return { text: "センサー未使用", strong: false };
   return { text: "測定中", strong: false };
@@ -129,8 +130,22 @@ export function isOnline(row: StudentRow, now = Date.now()): boolean {
 }
 
 /** 先生が見に行く順: 保留 → 却下 → 予想で止まっている子 */
+/** 予想と食い違ったあとに測り直した（反する結果を測り方のせいにしているかもしれない。声をかける候補） */
+export function remeasuredAfterMismatch(r: RecordSummary | null): boolean {
+  return !!r?.events.some((e) => e.k === "食い違いのあと測り直し");
+}
+
 export function attentionOf(students: StudentRow[]): StudentRow[] {
-  const rank = (s: StudentRow) => (s.current?.status === "held" ? 0 : s.current?.rejection_title ? 1 : s.current && s.current.stage === "predict" && (s.current.chat_turns > 0 || (s.current.retries.A ?? 0) > 0) ? 2 : 9);
+  const rank = (s: StudentRow) =>
+    s.current?.status === "held"
+      ? 0
+      : s.current?.rejection_title
+        ? 1
+        : remeasuredAfterMismatch(s.current)
+          ? 2
+          : s.current && s.current.stage === "predict" && (s.current.chat_turns > 0 || (s.current.retries.A ?? 0) > 0)
+            ? 3
+            : 9;
   return students.filter((s) => rank(s) < 9).sort((a, b) => rank(a) - rank(b) || a.number.localeCompare(b.number));
 }
 

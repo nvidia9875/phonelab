@@ -85,7 +85,8 @@ describe("remeasure", () => {
     expect(after.status).toBe("open");
     expect(after.result).toBeNull();
     expect(after.retries.A).toBe(1);
-    expect(after.events.at(-1)?.k).toBe("測り直し");
+    // この記録は予想と食い違っていたので、測り直しは「食い違いのあと」として残る（先生が声をかけられるように）
+    expect(after.events.at(-1)?.k).toBe("食い違いのあと測り直し");
     expect(after.measurements).toHaveLength(2); // 前の測定は消さずに残す
   });
 

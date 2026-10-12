@@ -53,3 +53,18 @@ describe("次の予想の理由と自信", () => {
     expect(recordById(rec.id)!.events.some((e) => e.body.includes("自信あり"))).toBe(true);
   });
 });
+
+describe("食い違ったあとの測り直し", () => {
+  beforeEach(() => clearAll());
+
+  it("asks what went wrong and records it for the teacher", async () => {
+    const { remeasure, MISMATCH_REMEASURE } = await import("./useFlow");
+    const rec = judged();
+
+    remeasure(rec, "B", "強くはじいたつもりが弱かった");
+
+    const ev = recordById(rec.id)!.events.at(-1)!;
+    expect(ev.k).toBe(MISMATCH_REMEASURE);
+    expect(ev.body).toContain("強くはじいたつもりが弱かった");
+  });
+});
