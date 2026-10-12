@@ -152,7 +152,7 @@ export function Result({ variant, judgement, explain, nextVariant, nextDirection
       {reflect && !j.undecided ? (
         <Card variant="line">
           <Eyebrow>次の予測は、理由を書いたら出てきます</Eyebrow>
-          <p className="card__hint">上の「なぜそうなったと思う？」に自分の考えを書くか、ラボ先生と話してから。</p>
+          <p className="card__hint">上の「理由」に自分の考えを書くか、ラボ先生と話してから。</p>
         </Card>
       ) : j.undecided ? (
         <Card variant="line">
@@ -169,7 +169,8 @@ export function Result({ variant, judgement, explain, nextVariant, nextDirection
           </p>
           {question && suggestion && (
             <>
-              <p className="card__hint">{suggestion.why}</p>
+              {/* つながらないときは理由の文と出どころが同じことを言うので、出どころだけ */}
+              {suggestion.source === "agent" && <p className="card__hint">{suggestion.why}</p>}
               <p className="card__hint">{NEXT_SOURCE[suggestion.source]}</p>
             </>
           )}

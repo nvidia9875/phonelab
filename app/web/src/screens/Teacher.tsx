@@ -328,7 +328,7 @@ export function Teacher({ classCode, cls, halted, onHalt, onPolicy, onResetStude
               <div className="projector__bars">
                 {dist.bars.filter((b) => b.label !== "まだ読めない").map((b) => (
                   <div className="projector__bar" key={b.label}>
-                    <div className="projector__fill" style={{ height: `${dist.total ? Math.max(4, Math.round((b.count / dist.total) * 100)) : 4}%` }} />
+                    <div className="projector__fill" style={{ height: `${dist.total && b.count ? Math.max(4, Math.round((b.count / dist.total) * 100)) : 0}%` }} />
                     <p className="projector__n">{b.count}</p>
                     <p className="projector__label">{b.label}</p>
                   </div>
