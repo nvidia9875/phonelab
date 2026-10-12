@@ -56,6 +56,9 @@ export type PitchFeatures = {
   f0_follow: number;
   /** 基本の高さの音の大きさの幅（dB）。決められないときは NaN */
   f0_follow_db: number;
+  /** いちばん大きい 4 フレームで、第 2〜8 倍音のいちばん強いものが基本よりどれだけ大きいか（dB の中央値）。
+   * 決められないときは NaN */
+  harmonic_over_f0_db: number;
 };
 
 const r1 = (v: number): number => +v.toFixed(1);
@@ -205,6 +208,7 @@ export function analyzePitch(b: PitchBuffer): PitchFeatures {
     voiced_frames: f0s.length,
     f0_steady_share: steadyShare(f0s),
     ...followFeatures(fundamentalFollow(near, b.sampleRate, median(f0s))),
+    harmonic_over_f0_db: harmonicOverF0(near, b.sampleRate, median(f0s)),
   };
 }
 
@@ -255,6 +259,38 @@ function followFeatures(r: { ratio: number; db: number }): { f0_follow: number; 
   return { f0_follow: r.ratio, f0_follow_db: r.db };
 }
 
+/** 基本が倍音（第 2〜8）より弱い音は、高さを決めない（保留）。1 オクターブ下（や 1/3 の高さ）の別の続く音が鳴って
+ * いると、それを基本と読んで結論が逆になった（10/12 デプロイ前レビュー 7〜9 回目。ゆらぎ・弱まり方を変えるたびに
+ * 時間の検査をすり抜けた）。本番の版は、下の音が上の音より 4.8 dB（1/2 の高さ）・3 dB（1/3）以上弱ければ上の音を
+ * 読む（自己相関の 0.5）。それより手前の 2 dB で止めれば、本番が正しく読める音を、この版が下の音と読んで通すことはない。
+ * いちばん音が大きいフレームで比べる（弱まったあとのフレームでは、続く音のほうが大きくなる） */
+const MAX_HARMONIC_OVER_F0_DB = 2;
+const MAX_HARMONIC_CHECKED = 8;
+/** 比べるフレームの数（はじいた直後の、いちばん大きいフレーム。4 回はじけばほぼ 1 回に 1 つ） */
+const LOUDEST_FRAMES = 4;
+function harmonicOverF0(frames: { f0: number; spectrum: Float64Array }[], sampleRate: number, f0: number): number {
+  const bin = sampleRate / FFT_SIZE;
+  const at = (m: Float64Array, hz: number) => {
+    const k = Math.round(hz / bin);
+    return 20 * Math.log10(Math.max(m[k - 1] ?? 0, m[k] ?? 0, m[k + 1] ?? 0) + 1e-12);
+  };
+  // フレームごとの高さで選ばない（いちばん大きいフレームは本当の音の高さを読み、中央値から外れていることがある）
+  if (frames.length < MIN_VOICED_FRAMES) return NaN;
+  const loud = [...frames].sort((a, b) => topDb(b.spectrum) - topDb(a.spectrum)).slice(0, LOUDEST_FRAMES);
+  const over = (m: Float64Array) => {
+    let best = -Infinity;
+    for (let h = 2; h <= MAX_HARMONIC_CHECKED && (h + 1) * f0 < sampleRate / 2; h++) best = Math.max(best, at(m, h * f0));
+    return best - at(m, f0);
+  };
+  return +median(loud.map((v) => over(v.spectrum))).toFixed(1);
+}
+
+function topDb(m: Float64Array): number {
+  let top = 0;
+  for (let k = 1; k < m.length; k++) top = Math.max(top, m[k]);
+  return 20 * Math.log10(top + 1e-12);
+}
+
 /** 基本の大きさがほとんど変わらない（2 dB 未満、かつ第 2 倍音の幅の 15% 未満）なら、音と関係ない続く音 */
 function followsNote(f: PitchFeatures): boolean {
   if (!Number.isFinite(f.f0_follow)) return true;
@@ -266,7 +302,8 @@ export function pitchChecks(f: PitchFeatures, toleranceRel: number): LocalCheck[
   const voicedOk = f.voiced_frames >= MIN_VOICED_FRAMES;
   const snrOk = f.snr_db >= MIN_SNR_DB;
   const clipOk = f.clipping_ratio <= MAX_CLIPPING;
-  const agree = Number.isFinite(d) && d <= toleranceRel;
+  const fundamentalOk = !(f.harmonic_over_f0_db > MAX_HARMONIC_OVER_F0_DB);
+  const agree = Number.isFinite(d) && d <= toleranceRel && fundamentalOk;
   const inRange = f.f0_hz >= MIN_HZ && f.f0_hz <= MAX_HZ;
   const followOk = followsNote(f);
   const steadyOk = f.f0_steady_share >= MIN_STEADY_SHARE && followOk;
@@ -277,7 +314,7 @@ export function pitchChecks(f: PitchFeatures, toleranceRel: number): LocalCheck[
     {
       code: "two_clocks_disagree",
       ok: agree,
-      text: Number.isFinite(d) ? `二つの計算で求めた高さが${agree ? "一致" : "一致しない"}（差 ${(d * 100).toFixed(1)}%、許容 ${Math.round(toleranceRel * 100)}%）` : "高さを決められません",
+      text: !fundamentalOk ? "基本の音が倍音より弱く、高さを決められません（低いほかの音が入っているかも）" : Number.isFinite(d) ? `二つの計算で求めた高さが${agree ? "一致" : "一致しない"}（差 ${(d * 100).toFixed(1)}%、許容 ${Math.round(toleranceRel * 100)}%）` : "高さを決められません",
     },
     { code: "unstable", ok: steadyOk, text: steadyOk ? "途中で高さが変わらない" : "途中で高さが変わった（ほかの音が入ったかも）" },
     { code: "out_of_range", ok: inRange, text: inRange ? `${Math.round(f.f0_hz)} Hz` : "音の高さとして考えにくい値です" },

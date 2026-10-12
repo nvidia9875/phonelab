@@ -64,12 +64,12 @@
       "case": "基本の音が弱く倍音が強い",
       "clean": false,
       "trials": 40,
-      "passed": 40,
-      "held": 0,
-      "held_rate": "0%",
+      "passed": 0,
+      "held": 40,
+      "held_rate": "100%",
       "false_pass": 0,
-      "median_error": "0.04%",
-      "worst_error": "0.11%"
+      "median_error": "—",
+      "worst_error": "—"
     },
     {
       "case": "倍音の無い音（ペットボトルに近い）",
@@ -86,23 +86,23 @@
       "case": "低い音（80〜100 Hz）・基本の音が弱い",
       "clean": false,
       "trials": 40,
-      "passed": 40,
-      "held": 0,
-      "held_rate": "0%",
+      "passed": 0,
+      "held": 40,
+      "held_rate": "100%",
       "false_pass": 0,
-      "median_error": "0.22%",
-      "worst_error": "0.60%"
+      "median_error": "—",
+      "worst_error": "—"
     },
     {
       "case": "基本の音が弱く、第 3 倍音も弱い",
       "clean": false,
       "trials": 40,
-      "passed": 4,
-      "held": 36,
-      "held_rate": "90%",
+      "passed": 0,
+      "held": 40,
+      "held_rate": "100%",
       "false_pass": 0,
-      "median_error": "0.04%",
-      "worst_error": "0.06%"
+      "median_error": "—",
+      "worst_error": "—"
     },
     {
       "case": "基本の音がとても弱い（−26 dB）",
@@ -378,7 +378,7 @@
     "weak_fundamental_limit": "基本が弱く高い番号の倍音がいちばん強い音（倍音の番号 2〜20、基本の強さ 0.01〜0.08、85〜300 Hz の 300 通り）: 誤って通る 52 件はすべて基本が 0.01（約 −40 dB）。0.02（約 −34 dB）以上は 0 件。再現: docs/eval/pitch-search/weakk.ts.txt"
   },
   "background": {
-    "note": "10/12 デプロイ前レビュー 6 回目の対応後。はじく前 0.5 秒の背景の形を覚える。推定の 1/k などの位置に背景の山があるとき、(1) その背景がいちばん強い山より 41 dB 以上弱く大きさが変わらない、または (2) はじいた音が 10 dB 以上弱まっていくのに、その帯域だけはじいた瞬間以外ずっと ±1 dB で変わらない、のどちらかなら背景だけとみなす。どちらでもなければ保留。背景の山が消えた（逆の位相の基本で打ち消された）ときも保留。本当の基本が 60 Hz 未満になる位置は調べない。harness: docs/eval/pitch-search/pluck_hum.ts.txt, overlap.ts.txt, over_hum.ts.txt",
+    "note": "10/12 デプロイ前レビュー 6 回目の対応後。はじく前 0.5 秒の背景の形を覚える。推定の 1/k などの位置に背景の山があるとき、(1) その背景がいちばん強い山より 41 dB 以上弱く大きさが変わらない、または (2) はじいた音が 10 dB 以上弱まっていくのに、その帯域だけはじいた瞬間以外ずっと ±1 dB で変わらない、のどちらかなら背景だけとみなす。どちらでもなければ保留。背景の山が消えた（逆の位相の基本で打ち消された）ときも保留。本当の基本が 60 Hz 未満になる位置は調べない。harness: docs/eval/pitch-search/pluck_hum.ts.txt, overlap.ts.txt, over_hum.ts.txt。10/12 夜: 基本が倍音より弱い音は保留にしたので、背景と重なる弱い基本の誤通過（overlap）は数字が同じでも、その音はふだんの授業では保留になる",
     "plucked_40_random_pitches": {
       "desc": "4 回はじく（exp(-3t) で弱まる）80〜600 Hz のでたらめな高さ 40 個。保留の数 / 誤って通した数",
       "rubber": {
@@ -440,21 +440,23 @@
     }
   },
   "intruder": {
-    "desc": "10/12 デプロイ前レビュー 7・8 回目の対応後。4 回はじいた輪ゴム（200/300/450 Hz）に、別の続く音（高さの比 1/3〜2、大きさ 0.005〜0.1、倍音あり・なし）を混ぜる。保留（unstable）の条件: (a) フレームごとの高さの 85% 以上が中央値から 6% 以内にそろわない、(b) 第 2 倍音の大きさが 4 dB 以上変わるのに、基本の高さの音の大きさがほとんど変わらない（2 dB 未満かつ第 2 倍音の幅の 15% 未満。はじいた瞬間のフレームを除く）= 音と関係なく鳴り続けている別の音。harness: docs/eval/pitch-search/intruder.ts.txt, intruder_decay.ts.txt, normal.ts.txt",
+    "desc": "10/12 デプロイ前レビュー 7〜9 回目の対応後。4 回はじいた輪ゴム（200/300/450 Hz）に別の続く音を混ぜる。保留（unstable / two_clocks_disagree）の条件: (a) フレームごとの高さの 85% 以上が中央値から 6% 以内にそろわない、(b) はじいても大きさが変わらない音を基本と読んだ、(c) いちばん大きい 4 フレームで、第 2〜8 倍音のどれかが基本より 2 dB 以上強い（本番の版は、下の音が 4.8 dB（1/2）・3 dB（1/3）以上弱ければ上の音を読むので、それより手前で止める）。harness: docs/eval/pitch-search/intruder.ts.txt, intruder_decay.ts.txt, intruder_wobble.ts.txt, normal.ts.txt",
     "mixed_720": {
-      "desc": "途中（0.8・2.0 秒）または最初から、音は exp(-3t) で弱まる",
-      "false_pass": 3,
-      "production_false_pass": 67,
-      "head_only": 0
+      "desc": "途中（0.8・2.0 秒）または最初から。音は exp(-3t)",
+      "false_pass": 0,
+      "production_false_pass": 67
     },
     "decay_1920": {
       "desc": "0.65・2.0 秒から、音の弱まり exp(-0.3t)〜exp(-3t)",
-      "false_pass": 13,
-      "production_false_pass": 119,
-      "head_only": 2,
-      "head_only_cases": "450 Hz の音がほとんど弱まらない（exp(-0.3t)）ところに、音の半分の大きさの 225 Hz の続く音が 0.65 秒（はじいた直後）から鳴る。音も混ざった音も大きさが変わらないので、時間でも見分けられない"
+      "false_pass": 0,
+      "production_false_pass": 119
     },
-    "ordinary_sounds": "倍音ごとに弱まる速さが違う・基本のほうが速く弱まる・1 回だけ・弱い音・ビブラート ±2%・はじいた直後に 3% 高い・ゆっくり弱まる（exp(-0.5t)）の 9 種 × 20 個で、保留 0（本番も 0）。Codex の確認では、はじいた直後に 20% 高い・ビブラート ±5% 以上は保留（本番は 0）",
-    "codex_cases": "7 回目（300 Hz に 0.8 秒から 150 Hz）はそろっている割合 0.59〜0.64 で保留、8 回目（ゆっくり弱まる音に 0.65 秒から 150 Hz 0.065）は割合 0.864 だが基本の大きさが変わらない（幅 0 dB）で保留"
+    "wobble_3600": {
+      "desc": "さらに混ぜた音の大きさを ±0〜30%（0.3 Hz）でゆらす",
+      "false_pass": 0,
+      "production_false_pass": 307
+    },
+    "ordinary_sounds": "倍音ごとに弱まる速さが違う・基本のほうが速く弱まる・1 回だけ・弱い音・ビブラート ±2%・はじいた直後に 3% 高い・ゆっくり弱まる（exp(-0.5t)）の 9 種 × 20 個で、保留 0（本番も 0）",
+    "cost": "基本が倍音より弱い音（基本 −16 dB など）は、1 オクターブ下の別の音と見分けられないので保留する（ベンチの 3 行が 40/40 保留。本番の版はこれらを 1 オクターブ上と答えて通していた）"
   }
 }

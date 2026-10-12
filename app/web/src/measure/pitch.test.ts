@@ -69,7 +69,7 @@ describe("analyzePitch", () => {
 });
 
 describe("1 オクターブ上の取り違え（10/12 合成ベンチマーク）", () => {
-  it("reads the fundamental even when the second harmonic is much stronger", () => {
+  it("holds (never passes an octave up) when the second harmonic is much stronger than the fundamental", () => {
     // 基本の音が弱く、第 2 倍音が強い（倍音の強さ 0.15・1・0.5・0.3）。自己相関の最初のピークは半分の周期に出る
     const amps = [0.15, 1, 0.5, 0.3];
     const frames = [];
@@ -86,8 +86,10 @@ describe("1 オクターブ上の取り違え（10/12 合成ベンチマーク�
     }
     const f = analyzePitch({ sampleRate: SR, frames });
 
-    expect(Math.abs(f.f0_hz - 220) / 220).toBeLessThan(0.03);
-    expect(pitchChecks(f, 0.03).every((c) => c.ok)).toBe(true);
+    // 基本が第 2 倍音より弱い音は、1 オクターブ下の別の音と見分けられないので決めない（10/12 デプロイ前レビュー 9 回目）。
+    // 本番の版は 440 Hz と答えて通していた
+    expect(pitchChecks(f, 0.03).every((c) => c.ok)).toBe(false);
+    expect(f.harmonic_over_f0_db).toBeGreaterThan(3);
   });
 
   it("does not halve a clean tone", () => {
@@ -292,6 +294,22 @@ describe("背景を覚えて、弱い本当の基本は見逃さない（10/12 �
     const f = analyzePitch({ sampleRate: SR, frames });
     expect(f.snr_db).toBeLessThan(80);
     expect(passes(f)).toBe(true);
+  });
+
+  it("holds when the sound an octave below wobbles slightly in loudness (9th review)", () => {
+    const frames = [];
+    for (let i = 0; i < 50; i++) {
+      const data = new Float32Array(N);
+      for (let k = 0; k < N; k++) {
+        const s = (i * 4800 + k) / SR;
+        let v = 0;
+        for (const p of [0.6, 1.7, 2.8, 3.9]) if (s >= p) v += Math.exp(-(s - p) * 1.5) * [1, 0.5, 0.25, 0.12].reduce((x, a, h) => x + a * Math.sin(2 * Math.PI * 300 * (h + 1) * (s - p) + h), 0);
+        const wob = s >= 0.65 ? 0.065 * (1 + 0.15 * Math.sin(2 * Math.PI * 0.3 * (s - 0.65) + 3)) * Math.sin(2 * Math.PI * 150 * s) : 0;
+        data[k] = 0.2 * v + wob + 0.001 * Math.sin(9999 * k);
+      }
+      frames.push({ t: i * 100, data });
+    }
+    expect(passes(analyzePitch({ sampleRate: SR, frames }))).toBe(false);
   });
 
   it("holds when a slowly decaying note has a sustained sound an octave below from 0.65 s (8th review)", () => {

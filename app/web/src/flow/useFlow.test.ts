@@ -28,6 +28,7 @@ function pitch(f0: number): Features {
     f0_steady_share: 1,
     f0_follow: NaN,
     f0_follow_db: NaN,
+    harmonic_over_f0_db: NaN,
   };
 }
 
