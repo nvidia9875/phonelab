@@ -267,6 +267,10 @@ def changes_condition(advice: str, variant_id: str) -> str | None:
                 continue
             after = _until_next_term(clause[at:], term, terms)
             before = _since_previous_term(clause[:at], term, terms)
+            # 「同じ」「変えず」は、その直後にある言葉にだけかかる（「重さは同じにして長くした糸を」の「長くした」は糸の変更）
+            keep = list(KEEP_WORDS.finditer(before))
+            if keep:
+                before = before[keep[-1].end() :]
             for scope in (after, before):
                 if CHANGE_VERBS.search(scope) and not KEEP_WORDS.search(scope):
                     return term

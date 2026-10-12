@@ -324,59 +324,57 @@
     ]
   },
   "paired_search": {
-    "note": "倍音 8 つまで・倍音のずれ・雑音・減衰・2 音の混ざりを含む 5 系統 × 70 通りの倍音の形 × 80〜1200 Hz の 70 の高さ（計 24,500 件）。同じ信号を直したあとの版と 10/9 の版に通した。誤って通る = 検査を通ったのに 3% より外れる。向きが逆 = 高さの比 1.03〜2.5 の 2 条件が両方通ったのに低くなったと出る。再現: docs/eval/pitch-search/（10/12 独立レビューの探索）",
+    "note": "5 系統 × 70 通りの倍音の形 × 80〜1200 Hz の 70 の高さ（計 24,500 件）。1 フレームでふるい、残った候補を 5 秒の信号（端末と同じ analyzePitch）で確かめ直した。誤って通る = 検査を通ったのに 3% より外れる。向きが逆 = 高さの比 1.03〜2.5 の 2 条件が両方通ったのに低くなったと出る。再現: docs/eval/pitch-search/paired_full.ts.txt",
     "families": {
       "倍音 8 つまで": {
-        "false_pass": [
-          0,
-          1162
-        ],
-        "inversion": [
-          0,
-          1464
-        ]
+        "false_pass": 0,
+        "inversion": 0,
+        "before_fix": {
+          "false_pass": 1162,
+          "inversion": 1464
+        }
       },
-      "倍音が 1% までずれる": {
-        "false_pass": [
-          77,
-          1201
-        ],
-        "inversion": [
-          0,
-          1583
-        ]
+      "倍音の番号に比例してずれる（第 h 倍音で最大 h% 程度）": {
+        "false_pass": 0,
+        "inversion": 0,
+        "before_fix": {
+          "false_pass": 1201,
+          "inversion": 1583
+        }
       },
       "雑音を強く": {
-        "false_pass": [
-          0,
-          1139
-        ],
-        "inversion": [
-          0,
-          1555
-        ]
+        "false_pass": 0,
+        "inversion": 0,
+        "before_fix": {
+          "false_pass": 1139,
+          "inversion": 1555
+        }
       },
       "減衰するはじき": {
-        "false_pass": [
-          0,
-          1215
-        ],
-        "inversion": [
-          0,
-          1798
-        ]
+        "false_pass": 0,
+        "inversion": 0,
+        "before_fix": {
+          "false_pass": 1215,
+          "inversion": 1798
+        }
       },
-      "2 つの音が混ざる": {
-        "false_pass": [
-          71,
-          1498
-        ],
-        "inversion": [
-          7,
-          1906
-        ]
+      "2 つの音が混ざる（和音）": {
+        "false_pass": 0,
+        "inversion": 0,
+        "before_fix": {
+          "false_pass": 1498,
+          "inversion": 1906
+        },
+        "note": "ほぼ全部を保留する（2 つの音が混ざると結論を出さない）"
       }
     },
-    "columns": "[直したあと, 10/9 の版]"
+    "background": {
+      "note": "ふつうの輪ゴムの音（倍音 1/0.5/0.25/0.12）に背景の音を混ぜ、80〜600 Hz の 11 の高さで保留した数（直したあと / 10/9 の版）。再現: docs/eval/pitch-search/over.ts.txt",
+      "声 −25 dB": "2/11 / 0/11",
+      "ざわめき −25 dB": "0/11 / 0/11",
+      "ざわめき −15 dB": "1/11 / 0/11",
+      "電源のうなり −25 dB": "4〜5/11 / 0/11",
+      "純音（背景なし〜声 −35 dB）": "0〜2/11 / 7〜10/11"
+    }
   }
 }

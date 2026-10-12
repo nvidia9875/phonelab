@@ -29,7 +29,7 @@ for (const a1 of grid) for (const a2 of grid) for (const a3 of grid) for (const 
       falsePass++;
       const key = a1 >= 0.1 ? "fundamental>=0.1" : a1 > 0 ? "fundamental<0.1" : "no-fundamental";
       byKind[key] = (byKind[key] ?? 0) + 1;
-      if (fp.length < 30 && key === "fundamental>=0.1") fp.push(`${JSON.stringify(amps)} ${f0} truth ${truth} -> ${f.f0_hz}`);
+      if (fp.length < 16) fp.push(`${JSON.stringify(amps)} ${f0} truth ${truth} -> ${f.f0_hz}`);
     }
   }
 }
@@ -37,7 +37,7 @@ for (const a1 of grid) for (const a2 of grid) for (const a3 of grid) for (const 
 let inversions = 0;
 const invEx: string[] = [];
 for (const key of Object.keys(passed)) { const [amps, f] = key.split("|"); if (+amps.split(",")[0] === 0) continue; for (const g of freqs) { const k2 = `${amps}|${g}`; if (g > +f && passed[k2] !== undefined && passed[k2] < passed[key]) { inversions++; invEx.push(`${amps} ${f}->${g}`); } } }
-console.log(JSON.stringify({ total, pass, falsePass, byKind, inversions_with_fundamental: inversions, invEx }, null, 1));
+console.log(JSON.stringify({ total, pass, falsePass, byKind, inversions_with_fundamental: inversions, invEx, fp }, null, 1));
 for (const [amps, a, b] of [[[0.6, 0.3, 1, 0.2], 220, 260], [[0.5, 0, 0.2, 1], 220, 260], [[0.15, 1, 0.2], 220, 330]] as [number[], number, number][]) {
   const fa = sig(a, amps, 0.002), fb = sig(b, amps, 0.002);
   const oa = pitchChecks(fa, 0.03).every((c) => c.ok), ob = pitchChecks(fb, 0.03).every((c) => c.ok);

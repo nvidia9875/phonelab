@@ -153,3 +153,34 @@ describe("純音の分かれ道が 1 オクターブ上の取り違えを追認�
     if (bOk) expect(Math.abs(b.f0_hz - 330) / 330).toBeLessThan(0.03);
   });
 });
+
+describe("調和性の検査（10/12 デプロイ前レビュー 4 回目）", () => {
+  function signal(f0: number, amps: number[], extra?: (s: number) => number) {
+    const frames = [];
+    for (let i = 0; i < 50; i++) {
+      const data = new Float32Array(N);
+      for (let k = 0; k < N; k++) {
+        const s = (i * 4800 + k) / SR;
+        data[k] = i < 5 ? 0.001 * Math.sin(9999 * k) : 0.2 * amps.reduce((v, a, h) => v + a * Math.sin(2 * Math.PI * f0 * (h + 1) * s), 0) + (extra ? extra(s) : 0);
+      }
+      frames.push({ t: i * 100, data });
+    }
+    return analyzePitch({ sampleRate: SR, frames });
+  }
+  const passes = (f: ReturnType<typeof analyzePitch>) => pitchChecks(f, 0.03).every((c) => c.ok);
+
+  it("does not pass a tone read at its 10th harmonic", () => {
+    expect(passes(signal(150, [0.5, 0, 0, 0, 0, 0, 0, 0, 0, 1]))).toBe(false);
+  });
+
+  it("does not pass two notes at 4:3 as one low note", () => {
+    const chord = signal(240, [1, 0.5, 0.25], (s) => 0.18 * (Math.sin(2 * Math.PI * 320 * s) + 0.5 * Math.sin(2 * Math.PI * 640 * s)));
+    expect(passes(chord)).toBe(false);
+  });
+
+  it("still passes a rubber band with a quiet mains hum or a quiet voice in the room", () => {
+    const hum = signal(220, [1, 0.5, 0.25, 0.12], (s) => 0.004 * Math.sin(2 * Math.PI * 60 * s));
+    expect(passes(hum)).toBe(true);
+    expect(Math.abs(hum.f0_hz - 220) / 220).toBeLessThan(0.03);
+  });
+});

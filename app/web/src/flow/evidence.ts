@@ -29,12 +29,11 @@ const CHECK_NAMES: Record<string, string> = {
 export function evidenceOf(rec: StudyRecord): Evidence {
   // テストモードのサンプルも含める（画面にはサンプルだと出ている）
   const passed = rec.measurements.filter((m) => m.pass);
-  const byCond = (c: CondKey) => passed.filter((m) => m.condition === c);
-  const pitch = (c: CondKey) => byCond(c).flatMap((m) => (m.features.profile === "pitch" ? [m.features.rms_db] : []));
-  const a = pitch("A");
-  const b = pitch("B");
-  const mean = (xs: number[]) => xs.reduce((s, x) => s + x, 0) / xs.length;
-  const loudness = a.length && b.length ? { A: mean(a), B: mean(b) } : null;
+  // 判定（ensureJudged）と同じく、条件ごとにいちばん新しい通った測定を使う（測り直す前の古い測定を混ぜない。10/12 Codex 4 回目）
+  const latest = (c: CondKey) => [...passed].reverse().find((m) => m.condition === c);
+  const la = latest("A");
+  const lb = latest("B");
+  const loudness = la?.features.profile === "pitch" && lb?.features.profile === "pitch" ? { A: la.features.rms_db, B: lb.features.rms_db } : null;
   const names = new Set<string>();
   for (const m of passed) for (const c of m.checks) if (c.ok && CHECK_NAMES[c.code]) names.add(CHECK_NAMES[c.code]);
   return { loudness, passedChecks: [...names] };

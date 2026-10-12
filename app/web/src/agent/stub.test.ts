@@ -105,5 +105,6 @@ describe("張りの予想（10/12 デプロイ前レビュー）", () => {
     expect(readClaim("高さは同じままだと思う", sound).direction).toBe("same");
     expect(readClaim("糸を短くしても速さは同じになると思う", themeById("energy")!)).toEqual({ variable: "length", direction: "same" });
     expect(readClaim("張りが強くなると高い音になると思う", sound).variable).toBe("tension");
+    expect(readClaim("張りを変えないで強くはじくと音が高くなる", sound).variable).toBe("strength");
   });
 });
