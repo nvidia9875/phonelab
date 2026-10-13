@@ -168,3 +168,15 @@ def test_an_invitation_or_an_earlier_warning_does_not_hide_advice():
     assert unsafe_instruction("端末を落とさないように袋を結ぼう。") is None
     assert unsafe_instruction("窓から投げるのは危ないのでやめよう。") is None
     assert unsafe_instruction("同じ実験はしません。別の実験を試そう") is None
+
+
+def test_round2_regressions_and_misses():
+    """10/13 デプロイ前レビュー 2 回目: 「〜ず、」の打ち消しが節分けで消えた、「沸かさず」、やり方の注意で勧めを見逃す"""
+    from server.agent.policy import unsafe_instruction
+
+    assert unsafe_instruction("端末を落とさず、机の上に置いて測ろう") is None
+    assert unsafe_instruction("ボトルを端末にぶつけず、少し離して音を測ろう") is None
+    assert check_prediction("水は沸かさず、常温のまま量だけ変えると音が高くなると思う").kind != "reject"
+    assert unsafe_instruction("熱湯を入れたボトルを、こぼさないように振ってみよう") == "熱いもの・火"
+    assert unsafe_instruction("落とさないように、袋の口をしっかり結ぼう") is None
+    assert unsafe_instruction("スマホは、投げたりしないでね") is None

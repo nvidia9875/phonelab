@@ -139,3 +139,9 @@ describe("checkPolicy: サーバと同じ規則（10/13 デプロイ前レビュ
     expect(checkPolicy("3 メートルの台に乗る", energy, []).kind).toBe("reject");
   });
 });
+
+describe("checkPolicy: 打ち消しの『沸かさず』（10/13 デプロイ前レビュー 2 回目）", () => {
+  it("does not reject", () => {
+    expect(checkPolicy("水は沸かさず、常温のまま量だけ変えると音が高くなると思う", themeById("bottle")!, []).kind).not.toBe("reject");
+  });
+});

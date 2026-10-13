@@ -25,7 +25,7 @@ FORBIDDEN: tuple[tuple[re.Pattern[str], str], ...] = (
     # すぐあとで打ち消している（「お湯は使わず」「お湯ではなく常温の水で」）ものは数えない（10/13 デプロイ前レビュー）
     (
         re.compile(
-            r"(熱湯|お湯|おゆ|熱い(湯|水|もの)|熱した(水|湯|もの)|あつい(お湯|湯|水)|沸騰|沸か|ドライヤー|コンロ|電子レンジ|ろうそく|ライター|火で|火に|火を)(?![^。、]{0,4}(は使わ|を使わ|使わず|ではなく|でなく|じゃなく|はやめ|は使えない))"
+            r"(熱湯|お湯|おゆ|熱い(湯|水|もの)|熱した(水|湯|もの)|あつい(お湯|湯|水)|沸騰|沸か|ドライヤー|コンロ|電子レンジ|ろうそく|ライター|火で|火に|火を)(?![^。、]{0,4}(は使わ|を使わ|使わず|ではなく|でなく|じゃなく|はやめ|は使えない|さず|せず|さない))"
         ),
         "熱いもの・火",
     ),
@@ -45,18 +45,24 @@ WARNING_WORDS = re.compile(
     r"ないよう|ないで|ないこと|ない方|ないほう|ません(?!か)|ず[、。に]|禁止|だめ|ダメ|危な|危険|気をつけ|注意|やめ"
 )
 SENTENCES = re.compile(r"[^。！？!?\n]+")
-CLAUSES = re.compile(r"[^、,]+")
+# 節は「、」ごと。区切りの「、」も節に残す（「落とさず、」の「ず、」を注意として読むため。10/13 デプロイ前レビュー 2 回目）
+CLAUSES = re.compile(r"[^、,]+[、,]?")
+# あとの節にあって、前の節の勧めまで取り消す強い言葉。「こぼさないように振ってみよう」の「ないよう」はやり方の注意なので含めない
+STOP_WORDS = re.compile(r"危な|危険|やめ|禁止|だめ|ダメ|使わない|しないで|ません(?!か)")
 
 
 def unsafe_instruction(text: str) -> str | None:
     """ラボ先生の文が危ない動作を勧めているか。勧めている文の種類を返す（無ければ None）。10/9 Codex #5
-    注意の言葉は、危ない言葉と同じ節か、そのあとの節にあるときだけ数える。「やけどに注意して、熱湯を入れて振ってみよう」の
-    ように前置きの注意だけで、そのあと勧めている文を見逃していた（10/13 デプロイ前レビュー）"""
+    注意の言葉は、危ない言葉と同じ節にあるか、そのあとの節に強い言葉（危ない・やめる など）があるときだけ数える。
+    「やけどに注意して、熱湯を入れて振ってみよう」のように前置きの注意だけで勧めている文や、「熱湯を入れたボトルを、
+    こぼさないように振ってみよう」のようにやり方の注意だけで勧めている文を見逃していた（10/13 デプロイ前レビュー）"""
     for sentence in SENTENCES.findall(text):
         clauses = CLAUSES.findall(sentence)
         for i, clause in enumerate(clauses):
             label = next((lb for pattern, lb in UNSAFE_OUTPUT if pattern.search(clause)), None)
-            if label and not any(WARNING_WORDS.search(c) for c in clauses[i:]):
+            if label is None or WARNING_WORDS.search(clause):
+                continue
+            if not any(STOP_WORDS.search(c) for c in clauses[i + 1 :]):
                 return label
     return None
 
