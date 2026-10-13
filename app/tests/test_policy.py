@@ -84,7 +84,7 @@ def test_unsafe_instruction_catches_advice_but_not_warnings():
 
     assert unsafe_instruction("端末を窓から投げてください。") == "端末の落下・投擲"
     assert unsafe_instruction("窓から投げてみない？") == "端末の落下・投擲"
-    assert unsafe_instruction("電子レンジで温めてみよう") == "熱いもの・火"  # 10/13 から入口でも止める類
+    assert unsafe_instruction("電子レンジで温めてみよう") == "火・電気・分解"
     assert unsafe_instruction("電池を外して分解しよう") == "火・電気・分解"
     assert unsafe_instruction("端末を落とさないように袋を結ぼう。") is None
     assert unsafe_instruction("窓から投げるのは危ないのでやめよう。") is None
@@ -161,7 +161,7 @@ def test_output_check_keeps_the_production_rule_for_warnings():
     """出口は本番と同じ: 注意の言葉がある文は通す（10/13 デプロイ前レビュー 3 回目で、節ごとの判定が安全な注意文を止めた）"""
     from server.agent.policy import unsafe_instruction
 
-    assert unsafe_instruction("熱湯を入れたボトルを振ってみよう") == "熱いもの・火"
+    assert unsafe_instruction("熱湯を入れたボトルを振ってみよう") is None  # 熱いもの・火は入口だけ
     assert unsafe_instruction("端末を落とさず、机の上に置いて測ろう") is None
     assert unsafe_instruction("端末を落としたり、ぶつけたりしないように袋をしっかり結ぼう") is None
     assert unsafe_instruction("お湯は使わないで、常温の水で比べよう") is None
@@ -175,5 +175,5 @@ def test_round4_output_rewording_and_volcano_pass():
     assert unsafe_instruction("お湯ではなく、常温の水を使って比べよう") is None
     assert unsafe_instruction("火山の噴火でできた岩石を観察しよう") is None
     assert check_prediction("火山の噴火でできた岩石は重いと思う").kind != "reject"
-    assert unsafe_instruction("熱湯を入れたボトルを振ってみよう") == "熱いもの・火"
-    assert unsafe_instruction("ろうそくの火で温めてみよう") == "熱いもの・火"
+    for text in ["熱湯ではなく、常温の水を使って比べよう", "沸騰は、液体の内部からも気体が生じる現象です", "ろうそくの炎の色を教科書の写真で比べよう"]:
+        assert unsafe_instruction(text) is None  # 10/13 デプロイ前レビュー 5 回目
