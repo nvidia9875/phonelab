@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="ja">
+<meta charset="utf-8" />
+<title>PhoneLab 統制の流れ</title>
+<link rel="stylesheet" href="style.css" />
+<script src="https://unpkg.com/lucide@0.469.0/dist/umd/lucide.min.js"></script>
+<style>
+  #canvas { width: 1600px; height: 920px; }
+  .node { position: absolute; top: 230px; height: 214px; padding: 16px; display: flex; flex-direction: column; gap: 8px; }
+  .node .icon { width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; background: var(--sand); }
+  .gate .icon { background: var(--ink); color: #fff; }
+  .gate .step { font-family: var(--font-mono); font-size: 12px; font-weight: 700; color: var(--teal); }
+  .node .title { font-size: 17px; }
+  .gemini { background: linear-gradient(160deg, #e8f6f5, #fffdf8 60%); }
+  .gemini .icon { background: var(--teal); color: #fff; }
+  .stop { position: absolute; top: 500px; height: 118px; padding: 14px 14px; border: 2px dashed var(--orange); border-radius: 14px; background: #fff8f2; }
+  .stop .label { display: inline-flex; align-items: center; gap: 6px; font-family: var(--font-head); font-weight: 900; font-size: 14px; color: #b85c2a; margin-bottom: 4px; }
+  .stop .label svg { width: 16px; height: 16px; }
+  .band { position: absolute; top: 680px; height: 196px; width: 474px; padding: 18px 20px; }
+  .band .head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .band ul { margin: 0; padding-left: 18px; }
+  .band li { font-size: 14px; line-height: 1.75; color: var(--ink-2); }
+  .band li b { color: var(--ink); }
+  .band.navy li { color: #d6dee8; } .band.navy li b { color: #fff; }
+  .band .icon { width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; }
+</style>
+
+<div id="canvas">
+  <div class="abs" style="left:56px; top:40px">
+    <div class="kicker">統制の流れ（ADK の BasePlugin 1 つ ＝ PolicyPlugin を 5 つのエージェントすべてに）</div>
+    <div class="headline">ラボ先生の前と後ろに、止める場所を 4 つ置いた</div>
+    <div class="lede">止めたときは理由を残して、決まりごとで進める。人が決めることは、ラボ先生には渡さない。</div>
+  </div>
+
+  <!-- 横一列 -->
+  <div class="card node student" style="left:56px; width:170px">
+    <div class="icon" style="background:var(--orange-soft); color:#b85c2a"><i data-lucide="pencil"></i></div>
+    <div class="title">生徒の文</div>
+    <div class="small">予想・会話の発言・自分の考え・これまでの履歴</div>
+  </div>
+  <div class="card node gate" style="left:256px; width:200px">
+    <div class="icon"><i data-lucide="shield-check"></i></div>
+    <div class="step">① 決定論の Policy</div>
+    <div class="title">危ない実験と命令を止める</div>
+    <div class="small">「落として測りたい」「チェックを飛ばして」。モデルは呼ばない</div>
+  </div>
+  <div class="card node gate" style="left:486px; width:200px">
+    <div class="icon"><i data-lucide="hand"></i></div>
+    <div class="step">② before_run</div>
+    <div class="title">先生が止めていたら動かさない</div>
+    <div class="small">学級の状態をその場で確かめる</div>
+  </div>
+  <div class="card node gate" style="left:716px; width:200px">
+    <div class="icon"><i data-lucide="scan-search"></i></div>
+    <div class="step">③ before_model</div>
+    <div class="title">Model Armor と回数の枠</div>
+    <div class="small">枠はモデルの前に Firestore のトランザクションで取る</div>
+  </div>
+  <div class="card node ai gemini" style="left:946px; width:190px">
+    <div class="icon"><i data-lucide="sparkles"></i></div>
+    <div class="title">Gemini 3.5<br/>Flash-Lite</div>
+    <div class="small">5 つのエージェント。選べるのはカタログの実験だけ。答えは渡していない</div>
+  </div>
+  <div class="card node gate" style="left:1166px; width:220px">
+    <div class="icon"><i data-lucide="list-checks"></i></div>
+    <div class="step">④ after_model</div>
+    <div class="title">出口で文を確かめる</div>
+    <div class="small">候補にない実験・結果の先出し・危ない動作の勧め・条件を変える助言</div>
+  </div>
+  <div class="card node" style="left:1416px; width:128px; align-items:center; text-align:center">
+    <div class="icon"><i data-lucide="smartphone"></i></div>
+    <div class="title">画面へ</div>
+    <div class="small">判断の跡つき</div>
+  </div>
+
+  <svg class="wires" viewBox="0 0 1600 960">
+    <defs>
+      <marker id="a" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#1e2a3a"/></marker>
+      <marker id="ao" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#e27a3f"/></marker>
+    </defs>
+    <!-- 本線 -->
+    <g stroke="#1e2a3a" stroke-width="3" fill="none" marker-end="url(#a)">
+      <path d="M228 337 L252 337"/><path d="M458 337 L482 337"/><path d="M688 337 L712 337"/>
+      <path d="M918 337 L942 337"/><path d="M1138 337 L1162 337"/><path d="M1388 337 L1412 337"/>
+    </g>
+    <!-- 止めたとき（下へ） -->
+    <g stroke="#e27a3f" stroke-width="2.5" fill="none" stroke-dasharray="5 6" marker-end="url(#ao)">
+      <path d="M356 448 L356 494"/><path d="M586 448 L586 494"/><path d="M816 448 L816 494"/><path d="M1276 448 L1276 494"/>
+    </g>
+    <!-- 作り直し（④ → Gemini に戻る） -->
+    <path d="M1276 224 C1276 184, 1041 184, 1041 222" stroke="#e27a3f" stroke-width="2.5" fill="none" stroke-dasharray="5 6" marker-end="url(#ao)"/>
+    <text x="1158" y="180" text-anchor="middle" font-family="Zen Maru Gothic" font-weight="700" font-size="14" fill="#b85c2a">落ちたら、理由を返して 1 回だけ作り直し</text>
+  </svg>
+
+  <div class="stop" style="left:256px; width:200px">
+    <div class="label"><i data-lucide="x-circle"></i>止めたら</div>
+    <div class="small">却下して、理由と代わりの実験を出す。モデルには渡らない</div>
+  </div>
+  <div class="stop" style="left:486px; width:200px">
+    <div class="label"><i data-lucide="x-circle"></i>止めたら</div>
+    <div class="small">409 を返す。測定中の端末も 2 秒ごとの確認で止まる</div>
+  </div>
+  <div class="stop" style="left:716px; width:200px">
+    <div class="label"><i data-lucide="x-circle"></i>止めたら</div>
+    <div class="small">検査できない文はモデルに渡さない（fail-closed）。枠が無ければ 429</div>
+  </div>
+  <div class="stop" style="left:1166px; width:378px">
+    <div class="label"><i data-lucide="rotate-ccw"></i>落ちたら作り直し</div>
+    <div class="small">理由を返して 1 回だけ作り直させる（これも回数の枠に入る）。それでも落ちたら、安全な決まった文に差し替える</div>
+  </div>
+  <div class="abs small" style="left:946px; top:500px; width:190px; padding:12px 14px; border:2px solid var(--teal); border-radius:14px; background:var(--card)">
+    <span class="mono" style="color:#13807c; font-weight:700">before_tool</span><br/>先生への見立ては、読み取り専用のツール 2 つで学級の要約だけを読む
+  </div>
+
+  <!-- 下の 3 つ -->
+  <div class="card band student" style="left:56px">
+    <div class="head"><span class="icon" style="background:var(--orange-soft); color:#b85c2a"><i data-lucide="user-check"></i></span><span class="title">人が決めること</span></div>
+    <ul>
+      <li><b>生徒</b>が、使うセンサーと秒数を見て、自分で許可してから測る</li>
+      <li><b>先生</b>が、使ってよいセンサー・家でやる実験を決める</li>
+      <li><b>先生</b>だけが、全端末の測定を止める・解除する</li>
+      <li>見立ては提案だけ。設定を変えるのは先生のボタン</li>
+    </ul>
+  </div>
+  <div class="card band ai" style="left:563px">
+    <div class="head"><span class="icon" style="background:var(--teal-soft); color:#13807c"><i data-lucide="footprints"></i></span><span class="title">跡を残すこと</span></div>
+    <ul>
+      <li>何を読み、何を選び、統制が何を直したか＝<b>判断の跡</b></li>
+      <li>同じ段で、生徒の画面・教員画面・<b>Cloud Trace</b> に</li>
+      <li>トレースに生徒の文は入れない</li>
+      <li>先生の操作は、追記だけの<b>監査記録</b>に</li>
+    </ul>
+  </div>
+  <div class="card band navy" style="left:1070px">
+    <div class="head"><span class="icon" style="background:#2c3b50; color:#7fd6d2"><i data-lucide="key-round"></i></span><span class="title">権限を絞ること</span></div>
+    <ul>
+      <li>Cloud Run は<b>専用のサービスアカウント</b>、役割 4 つだけ</li>
+      <li>デモの PIN とセッションの署名鍵は <b>Secret Manager</b></li>
+      <li>AI を呼べるのは<b>学級の生徒だけ</b>（番号と合言葉）</li>
+      <li>音声や加速度の生データは<b>端末から出さない</b></li>
+    </ul>
+  </div>
+</div>
+<script src="break.js"></script>
+<script>lucide.createIcons();</script>

@@ -85,6 +85,7 @@ def test_unsafe_instruction_catches_advice_but_not_warnings():
     assert unsafe_instruction("端末を窓から投げてください。") == "端末の落下・投擲"
     assert unsafe_instruction("窓から投げてみない？") == "端末の落下・投擲"
     assert unsafe_instruction("電子レンジで温めてみよう") == "火・電気・分解"
+    assert unsafe_instruction("電池を外して分解しよう") == "火・電気・分解"
     assert unsafe_instruction("端末を落とさないように袋を結ぼう。") is None
     assert unsafe_instruction("窓から投げるのは危ないのでやめよう。") is None
     assert unsafe_instruction("1.98 m/s だったね。同じ高さから放そう") is None
@@ -123,3 +124,56 @@ def test_changes_condition_checks_every_occurrence_of_a_term():
 
     assert changes_condition("糸の長さは同じにして糸の長さを短くしよう", "energy_length")
     assert changes_condition("重さは同じにして長くした糸を使おう", "energy_length")
+
+
+@pytest.mark.parametrize(
+    "text",
+    ["ペットボトルに熱いお湯を入れて振ると、音が高くなると思う", "熱湯を入れたら高くなる", "水を沸かして測る", "ドライヤーで温めると速くなる", "ろうそくの火で温める"],
+)
+def test_rejects_hot_things_and_fire(text):
+    """10/13: 熱いお湯を入れて振る予想が、却下されずに水の量の実験へ進んでいた"""
+    decision = check_prediction(text)
+    assert decision.kind == "reject"
+    assert decision.rejection.reasons[0] == "禁止動作：熱いもの・火"
+
+
+@pytest.mark.parametrize("text", ["水を増やすと音が低くなると思う", "水の温度は同じにして、量だけ変える", "強くはじくと高くなる。火曜日に測る"])
+def test_ordinary_water_predictions_are_not_rejected_as_heat(text):
+    assert check_prediction(text).kind != "reject"
+
+
+def test_heat_is_rejected_even_when_negated_on_purpose():
+    """10/13: 打ち消し（「お湯は使わず」）も止める。読み分けると別の言い回しが漏れたので、安全な側に倒す（意図した誤検知）"""
+    decision = check_prediction("お湯は使わず、常温の水の量だけ変えると音が高くなると思う")
+    assert decision.kind == "reject"
+    assert decision.rejection.reasons[0] == "禁止動作：熱いもの・火"
+
+
+@pytest.mark.parametrize("text", ["ペットボトルに熱した水を入れて振ってみる", "あついおゆを入れて振ると高くなる"])
+def test_heat_variants_are_rejected(text):
+    decision = check_prediction(text)
+    assert decision.kind == "reject"
+    assert decision.rejection.reasons[0] == "禁止動作：熱いもの・火"
+    assert decision.rejection.quoted
+
+
+def test_output_check_keeps_the_production_rule_for_warnings():
+    """出口は本番と同じ: 注意の言葉がある文は通す（10/13 デプロイ前レビュー 3 回目で、節ごとの判定が安全な注意文を止めた）"""
+    from server.agent.policy import unsafe_instruction
+
+    assert unsafe_instruction("熱湯を入れたボトルを振ってみよう") is None  # 熱いもの・火は入口だけ
+    assert unsafe_instruction("端末を落とさず、机の上に置いて測ろう") is None
+    assert unsafe_instruction("端末を落としたり、ぶつけたりしないように袋をしっかり結ぼう") is None
+    assert unsafe_instruction("お湯は使わないで、常温の水で比べよう") is None
+    assert unsafe_instruction("窓から投げるのは危ないのでやめよう。") is None
+
+
+def test_round4_output_rewording_and_volcano_pass():
+    """10/13 デプロイ前レビュー 4 回目: 出口で「お湯ではなく」と「噴火で」を止めていた"""
+    from server.agent.policy import unsafe_instruction
+
+    assert unsafe_instruction("お湯ではなく、常温の水を使って比べよう") is None
+    assert unsafe_instruction("火山の噴火でできた岩石を観察しよう") is None
+    assert check_prediction("火山の噴火でできた岩石は重いと思う").kind != "reject"
+    for text in ["熱湯ではなく、常温の水を使って比べよう", "沸騰は、液体の内部からも気体が生じる現象です", "ろうそくの炎の色を教科書の写真で比べよう"]:
+        assert unsafe_instruction(text) is None  # 10/13 デプロイ前レビュー 5 回目

@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="ja">
+<meta charset="utf-8" />
+<title>PhoneLab システム構成</title>
+<link rel="stylesheet" href="style.css" />
+<script src="https://unpkg.com/lucide@0.469.0/dist/umd/lucide.min.js"></script>
+<style>
+  #canvas { width: 1600px; height: 950px; }
+  .zone-label { position: absolute; font-family: var(--font-head); font-weight: 900; font-size: 15px; letter-spacing: 0.1em; color: var(--muted); }
+  .box { position: absolute; padding: 16px 18px; }
+  .box .head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .box .icon { width: 38px; height: 38px; border-radius: 11px; display: grid; place-items: center; background: var(--sand); flex: none; }
+  .box .title { font-size: 18px; }
+  .flowlist { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+  .flowlist li { display: flex; gap: 10px; align-items: flex-start; font-size: 13.5px; line-height: 1.5; color: var(--ink-2); }
+  .flowlist li .dot { flex: none; width: 22px; height: 22px; border-radius: 50%; background: var(--ink); color: #fff; display: grid; place-items: center; font-size: 11.5px; font-weight: 700; font-family: var(--font-head); margin-top: 1px; }
+  .pill { display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 999px; font-size: 13px; font-weight: 700; font-family: var(--font-head); }
+  .frame { position: absolute; left: 488px; top: 196px; width: 608px; height: 704px; border: 2.5px dashed var(--ink); border-radius: 22px; background: rgba(255, 253, 248, 0.55); }
+  .api { display: flex; flex-wrap: wrap; gap: 6px; }
+  .api span { font-family: var(--font-mono); font-size: 12px; padding: 3px 8px; border-radius: 6px; background: var(--sand); color: var(--ink); }
+  .agents { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-top: 10px; }
+  .agent { border: 2px solid var(--teal); border-radius: 12px; background: #fff; padding: 10px 8px; text-align: center; }
+  .agent b { display: block; font-family: var(--font-head); font-size: 14px; color: #13807c; }
+  .agent span { font-size: 11.5px; color: var(--muted); line-height: 1.4; display: block; margin-top: 3px; }
+  .plugin { margin-top: 12px; border-radius: 12px; background: var(--ink); color: #fff; padding: 12px 14px; }
+  .plugin .t { font-family: var(--font-head); font-weight: 900; font-size: 15px; display: flex; align-items: center; gap: 8px; }
+  .plugin .hooks { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 8px; }
+  .plugin .hooks div { border: 1.5px solid #4a5a70; border-radius: 8px; padding: 6px 8px; font-size: 11.5px; color: #d6dee8; line-height: 1.4; }
+  .plugin .hooks code { display: block; font-family: var(--font-mono); font-size: 11.5px; color: #7fd6d2; font-weight: 700; }
+  .svc { position: absolute; left: 1184px; width: 360px; height: 100px; padding: 14px 16px; display: flex; gap: 14px; align-items: flex-start; }
+  .svc .icon { width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; flex: none; color: #fff; }
+  .svc .title { font-size: 17px; }
+  .svc .where { font-family: var(--font-mono); font-size: 11.5px; color: var(--muted-2); margin-left: 6px; font-weight: 400; }
+  .wlabel { position: absolute; font-size: 12px; font-weight: 700; color: var(--muted); line-height: 1.35; text-align: center; background: var(--paper); padding: 0 4px; }
+</style>
+
+<div id="canvas">
+  <div class="abs" style="left:56px; top:40px">
+    <div class="kicker">システム構成</div>
+    <div class="headline">端末で測り、Cloud Run の 1 つのサービスでエージェントを動かす</div>
+    <div class="lede" data-nobr>音声や加速度の生データは端末から出ない。サーバに届くのは、文と、検査を通った数値の要約だけ。</div>
+  </div>
+
+  <div class="zone-label" style="left:56px; top:166px">教室</div>
+  <div class="zone-label" style="left:488px; top:166px">Google Cloud ― Cloud Run（asia-northeast1）</div>
+  <div class="zone-label" style="left:1184px; top:166px">Google Cloud のサービス</div>
+
+  <!-- 生徒の端末 -->
+  <div class="card box student" style="left:56px; top:196px; width:350px; height:430px">
+    <div class="head"><span class="icon" style="background:var(--orange-soft); color:#b85c2a"><i data-lucide="tablet-smartphone"></i></span><div><div class="title">生徒の端末</div><div class="small">学校の iPad・家のスマホ（Web アプリ）</div></div></div>
+    <ul class="flowlist">
+      <li><span class="dot" style="background:var(--orange)">1</span>予想と理由を書く。ラボ先生の提案を見て、センサーを使うのを自分で許可</li>
+      <li><span class="dot">2</span>許可した秒数だけ、センサー（加速度・ジャイロ・マイク）を読む</li>
+      <li><span class="dot">3</span>端末の中で計算と検査（二つの計算の一致・雑音・音割れ・途中の変化）。落ちたら保留</li>
+      <li><span class="dot">4</span>2 条件を比べて判定。記録は端末（localStorage）に</li>
+      <li><span class="dot">5</span>測定中は 2 秒ごとに学級の停止を確認</li>
+    </ul>
+    <div style="margin-top:14px"><span class="pill" style="background:var(--orange-soft); color:#b85c2a"><i data-lucide="file-lock-2" style="width:16px;height:16px"></i>送るのは数値の要約だけ（約 285 バイト）</span></div>
+  </div>
+
+  <!-- 教員画面 -->
+  <div class="card box" style="left:56px; top:650px; width:350px; height:250px">
+    <div class="head"><span class="icon"><i data-lucide="monitor"></i></span><div><div class="title">教員画面</div><div class="small">PC。学級コードと PIN（scrypt）で入る</div></div></div>
+    <ul class="flowlist">
+      <li><span class="dot">・</span>予想の分布、保留中の子、生徒の記録（番号だけ）</li>
+      <li><span class="dot">・</span>ラボ先生の見立てを聞く（提案だけ）</li>
+      <li><span class="dot">・</span>許可の切り替え、<b>全端末の測定を止める</b></li>
+      <li><span class="dot">・</span>先生の操作は監査記録に残る</li>
+    </ul>
+  </div>
+
+  <!-- Cloud Run -->
+  <div class="frame"></div>
+  <div class="box" style="left:510px; top:212px; width:566px; padding:0">
+    <div class="head"><span class="icon" style="background:var(--ink); color:#fff"><i data-lucide="server"></i></span><div><div class="title">FastAPI ＋ Google ADK 2.8</div><div class="small">1 つのコンテナで Web アプリも配る。min-instances 0（授業が無いときは課金されない）</div></div></div>
+    <div class="api" style="margin-top:6px">
+      <span>POST /api/plan</span><span>/api/replan</span><span>/api/next</span><span>/api/chat</span><span>/api/class/{code}/…</span><span>/api/records</span>
+    </div>
+  </div>
+  <div class="card box" style="left:510px; top:350px; width:566px; height:112px">
+    <div class="head" style="margin-bottom:4px"><span class="icon"><i data-lucide="door-closed"></i></span><div class="title">入口の守り</div></div>
+    <div class="desc" data-nobr>AI を呼べるのは<b>学級の生徒だけ</b>（番号と合言葉）。接続元ごとのレート制限、回数の枠はモデルの前に Firestore で取る。停止中は 409。</div>
+  </div>
+  <div class="card box ai" style="left:510px; top:482px; width:566px; height:398px">
+    <div class="head" style="margin-bottom:0"><span class="icon" style="background:var(--teal-soft); color:#13807c"><i data-lucide="bot"></i></span><div><div class="title">ラボ先生 ＝ 5 つの LlmAgent</div><div class="small" data-nobr>Gemini 3.5 Flash-Lite。4 つは構造化出力、Tutor は文章</div></div></div>
+    <div class="agents">
+      <div class="agent"><b>Planner</b><span>予想を読み、実験を選ぶ・問い返す</span></div>
+      <div class="agent"><b>Replanner</b><span>保留の理由から、測り直すか別の実験か</span></div>
+      <div class="agent"><b>NextStep</b><span>次の実験か、先にふり返りか</span></div>
+      <div class="agent"><b>ClassAgent</b><span>学級の見立て（読み取り専用ツール）</span></div>
+      <div class="agent"><b>Tutor</b><span>ふり返りの問いかけと説明</span></div>
+    </div>
+    <div class="plugin">
+      <div class="t"><i data-lucide="shield" style="width:18px;height:18px;color:#7fd6d2"></i>PolicyPlugin（BasePlugin 1 つを Runner に登録）</div>
+      <div class="hooks">
+        <div><code>before_run</code>止めていれば動かさない</div>
+        <div><code>before_model</code>Model Armor・回数の枠</div>
+        <div><code>before_tool</code>許したツール・回数</div>
+        <div><code>after_model</code>出口の検査と作り直し</div>
+      </div>
+    </div>
+    <div class="small" data-nobr style="margin-top:12px">決定論の Policy（危ない実験・命令）は、Runner に渡す前に止める。答え（answers.py）はエージェントに渡さない。</div>
+  </div>
+
+  <!-- サービス -->
+  <div class="card svc" style="top:196px"><span class="icon" style="background:var(--teal)"><i data-lucide="sparkles"></i></span><div><div class="title">Vertex AI<span class="where">global</span></div><div class="small">Gemini 3.5 Flash-Lite。計画まで中央値 1.3 秒、授業 1 回で約 30 円の試算</div></div></div>
+  <div class="card svc" style="top:316px"><span class="icon" style="background:#c94a3d"><i data-lucide="scan-search"></i></span><div><div class="title">Model Armor<span class="where">us-central1</span></div><div class="small">予想・会話・考え・履歴を検査。検査できないときはモデルに渡さない</div></div></div>
+  <div class="card svc" style="top:436px"><span class="icon" style="background:#e27a3f"><i data-lucide="database"></i></span><div><div class="title">Firestore<span class="where">asia-northeast1</span></div><div class="small">学級・記録の要約・回数の枠（トランザクション）・PIN の間違い・監査記録</div></div></div>
+  <div class="card svc" style="top:556px"><span class="icon" style="background:#3b6fb6"><i data-lucide="activity"></i></span><div><div class="title">Cloud Trace<span class="where">OTLP</span></div><div class="small">1 リクエスト＝1 トレース。判断の跡と同じ段。生徒の文は入れない</div></div></div>
+  <div class="card svc" style="top:676px"><span class="icon" style="background:#1e2a3a"><i data-lucide="key-round"></i></span><div><div class="title">Secret Manager</div><div class="small">デモの PIN、セッションの署名鍵</div></div></div>
+  <div class="card svc" style="top:796px"><span class="icon" style="background:#6b7a8c"><i data-lucide="hammer"></i></span><div><div class="title">Cloud Build</div><div class="small">ソースからデプロイ。実行は専用のサービスアカウント（役割 4 つ）</div></div></div>
+
+  <svg class="wires" viewBox="0 0 1600 1010">
+    <defs>
+      <marker id="a" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#1e2a3a"/></marker>
+    </defs>
+    <g stroke="#1e2a3a" stroke-width="2.5" fill="none" marker-end="url(#a)" marker-start="url(#a)">
+      <!-- 端末 ⇄ Cloud Run -->
+      <path d="M410 300 L484 300"/>
+      <!-- 教員画面 ⇄ Cloud Run -->
+      <path d="M410 760 L484 760"/>
+    </g>
+    <g stroke="#1e2a3a" stroke-width="2.5" fill="none" marker-end="url(#a)">
+      <path d="M1100 246 L1180 246"/>
+      <path d="M1100 366 L1180 366"/>
+      <path d="M1100 486 L1180 486"/>
+      <path d="M1100 606 L1180 606"/>
+    </g>
+    <g stroke="#1e2a3a" stroke-width="2.5" fill="none" stroke-dasharray="5 6" marker-end="url(#a)">
+      <path d="M1180 726 L1100 726"/>
+      <path d="M1180 846 L1100 846"/>
+    </g>
+  </svg>
+  <div class="wlabel" style="left:408px; top:314px; width:80px">文と要約<br/>停止の確認</div>
+  <div class="wlabel" style="left:408px; top:774px; width:80px">PIN・停止<br/>見立て</div>
+  <div class="wlabel" style="left:1096px; top:212px; width:88px">構造化出力</div>
+  <div class="wlabel" style="left:1096px; top:332px; width:88px">文の検査</div>
+  <div class="wlabel" style="left:1096px; top:452px; width:88px">枠・記録</div>
+  <div class="wlabel" style="left:1096px; top:572px; width:88px">本文なし</div>
+  <div class="wlabel" style="left:1096px; top:692px; width:88px">起動時</div>
+  <div class="wlabel" style="left:1096px; top:812px; width:88px">デプロイ</div>
+</div>
+<script src="break.js"></script>
+<script>lucide.createIcons();</script>

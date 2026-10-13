@@ -49,9 +49,12 @@ export type PolicyResult =
 
 const FORBIDDEN: [RegExp, string][] = [
   [/落と|投げ|ぶつけ/, "端末の落下・投擲"],
-  [/[2-9２-９] ?m|屋上|階段|ベランダ|窓から/, "1 m を超える高さ"],
+  // 「1.98 m/s」「0.5 m」のような小数や速さは高さとして読まない（サーバと同じ規則。10/13 デプロイ前レビューで食い違いを指摘）
+  [/(?<![0-9０-９.．])[2-9２-９] ?(m|ｍ|メートル)(?![/／]s|毎秒)|屋上|階段|ベランダ|窓から/, "1 m を超える高さ"],
   [/水に|プール|風呂/, "水の近く"],
   [/道路|車道|交差点/, "交通のある場所"],
+  // 「ペットボトルに熱いお湯を入れて振る」が通っていた（10/13）。サーバの server/agent/policy.py と同じ規則
+  [/熱湯|お湯|おゆ|熱い(湯|水|もの)|熱した(水|湯|もの)|あつい(お湯|湯|水)|沸騰|沸か|ドライヤー|コンロ|電子レンジ|ろうそく|ライター|(?<![一-龥])火(で|に|を)/, "熱いもの・火"],
 ];
 const INJECTION = /飛ばして|無視して|と表示|答えは|チェックを飛ば|スキップ/;
 const HINT_REQ = /答え(だけ)?教えて|正解(は|を)|答えを教え/;
@@ -63,7 +66,10 @@ export function checkPolicy(text: string, theme: Theme, done: string[]): PolicyR
   const forbidden = FORBIDDEN.find(([re]) => re.test(text));
   const injected = INJECTION.test(text);
   if (forbidden || injected) {
-    const quotedMatch = text.match(/[^。\n]*(飛ばして|無視して|と表示|答えは|落と)[^。\n]*。?/);
+    // 引用は、指示文があればそれを、無ければ禁止動作の文を（サーバの QUOTE_INJECTION / QUOTE_FORBIDDEN と同じ）
+    const quotedMatch =
+      text.match(/[^。\n]*(飛ばして|無視して|と表示|答えは)[^。\n]*。?/) ??
+      text.match(/[^。\n]*(落と|投げ|ぶつけ|屋上|階段|ベランダ|窓から|水に|プール|風呂|道路|車道|交差点|熱湯|お湯|おゆ|熱い|熱した|あつい|沸騰|沸か|ドライヤー|コンロ|電子レンジ|ろうそく|ライター|火で|火に|火を)[^。\n]*。?/);
     const alt = pickVariant(theme, { variable: "unknown", direction: "unknown" }, done);
     const reasons = [
       forbidden ? `禁止動作：${forbidden[1]}` : "禁止動作に当たる要望はありませんが、指示文が含まれていました",

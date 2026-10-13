@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { themeById, variantById } from "../catalog/themes";
-import { choosePlan, judge, readClaim } from "./stub";
+import { checkPolicy, choosePlan, judge, readClaim } from "./stub";
 
 const energy = themeById("energy")!;
 const sound = themeById("sound")!;
@@ -106,5 +106,36 @@ describe("張りの予想（10/12 デプロイ前レビュー）", () => {
     expect(readClaim("糸を短くしても速さは同じになると思う", themeById("energy")!)).toEqual({ variable: "length", direction: "same" });
     expect(readClaim("張りが強くなると高い音になると思う", sound).variable).toBe("tension");
     expect(readClaim("張りを変えないで強くはじくと音が高くなる", sound).variable).toBe("strength");
+  });
+});
+
+describe("checkPolicy: 熱いもの・火（10/13）", () => {
+  const bottle = themeById("bottle")!;
+  it.each(["ペットボトルに熱いお湯を入れて振ると、音が高くなると思う", "熱湯を入れたら高くなる", "ろうそくの火で温める"])("rejects %s", (text) => {
+    const r = checkPolicy(text, bottle, []);
+    expect(r.kind).toBe("reject");
+    if (r.kind === "reject") expect(r.rejection.reasons[0]).toBe("禁止動作：熱いもの・火");
+  });
+
+  it("allows an ordinary water prediction", () => {
+    expect(checkPolicy("水を増やすと音が低くなると思う", bottle, []).kind).toBe("allow");
+  });
+});
+
+describe("checkPolicy: サーバと同じ規則（10/13 デプロイ前レビュー）", () => {
+  const bottle = themeById("bottle")!;
+  it("rejects even a negated hot-water mention, on purpose (same as the server)", () => {
+    expect(checkPolicy("お湯は使わず、常温の水の量だけ変えると音が高くなると思う", bottle, []).kind).toBe("reject");
+  });
+  it.each(["ペットボトルに熱した水を入れて振ってみる", "あついおゆを入れて振ると高くなる"])("rejects %s and quotes it", (text) => {
+    const r = checkPolicy(text, bottle, []);
+    expect(r.kind).toBe("reject");
+    if (r.kind === "reject") expect(r.rejection.quoted).not.toBe("");
+  });
+  it.each(["いちばん下の速さは 1.98 m/s くらいだと思う", "速さは 2 m/s になると思う", "0.5 m 動かす"])("does not read %s as a high place", (text) => {
+    expect(checkPolicy(text, energy, []).kind).not.toBe("reject");
+  });
+  it("rejects a high place written in katakana units", () => {
+    expect(checkPolicy("3 メートルの台に乗る", energy, []).kind).toBe("reject");
   });
 });

@@ -1,0 +1,22 @@
+{
+  "name": "phonelab-video",
+  "private": true,
+  "version": "0.0.0",
+  "description": "PhoneLab のデモ動画（3 分）のサンプル。実写は placeholder を差し替える",
+  "scripts": {
+    "studio": "remotion studio",
+    "render": "remotion render PhoneLabDemo out/phonelab-demo-sample.mp4"
+  },
+  "dependencies": {
+    "@remotion/cli": "^4.0.535",
+    "@remotion/google-fonts": "^4.0.535",
+    "@remotion/transitions": "^4.0.535",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "remotion": "^4.0.535"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.31",
+    "typescript": "^7.0.2"
+  }
+}

@@ -9,3 +9,7 @@ dist/
 !.env.example
 *.zip
 .playwright-mcp/
+
+# 動画（Remotion）
+video/node_modules/
+video/out/

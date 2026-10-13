@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="ja">
+<meta charset="utf-8" />
+<title>PhoneLab 体験の流れ</title>
+<link rel="stylesheet" href="style.css" />
+<script src="https://unpkg.com/lucide@0.469.0/dist/umd/lucide.min.js"></script>
+<style>
+  #canvas { width: 1600px; height: 1104px; }
+  .step { position: absolute; top: 400px; width: 232px; height: 392px; padding: 16px 16px 0; display: flex; flex-direction: column; gap: 8px; overflow: hidden; }
+  .step .head { display: flex; align-items: center; gap: 10px; white-space: nowrap; }
+  .step .desc { min-height: 44px; }
+  .art { margin: 6px -16px 0; flex: 1; border-top: 2px solid var(--line); background: var(--paper); display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 16px; padding: 40px 14px 20px; }
+  .step.ai .art { border-top-color: var(--teal-soft); background: #f1f8f6; }
+  .step.student .art { border-top-color: var(--orange-soft); background: #fdf5ee; }
+  .big { width: 76px; height: 76px; border-radius: 22px; display: grid; place-items: center; background: var(--ink); color: #fff; box-shadow: 0 3px 0 rgba(30,42,58,.25); }
+  .big svg { width: 38px; height: 38px; stroke-width: 2; }
+  .step.ai .big { background: var(--teal); }
+  .step.student .big { background: var(--orange); }
+  .bubble { position: relative; width: 100%; background: var(--card); border: 2px solid var(--ink); border-radius: 14px; padding: 10px 12px; font-size: 14px; line-height: 1.55; text-align: center; color: var(--ink); }
+  .bubble::before { content: ""; position: absolute; left: 50%; top: -9px; width: 14px; height: 14px; background: var(--card); border-left: 2px solid var(--ink); border-top: 2px solid var(--ink); transform: translateX(-50%) rotate(45deg); }
+  .step.ai .bubble, .step.ai .bubble::before { border-color: var(--teal); }
+  .step.student .bubble, .step.student .bubble::before { border-color: var(--orange); }
+  .bubble b { font-family: var(--font-head); font-weight: 900; }
+  .bubble .who { display: block; font-size: 11.5px; color: var(--muted); margin-bottom: 2px; font-family: var(--font-head); font-weight: 700; }
+  .bubble .btn { display: block; margin-top: 8px; padding: 6px 8px; border-radius: 10px; background: var(--ink); color: #fff; font-family: var(--font-head); font-weight: 700; font-size: 13px; }
+  .nums { display: flex; gap: 6px; justify-content: center; align-items: baseline; font-family: var(--font-head); font-weight: 900; font-size: 22px; }
+  .nums small { font-size: 12px; color: var(--muted); font-weight: 700; }
+  .chev { position: absolute; top: 576px; width: 20px; height: 40px; color: var(--ink); }
+  .loop { position: absolute; top: 880px; width: 348px; padding: 14px 16px; display: flex; gap: 12px; align-items: flex-start; }
+  .loop .icon { flex: none; width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; }
+  .loop .title { font-size: 16px; }
+  .halt { position: absolute; left: 56px; right: 56px; bottom: 30px; height: 52px; border-radius: 14px; background: var(--ink); color: #fff; display: flex; align-items: center; gap: 12px; padding: 0 20px; font-family: var(--font-head); font-weight: 700; font-size: 16px; }
+  .halt .icon svg { color: #ff9b6a; }
+  .halt small { font-family: var(--font-body); font-weight: 400; color: #c9d3de; font-size: 13.5px; margin-left: auto; }
+  .setup { position: absolute; left: 56px; top: 196px; width: 1488px; height: 176px; display: flex; align-items: stretch; overflow: hidden; }
+  .setup .pic { width: 300px; flex: none; background: #f1ece0; border-right: 2px solid var(--line); }
+  .setup .body { padding: 20px 26px; display: flex; flex-direction: column; gap: 8px; }
+  .setup .ex { font-family: var(--font-head); font-weight: 700; font-size: 14px; color: var(--muted); letter-spacing: 0.06em; }
+  .setup .title { font-size: 24px; }
+  .setup .q { margin-top: auto; display: inline-flex; align-self: flex-start; align-items: center; gap: 8px; padding: 7px 14px; border-radius: 999px; background: var(--ink); color: #fff; font-family: var(--font-head); font-weight: 700; font-size: 16px; }
+  .setup .q svg { width: 18px; height: 18px; color: #ffb48a; }
+  .setup .steps3 { display: flex; gap: 18px; font-size: 14.5px; color: var(--ink-2); line-height: 1.55; }
+  .setup .steps3 b { font-family: var(--font-head); color: var(--orange); margin-right: 4px; }
+</style>
+
+<div id="canvas">
+  <div class="abs" style="left:56px; top:40px">
+    <div class="kicker">体験の流れ</div>
+    <div class="headline">予想を書く → 確かめ方を選ぶ → 測る → 比べる → ふり返る</div>
+  </div>
+  <div class="abs legend" style="left:56px; top:142px">
+    <span class="tag student"><i data-lucide="pencil"></i>生徒が決める</span>
+    <span class="tag ai"><i data-lucide="sparkles"></i>ラボ先生（Gemini）が選ぶ</span>
+    <span class="tag code"><i data-lucide="cpu"></i>決まったコードが計算・判定</span>
+  </div>
+
+  <div class="card setup">
+    <svg class="pic" viewBox="0 0 300 176">
+      <rect x="54" y="18" width="128" height="7" rx="3.5" fill="#1e2a3a"/>
+      <!-- いちばん下（うすく） -->
+      <path d="M118 24 L118 142" stroke="#b8c0ca" stroke-width="2" stroke-dasharray="4 5"/>
+      <rect x="101" y="142" width="34" height="26" rx="7" fill="none" stroke="#8a93a0" stroke-width="2" stroke-dasharray="4 4"/>
+      <!-- 振れる道すじ -->
+      <path d="M188.9 126.0 A 130 130 0 0 1 140 160" fill="none" stroke="#e27a3f" stroke-width="2.5" stroke-dasharray="6 6"/>
+      <path d="M148 164 L138 161 L145 153" fill="none" stroke="#e27a3f" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+      <!-- 持ち上げた袋：スマホと消しゴム -->
+      <path d="M118 24 L202.9 106.0" stroke="#1e2a3a" stroke-width="2.5"/>
+      <rect x="185.9" y="106.0" width="34" height="26" rx="7" fill="#fffdf8" stroke="#1e2a3a" stroke-width="2.5"/>
+      <rect x="191.9" y="111.0" width="10" height="16" rx="2.5" fill="#1e2a3a"/>
+      <rect x="205.9" y="118.0" width="9" height="8" rx="2" fill="#e27a3f"/>
+      <!-- 高さ 15 cm -->
+      <path d="M222.9 119.0 L262 119.0 M138 155 L262 155" stroke="#1fa39f" stroke-width="1.5" stroke-dasharray="3 4"/>
+      <path d="M262 119.0 L262 155" stroke="#1fa39f" stroke-width="2.5"/>
+      <path d="M256 119.0 L268 119.0 M256 155 L268 155" stroke="#1fa39f" stroke-width="2.5"/>
+      <text x="272" y="136.0" font-family="Zen Maru Gothic" font-weight="900" font-size="15" fill="#13807c">15</text>
+      <text x="272" y="150.0" font-family="Zen Maru Gothic" font-weight="700" font-size="11" fill="#13807c">cm</text>
+      <text x="170.4" y="61.0" font-family="Zen Maru Gothic" font-weight="700" font-size="12" fill="#3a4552">糸 80 cm</text>
+      <text x="72" y="158" font-family="Zen Maru Gothic" font-weight="700" font-size="11" fill="#8a93a0" text-anchor="end">いちばん下</text>
+    </svg>
+    <div class="body">
+      <div class="ex">この図の例 ― 中学 3 年「振り子とエネルギー」</div>
+      <div class="title">袋にスマホと消しゴムを入れた振り子で、最大の速さを測る</div>
+      <div class="steps3">
+        <span><b>1</b>糸（80 cm）の先に袋を結び、スマホと消しゴムを入れる</span>
+        <span><b>2</b>袋を 15 cm 持ち上げて、そっと放す</span>
+        <span><b>3</b>スマホの加速度とジャイロで、最大の速さ（いちばん下を通るとき）を出す</span>
+      </div>
+      <div class="q"><i data-lucide="help-circle"></i>問い：重さを変えたら、最大の速さはどうなる？</div>
+    </div>
+  </div>
+
+  <!-- 6 つの段 x = 56 + i*252 -->
+  <div class="card step student" style="left:56px">
+    <div class="head"><span class="num" style="background:var(--orange)">1</span><span class="title">予想と理由を書く</span></div>
+    <div class="desc">書くまで、実験もセンサーも出ない。</div>
+    <div class="art"><div class="big"><i data-lucide="pencil-line"></i></div><div class="bubble"><span class="who">生徒</span>「重いほうが速くなると思う。<b>重いと勢いがつきそうだから</b>」</div></div>
+  </div>
+  <div class="card step ai" style="left:308px">
+    <div class="head"><span class="num" style="background:var(--teal)">2</span><span class="title">実験を選ぶ</span></div>
+    <div class="desc">予想を読んで、カタログから選ぶ。答えは知らない。</div>
+    <div class="art"><div class="big"><i data-lucide="flask-conical"></i></div><div class="bubble"><span class="who">ラボ先生</span>「同じ高さから、<b>重さだけ</b>増やして放す」</div></div>
+  </div>
+  <div class="card step student" style="left:560px">
+    <div class="head"><span class="num" style="background:var(--orange)">3</span><span class="title">センサーを許可</span></div>
+    <div class="desc">自分でボタンを押すまで、センサーは動かない。</div>
+    <div class="art"><div class="big"><i data-lucide="smartphone"></i></div><div class="bubble"><span class="who">画面に出る</span>動きのセンサーを<b> 10 秒だけ</b>使います<span class="btn">この実験でやってみる</span></div></div>
+  </div>
+  <div class="card step" style="left:812px">
+    <div class="head"><span class="num">4</span><span class="title">測って、検査</span></div>
+    <div class="desc">2 条件を測る。計算と検査はスマホの中。</div>
+    <div class="art"><div class="big"><i data-lucide="gauge"></i></div><div class="bubble"><span class="who">最大の速さ</span>消しゴム 1 個：<b>秒速 1.7 m</b><br/>消しゴム 2 個：<b>秒速 1.7 m</b></div></div>
+  </div>
+  <div class="card step" style="left:1064px">
+    <div class="head"><span class="num">5</span><span class="title">予想と比べる</span></div>
+    <div class="desc">差が測定のずれより大きいかで決める。</div>
+    <div class="art"><div class="big"><i data-lucide="scale"></i></div><div class="bubble"><span class="who">結果</span>重さを変えても、<b>速さは変わらなかった</b></div></div>
+  </div>
+  <div class="card step ai" style="left:1316px">
+    <div class="head"><span class="num" style="background:var(--teal)">6</span><span class="title">次の一手</span></div>
+    <div class="desc">次の実験か、先にふり返りかを選ぶ。</div>
+    <div class="art"><div class="big"><i data-lucide="message-circle-question"></i></div><div class="bubble"><span class="who">ラボ先生</span>予想と違ったので、<br/><b>先にふり返り</b>。<br/>「なぜ同じだったと思う？」</div></div>
+  </div>
+
+  <!-- 段のあいだの矢印 -->
+  <svg class="chev" style="left:290px" viewBox="0 0 20 40"><path d="M4 6 L16 20 L4 34" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  <svg class="chev" style="left:542px" viewBox="0 0 20 40"><path d="M4 6 L16 20 L4 34" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  <svg class="chev" style="left:794px" viewBox="0 0 20 40"><path d="M4 6 L16 20 L4 34" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  <svg class="chev" style="left:1046px" viewBox="0 0 20 40"><path d="M4 6 L16 20 L4 34" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  <svg class="chev" style="left:1298px" viewBox="0 0 20 40"><path d="M4 6 L16 20 L4 34" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+
+  <!-- 戻りの輪（段の下から説明へ） -->
+  <svg class="wires" viewBox="0 0 1600 1104">
+    <defs>
+      <marker id="ah-o" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#e27a3f"/></marker>
+      <marker id="ah-n" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#1e2a3a"/></marker>
+      <marker id="ah-t" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#1fa39f"/></marker>
+    </defs>
+    <!-- 1 → 問い返し → 1 -->
+    <path d="M200 796 C200 844, 236 854, 236 880" fill="none" stroke="#1fa39f" stroke-width="2.5" stroke-dasharray="6 6"/>
+    <path d="M120 880 C120 844, 120 832, 120 802" fill="none" stroke="#1fa39f" stroke-width="2.5" stroke-dasharray="6 6" marker-end="url(#ah-t)"/>
+    <!-- 4 → 保留 → 4 -->
+    <path d="M960 796 C960 844, 920 854, 920 880" fill="none" stroke="#1e2a3a" stroke-width="2.5" stroke-dasharray="6 6"/>
+    <path d="M860 880 C860 844, 860 832, 860 802" fill="none" stroke="#1e2a3a" stroke-width="2.5" stroke-dasharray="6 6" marker-end="url(#ah-n)"/>
+    <!-- 6 → ふり返り -->
+    <path d="M1432 796 C1432 834, 1400 854, 1400 880" fill="none" stroke="#e27a3f" stroke-width="2.5" stroke-dasharray="6 6" marker-end="url(#ah-o)"/>
+  </svg>
+
+  <div class="card loop ai" style="left:56px">
+    <div class="icon" style="background:var(--teal-soft); color:#13807c"><i data-lucide="message-circle-question"></i></div>
+    <div><div class="title">理由が無ければ、聞き返す</div><div class="small">実験を出す前に 1 回だけ「どうしてそう思ったの？」。理由を書き足すと 2 へ</div></div>
+  </div>
+  <div class="card loop" style="left:626px">
+    <div class="icon" style="background:var(--sand)"><i data-lucide="pause-circle"></i></div>
+    <div><div class="title">検査に落ちたら、保留</div><div class="small">雑音が大きい・二つのセンサーの値が食い違うなら、結論を出さない。ラボ先生が測り直し方か別の実験を提案</div></div>
+  </div>
+  <div class="card loop student" style="left:1196px">
+    <div class="icon" style="background:var(--orange-soft); color:#b85c2a"><i data-lucide="lightbulb"></i></div>
+    <div><div class="title">食い違ったら、先にふり返り</div><div class="small">「なぜ？」を自分の言葉で書くまで、次の実験も説明も出ない</div></div>
+  </div>
+
+  <div class="halt"><span class="icon"><i data-lucide="octagon-x"></i></span>先生は、いつでもクラス全員のスマホの測定を止められる<small>止めるのも解除するのも人だけ。ラボ先生には止める・許可を変える手段が無い</small></div>
+</div>
+<script src="break.js"></script>
+<script>lucide.createIcons();</script>
