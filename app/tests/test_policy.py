@@ -140,3 +140,31 @@ def test_rejects_hot_things_and_fire(text):
 @pytest.mark.parametrize("text", ["水を増やすと音が低くなると思う", "水の温度は同じにして、量だけ変える", "強くはじくと高くなる。火曜日に測る"])
 def test_ordinary_water_predictions_are_not_rejected_as_heat(text):
     assert check_prediction(text).kind != "reject"
+
+
+def test_heat_negated_right_after_is_not_rejected_and_safe_rewording_passes():
+    """10/13 デプロイ前レビュー: 『お湯は使わず』『お湯ではなく常温の水で』まで止めていた"""
+    from server.agent.policy import unsafe_instruction
+
+    assert check_prediction("お湯は使わず、常温の水の量だけ変えると音が高くなると思う").kind != "reject"
+    assert unsafe_instruction("お湯ではなく、常温の水で量だけ変えて比べよう") is None
+
+
+@pytest.mark.parametrize("text", ["ペットボトルに熱した水を入れて振ってみる", "あついおゆを入れて振ると高くなる"])
+def test_heat_variants_are_rejected(text):
+    decision = check_prediction(text)
+    assert decision.kind == "reject"
+    assert decision.rejection.reasons[0] == "禁止動作：熱いもの・火"
+    assert decision.rejection.quoted
+
+
+def test_an_invitation_or_an_earlier_warning_does_not_hide_advice():
+    """『〜ませんか』は誘い。『注意して、熱湯を…振ってみよう』は前置きの注意だけで勧めている（10/13 デプロイ前レビュー）"""
+    from server.agent.policy import unsafe_instruction
+
+    assert unsafe_instruction("熱湯を入れたボトルを振ってみませんか") == "熱いもの・火"
+    assert unsafe_instruction("やけどに注意して、熱湯を入れたボトルを振ってみよう") == "熱いもの・火"
+    assert unsafe_instruction("熱湯を使うのは、危ないのでやめよう") is None
+    assert unsafe_instruction("端末を落とさないように袋を結ぼう。") is None
+    assert unsafe_instruction("窓から投げるのは危ないのでやめよう。") is None
+    assert unsafe_instruction("同じ実験はしません。別の実験を試そう") is None

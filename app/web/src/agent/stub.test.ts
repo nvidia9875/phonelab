@@ -121,3 +121,21 @@ describe("checkPolicy: 熱いもの・火（10/13）", () => {
     expect(checkPolicy("水を増やすと音が低くなると思う", bottle, []).kind).toBe("allow");
   });
 });
+
+describe("checkPolicy: サーバと同じ規則（10/13 デプロイ前レビュー）", () => {
+  const bottle = themeById("bottle")!;
+  it("does not reject a negated hot-water mention", () => {
+    expect(checkPolicy("お湯は使わず、常温の水の量だけ変えると音が高くなると思う", bottle, []).kind).not.toBe("reject");
+  });
+  it.each(["ペットボトルに熱した水を入れて振ってみる", "あついおゆを入れて振ると高くなる"])("rejects %s and quotes it", (text) => {
+    const r = checkPolicy(text, bottle, []);
+    expect(r.kind).toBe("reject");
+    if (r.kind === "reject") expect(r.rejection.quoted).not.toBe("");
+  });
+  it.each(["いちばん下の速さは 1.98 m/s くらいだと思う", "速さは 2 m/s になると思う", "0.5 m 動かす"])("does not read %s as a high place", (text) => {
+    expect(checkPolicy(text, energy, []).kind).not.toBe("reject");
+  });
+  it("rejects a high place written in katakana units", () => {
+    expect(checkPolicy("3 メートルの台に乗る", energy, []).kind).toBe("reject");
+  });
+});
