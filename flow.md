@@ -182,7 +182,7 @@ flowchart LR
 ```
 
 - [x] A1 エントリー・参加者情報フォームが完了（9/9 本人確認）
-- [x] A2 GCP プロジェクト **`phonelab-2026`**（番号 1094091671194、個人アカウント、9/9 作成）。請求先 `ai_agent_hackathon_2026_08`（010A3E-54DA90-8A0880）に紐づけ済み
+- [x] A2 GCP プロジェクト **`phonelab-2026`**（番号 1094091671194、個人アカウント、9/9 作成）。ハッカソンのクレジットの請求先に紐づけ済み
 - [x] A3 クレジット確認済み（9/9 コンソール）。`ai_agent_hackathon_2026_08` に **¥49,124（残り 100%）**、状態「利用可能」、`phonelab-2026` はこの請求先に紐づいているので消費される。**終了日 2026-10-19**（8/20 有効化から 2 ヶ月）。10/20〜12/1 の稼働は自己負担になるが、min-instances=0 なのでほぼ 0 円
 - [x] A4 予算アラート（請求アカウント通貨は JPY。45,000 円で 50% / 90% に通知。9/9）
 - [x] A5 API 有効化（run / cloudbuild / artifactregistry / aiplatform / firestore / cloudtrace / logging / monitoring / modelarmor / cloudkms / billingbudgets / **observability（9/15 追加。無いと Trace が保存されない）**）。Firestore native を asia-northeast1 に作成済み。デフォルト compute SA に cloudbuild.builds.builder 等を付与（新規プロジェクトはこれが無いとソースデプロイが失敗する）
