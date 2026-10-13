@@ -166,3 +166,14 @@ def test_output_check_keeps_the_production_rule_for_warnings():
     assert unsafe_instruction("端末を落としたり、ぶつけたりしないように袋をしっかり結ぼう") is None
     assert unsafe_instruction("お湯は使わないで、常温の水で比べよう") is None
     assert unsafe_instruction("窓から投げるのは危ないのでやめよう。") is None
+
+
+def test_round4_output_rewording_and_volcano_pass():
+    """10/13 デプロイ前レビュー 4 回目: 出口で「お湯ではなく」と「噴火で」を止めていた"""
+    from server.agent.policy import unsafe_instruction
+
+    assert unsafe_instruction("お湯ではなく、常温の水を使って比べよう") is None
+    assert unsafe_instruction("火山の噴火でできた岩石を観察しよう") is None
+    assert check_prediction("火山の噴火でできた岩石は重いと思う").kind != "reject"
+    assert unsafe_instruction("熱湯を入れたボトルを振ってみよう") == "熱いもの・火"
+    assert unsafe_instruction("ろうそくの火で温めてみよう") == "熱いもの・火"
