@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { themeById, variantById } from "../catalog/themes";
-import { choosePlan, judge, readClaim } from "./stub";
+import { checkPolicy, choosePlan, judge, readClaim } from "./stub";
 
 const energy = themeById("energy")!;
 const sound = themeById("sound")!;
@@ -106,5 +106,18 @@ describe("張りの予想（10/12 デプロイ前レビュー）", () => {
     expect(readClaim("糸を短くしても速さは同じになると思う", themeById("energy")!)).toEqual({ variable: "length", direction: "same" });
     expect(readClaim("張りが強くなると高い音になると思う", sound).variable).toBe("tension");
     expect(readClaim("張りを変えないで強くはじくと音が高くなる", sound).variable).toBe("strength");
+  });
+});
+
+describe("checkPolicy: 熱いもの・火（10/13）", () => {
+  const bottle = themeById("bottle")!;
+  it.each(["ペットボトルに熱いお湯を入れて振ると、音が高くなると思う", "熱湯を入れたら高くなる", "ろうそくの火で温める"])("rejects %s", (text) => {
+    const r = checkPolicy(text, bottle, []);
+    expect(r.kind).toBe("reject");
+    if (r.kind === "reject") expect(r.rejection.reasons[0]).toBe("禁止動作：熱いもの・火");
+  });
+
+  it("allows an ordinary water prediction", () => {
+    expect(checkPolicy("水を増やすと音が低くなると思う", bottle, []).kind).toBe("allow");
   });
 });
