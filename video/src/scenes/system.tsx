@@ -1,6 +1,7 @@
 // 仕組み: 統制の流れ → 構成 → 記録 → 数字 → 締め
 import React from "react";
-import { AbsoluteFill, Easing, interpolate } from "remotion";
+import { AbsoluteFill, Easing, interpolate, OffthreadVideo, staticFile } from "remotion";
+import { FOOTAGE } from "../footage";
 import { Chip, prog, useSpring, useT, Wave } from "../anim";
 import { BigLines, Caption, Kicker, Paper, Stat } from "../components";
 import { C, head } from "../theme";
@@ -180,7 +181,22 @@ const SPANS = [
   { name: "phonelab.self_correct", at: 0.75, len: 0.2, color: C.orange },
 ];
 
-export const Trace: React.FC = () => {
+export const Trace: React.FC = () => (FOOTAGE.trace ? <TraceLive /> : <TraceAnim />);
+
+const TraceLive: React.FC = () => {
+  const clip = FOOTAGE.trace!;
+  return (
+    <Paper>
+      <Kicker text="記録（Cloud Trace）" color={C.teal} />
+      <div style={{ position: "absolute", left: 160, top: 110, width: 1600, height: 760, borderRadius: 22, overflow: "hidden", border: `3px solid ${C.ink}`, background: C.card }}>
+        <OffthreadVideo src={staticFile(`footage/${clip.file}`)} startFrom={Math.round((clip.startFrom ?? 0) * 30)} muted style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+      </div>
+      <Caption text="判断の跡は Cloud Trace にも同じ段で残る。生徒の文は残さない。" />
+    </Paper>
+  );
+};
+
+const TraceAnim: React.FC = () => {
   const t = useT();
   return (
     <Paper>

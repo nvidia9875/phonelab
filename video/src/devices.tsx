@@ -1,6 +1,7 @@
 // スマホと PC の枠。中にスクショを置き、上に Mark・Tap・Pop・Type を画像の座標（px）で重ねる
 import React from "react";
-import { Img, staticFile } from "remotion";
+import { Img, OffthreadVideo, staticFile } from "remotion";
+import type { Clip } from "./footage";
 import { keys, prog, useSpring, useT } from "./anim";
 import { C } from "./theme";
 
@@ -21,7 +22,9 @@ export const Phone: React.FC<{
   tilt?: boolean;
   children?: React.ReactNode;
   swapTo?: { src: string; imgH: number; at: number };
-}> = ({ src, imgH, x = 960, y = 80, scroll = [[0, 0]], enter = 0, exit = 999, tilt = true, children, swapTo }) => {
+  /** スクショの代わりに画面収録を流す */
+  video?: Clip;
+}> = ({ src, imgH, x = 960, y = 80, scroll = [[0, 0]], enter = 0, exit = 999, tilt = true, children, swapTo, video }) => {
   const t = useT();
   const inS = useSpring(enter);
   const out = prog(t, exit, 0.5);
@@ -46,7 +49,10 @@ export const Phone: React.FC<{
       }}
     >
       <div style={{ width: IN_W, height: IN_H, borderRadius: 48, overflow: "hidden", background: C.paper, position: "relative" }}>
-        <div style={{ position: "absolute", left: 0, top: -shift, width: IMG_W, height: imgH, transform: `scale(${SCALE})`, transformOrigin: "0 0", opacity: 1 - swap }}>
+        {video ? (
+          <OffthreadVideo src={staticFile(`footage/${video.file}`)} startFrom={Math.round((video.startFrom ?? 0) * 30)} muted={video.muted ?? true} style={{ position: "absolute", inset: 0, width: IN_W, height: IN_H, objectFit: "cover" }} />
+        ) : null}
+        <div style={{ position: "absolute", left: 0, top: -shift, width: IMG_W, height: imgH, transform: `scale(${SCALE})`, transformOrigin: "0 0", opacity: video ? 0 : 1 - swap }}>
           <Img src={staticFile(src)} style={{ width: IMG_W, display: "block" }} />
           {children}
         </div>
@@ -73,7 +79,9 @@ export const Browser: React.FC<{
   camera: [number, number, number, number][];
   enter?: number;
   children?: React.ReactNode;
-}> = ({ src, imgW, x, y = 110, w, h, camera, enter = 0, children }) => {
+  /** スクショの代わりに画面録画を流す */
+  video?: Clip;
+}> = ({ src, imgW, x, y = 110, w, h, camera, enter = 0, children, video }) => {
   const t = useT();
   const inS = useSpring(enter);
   const bar = 46;
@@ -110,7 +118,10 @@ export const Browser: React.FC<{
         </div>
       </div>
       <div style={{ position: "relative", width: vw, height: vh, overflow: "hidden" }}>
-        <div style={{ position: "absolute", left: 0, top: 0, width: imgW, transformOrigin: "0 0", transform: `translate(${vw / 2}px, ${vh / 2}px) scale(${s}) translate(${-cx}px, ${-cy}px)` }}>
+        {video ? (
+          <OffthreadVideo src={staticFile(`footage/${video.file}`)} startFrom={Math.round((video.startFrom ?? 0) * 30)} muted={video.muted ?? true} style={{ position: "absolute", inset: 0, width: vw, height: vh, objectFit: "contain", background: C.card }} />
+        ) : null}
+        <div style={{ position: "absolute", left: 0, top: 0, width: imgW, transformOrigin: "0 0", opacity: video ? 0 : 1, transform: `translate(${vw / 2}px, ${vh / 2}px) scale(${s}) translate(${-cx}px, ${-cy}px)` }}>
           <Img src={staticFile(src)} style={{ width: imgW, display: "block" }} />
           {children}
         </div>

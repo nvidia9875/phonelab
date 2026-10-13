@@ -13,3 +13,5 @@ dist/
 # 動画（Remotion）
 video/node_modules/
 video/out/
+video/public/footage/*.mp4
+video/public/footage/*.mov

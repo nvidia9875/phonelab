@@ -1,6 +1,7 @@
 // 生徒の流れ: つかみ → 課題 → 予想 → 計画 → 許可と測定 → 結果
 import React from "react";
-import { Easing, interpolate, Sequence } from "remotion";
+import { Easing, interpolate, OffthreadVideo, Sequence, staticFile } from "remotion";
+import { FOOTAGE } from "../footage";
 import { breakAtPunct, Chip, Count, Mark, Pop, prog, Rows, Stamp, Tap, Type, useSpring, useT, Wave } from "../anim";
 import { Kicker, Logo, Paper } from "../components";
 import { Phone } from "../devices";
@@ -42,7 +43,26 @@ function bandOffset(t: number): number {
   return PLUCKS.reduce((a, p) => (t < p ? a : a + 34 * Math.exp(-(t - p) * 2.6) * Math.sin(2 * Math.PI * 7 * (t - p))), 0);
 }
 
-export const Opening: React.FC = () => {
+export const Opening: React.FC = () => (FOOTAGE.pluck ? <OpeningLive /> : <OpeningAnim />);
+
+/** 実写のつかみ: 輪ゴムをはじく手元の上に、タイトル */
+const OpeningLive: React.FC = () => {
+  const w1 = useSpring(1.0);
+  const w2 = useSpring(1.9);
+  const clip = FOOTAGE.pluck!;
+  return (
+    <Paper>
+      <OffthreadVideo src={staticFile(`footage/${clip.file}`)} startFrom={Math.round((clip.startFrom ?? 0) * 30)} muted={clip.muted ?? false} style={{ position: "absolute", inset: 0, width: 1920, height: 1080, objectFit: "cover" }} />
+      <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: 420, background: "linear-gradient(transparent, rgba(30,42,58,0.85))" }} />
+      <div style={{ position: "absolute", left: 0, right: 0, bottom: 110, textAlign: "center", fontFamily: head, fontWeight: 900, fontSize: 84, color: "#fff" }}>
+        <span style={{ display: "inline-block", opacity: w1, transform: `translateY(${(1 - w1) * 40}px)` }}>スマホが実験器具。</span>
+        <span style={{ display: "inline-block", color: "#FFB48A", opacity: w2, transform: `translateY(${(1 - w2) * 40}px)` }}>AI は答えを言わない。</span>
+      </div>
+    </Paper>
+  );
+};
+
+const OpeningAnim: React.FC = () => {
   const t = useT();
   const d = bandOffset(t);
   const w1 = useSpring(1.0);

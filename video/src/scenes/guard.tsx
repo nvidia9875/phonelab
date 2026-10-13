@@ -1,6 +1,7 @@
 // ふり返り・保留・却下・先生の画面・停止・家で
 import React from "react";
-import { Easing, Sequence } from "remotion";
+import { Easing, OffthreadVideo, Sequence, staticFile } from "remotion";
+import { FOOTAGE } from "../footage";
 import { Chip, Mark, Pop, prog, Stamp, Tap, Type, useSpring, useT, Wave } from "../anim";
 import { Caption, Kicker, Logo, Paper } from "../components";
 import { Browser, Phone } from "../devices";
@@ -174,7 +175,7 @@ export const Halt: React.FC = () => {
   return (
     <Paper>
       <Kicker text="止めるのは人" color={C.ink} />
-      <Browser src="07-teacher.png" imgW={1280} x={80} w={1000} h={720} camera={[[0, 2.5, 1000, 165]]}>
+      <Browser src="07-teacher.png" imgW={1280} x={80} w={1000} h={720} camera={[[0, 2.5, 1000, 165]]} video={FOOTAGE.haltTeacher}>
         <Tap x={1147} y={50} at={2.0} />
         {sent ? <div style={{ position: "absolute", left: 1047, top: 28, width: 201, height: 44, borderRadius: 10, background: RED, color: "#fff", display: "grid", placeItems: "center", fontFamily: head, fontWeight: 900, fontSize: 15, opacity: prog(t, 2.3, 0.2) }}>測定を止めています</div> : null}
       </Browser>
@@ -190,7 +191,7 @@ export const Halt: React.FC = () => {
         })}
       </svg>
       <div style={{ position: "absolute", left: 1090, top: 120, width: 170, fontSize: 22, lineHeight: 1.4, color: C.muted, opacity: prog(t, 2.4, 0.3) }}>2 秒ごとの確認で届く</div>
-      <Phone src="04-checks.png" imgH={860} x={1490} y={80} swapTo={{ src: "09-halted.png", imgH: 860, at: 4.0 }} />
+      <Phone src="04-checks.png" imgH={860} x={1490} y={80} swapTo={FOOTAGE.haltPhone ? undefined : { src: "09-halted.png", imgH: 860, at: 4.0 }} video={FOOTAGE.haltPhone} />
       <div style={{ position: "absolute", left: 80, top: 850, opacity: prog(t, 2.4, 0.3) }}>
         <Chip color={RED} solid>
           止まるまで {timer.toFixed(1)} 秒
@@ -205,7 +206,26 @@ export const Halt: React.FC = () => {
 };
 
 /* ---------- 11. 家で ---------- */
-export const Home: React.FC = () => {
+export const Home: React.FC = () => (FOOTAGE.pendulumSide || FOOTAGE.pendulumScreen ? <HomeLive /> : <HomeAnim />);
+
+/** 実写の家で: 左に振り子を横から、右にそのときのスマホの画面 */
+const HomeLive: React.FC = () => {
+  const side = FOOTAGE.pendulumSide;
+  return (
+    <Paper>
+      <Kicker text="家で" />
+      {side ? (
+        <div style={{ position: "absolute", left: 80, top: 110, width: 1100, height: 760, borderRadius: 26, overflow: "hidden", border: `4px solid ${C.ink}`, boxShadow: `0 6px 0 ${C.ink}` }}>
+          <OffthreadVideo src={staticFile(`footage/${side.file}`)} startFrom={Math.round((side.startFrom ?? 0) * 30)} muted={side.muted ?? true} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+        </div>
+      ) : null}
+      <Phone src="p05-result.png" imgH={1286} x={side ? 1530 : 960} y={90} video={FOOTAGE.pendulumScreen} />
+      <Caption text="先生が許可した実験は、家で自分のスマホから。" sub="記録は学校と同じ列に並ぶ" />
+    </Paper>
+  );
+};
+
+const HomeAnim: React.FC = () => {
   const t = useT();
   const L = 380;
   const th0 = 0.5;
