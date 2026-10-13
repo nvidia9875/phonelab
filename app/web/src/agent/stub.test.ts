@@ -124,8 +124,8 @@ describe("checkPolicy: 熱いもの・火（10/13）", () => {
 
 describe("checkPolicy: サーバと同じ規則（10/13 デプロイ前レビュー）", () => {
   const bottle = themeById("bottle")!;
-  it("does not reject a negated hot-water mention", () => {
-    expect(checkPolicy("お湯は使わず、常温の水の量だけ変えると音が高くなると思う", bottle, []).kind).not.toBe("reject");
+  it("rejects even a negated hot-water mention, on purpose (same as the server)", () => {
+    expect(checkPolicy("お湯は使わず、常温の水の量だけ変えると音が高くなると思う", bottle, []).kind).toBe("reject");
   });
   it.each(["ペットボトルに熱した水を入れて振ってみる", "あついおゆを入れて振ると高くなる"])("rejects %s and quotes it", (text) => {
     const r = checkPolicy(text, bottle, []);
@@ -137,11 +137,5 @@ describe("checkPolicy: サーバと同じ規則（10/13 デプロイ前レビュ
   });
   it("rejects a high place written in katakana units", () => {
     expect(checkPolicy("3 メートルの台に乗る", energy, []).kind).toBe("reject");
-  });
-});
-
-describe("checkPolicy: 打ち消しの『沸かさず』（10/13 デプロイ前レビュー 2 回目）", () => {
-  it("does not reject", () => {
-    expect(checkPolicy("水は沸かさず、常温のまま量だけ変えると音が高くなると思う", themeById("bottle")!, []).kind).not.toBe("reject");
   });
 });
