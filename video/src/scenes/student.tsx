@@ -8,12 +8,8 @@ import { Phone } from "../devices";
 import { body, C, head } from "../theme";
 
 /** 撮ったものに差し替える場所の札（右上） */
-export const SwapTag: React.FC<{ text: string; left?: boolean }> = ({ text, left }) => (
-  <div style={{ position: "absolute", [left ? "left" : "right"]: 40, top: 96, padding: "8px 16px", borderRadius: 12, border: `3px dashed ${C.orange}`, background: "rgba(255,253,248,0.9)", color: "#B85C2A", fontFamily: head, fontWeight: 700, fontSize: 20 }}>
-    ● 実写／画面録画に差し替え：{text}
-  </div>
-);
-
+// 実写・画面録画は差し込み済みなので、札は出さない
+export const SwapTag: React.FC<{ text: string; left?: boolean }> = () => null;
 /** 右側の見出しと説明。説明は subAt 秒から */
 export const SideText: React.FC<{ title: string; sub?: string; subAt?: number; x?: number; y?: number; w?: number; color?: string; size?: number }> = ({
   title,
@@ -45,23 +41,31 @@ function bandOffset(t: number): number {
 
 export const Opening: React.FC = () => (FOOTAGE.pluck ? <OpeningLive /> : <OpeningAnim />);
 
-/** 実写のつかみ: 輪ゴムをはじく手元の上に、タイトル */
+/** だから PhoneLab: 輪ゴムをはじく手元の上に、タイトルと 3 つの答え */
+export const ANSWERS = ["① 器具はスマホ", "② 先生には 1 画面", "③ AI の「ラボ先生」は問い返すだけ"];
 const OpeningLive: React.FC = () => {
+  const t = useT();
+  const k = useSpring(0.3);
   const w1 = useSpring(1.0);
   const w2 = useSpring(1.9);
   const clip = FOOTAGE.pluck!;
   return (
     <Paper>
       <OffthreadVideo src={staticFile(`footage/${clip.file}`)} startFrom={Math.round((clip.startFrom ?? 0) * 30)} muted={clip.muted ?? false} style={{ position: "absolute", inset: 0, width: 1920, height: 1080, objectFit: "cover" }} />
-      <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: 420, background: "linear-gradient(transparent, rgba(30,42,58,0.85))" }} />
-      {clip.label ? (
-        <div style={{ position: "absolute", left: 0, top: 0 }}>
-          <div style={{ position: "absolute", left: 40, top: 40, padding: "6px 14px", borderRadius: 999, background: "rgba(30,42,58,0.72)", color: "#fff", fontSize: 20, fontWeight: 700, whiteSpace: "nowrap" }}>{clip.label}</div>
-        </div>
-      ) : null}
-      <div style={{ position: "absolute", left: 0, right: 0, bottom: 110, textAlign: "center", fontFamily: head, fontWeight: 900, fontSize: 84, color: "#fff" }}>
-        <span style={{ display: "inline-block", opacity: w1, transform: `translateY(${(1 - w1) * 40}px)` }}>スマホが実験器具。</span>
-        <span style={{ display: "inline-block", color: "#FFB48A", opacity: w2, transform: `translateY(${(1 - w2) * 40}px)` }}>AI は答えを言わない。</span>
+      <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: 600, background: "linear-gradient(transparent, rgba(30,42,58,0.9))" }} />
+      <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 1100, background: "linear-gradient(90deg, rgba(30,42,58,0.55), transparent)" }} />
+      {/* 題字は左に寄せて、右下の CG のスマホにかからないように */}
+      <div style={{ position: "absolute", left: 110, bottom: 385, fontFamily: head, fontWeight: 900, fontSize: 46, color: "#FFB48A", opacity: k, transform: `translateY(${(1 - k) * 20}px)` }}>だから、PhoneLab。</div>
+      <div style={{ position: "absolute", left: 110, bottom: 150, fontFamily: head, fontWeight: 900, fontSize: 80, lineHeight: 1.3, color: "#fff" }}>
+        <div style={{ opacity: w1, transform: `translateY(${(1 - w1) * 40}px)` }}>スマホが実験器具。</div>
+        <div style={{ color: "#FFB48A", opacity: w2, transform: `translateY(${(1 - w2) * 40}px)` }}>AI は答えを言わない。</div>
+      </div>
+      <div style={{ position: "absolute", left: 110, bottom: 70, display: "flex", gap: 22 }}>
+        {ANSWERS.map((a, i) => (
+          <Chip key={a} at={3.6 + i * 0.5} color={C.teal} solid size={27}>
+            {a}
+          </Chip>
+        ))}
       </div>
     </Paper>
   );
@@ -134,8 +138,8 @@ export const Problem: React.FC = () => {
   return (
     <Paper dark>
       <div style={{ position: "absolute", left: 110, top: 330, width: 880, fontFamily: head, fontWeight: 900, fontSize: 60, lineHeight: 1.45 }}>
-        <div style={{ opacity: l1, transform: `translateY(${(1 - l1) * 30}px)` }}>30 人がそれぞれの予想を確かめる実験を、</div>
-        <div style={{ opacity: l2, transform: `translateY(${(1 - l2) * 30}px)`, color: "#FFB48A" }}>先生が一人で見て回るのは、簡単ではない。</div>
+        <div style={{ opacity: l1, transform: `translateY(${(1 - l1) * 30}px)` }}>30 人が、それぞれ<br />違う実験をしている。</div>
+        <div style={{ opacity: l2, transform: `translateY(${(1 - l2) * 30}px)`, color: "#FFB48A" }}>先生一人では、<br />全員を見て回れない。</div>
       </div>
       {Array.from({ length: rows * cols }).map((_, k) => {
         const c = k % cols;
@@ -151,7 +155,7 @@ export const Problem: React.FC = () => {
       })}
       <div style={{ position: "absolute", left: tx - 30, top: ty - 30, width: 60, height: 60, borderRadius: 30, background: C.orange, border: "5px solid #fff", opacity: teacher, boxShadow: "0 0 0 10px rgba(226,122,63,0.25)" }} />
       <div style={{ position: "absolute", left: gx - 34, top: gy + rows * step - 10, fontSize: 26, color: "#C9D3DE", opacity: teacher }}>
-        先生が見て回れたのは <span style={{ color: "#FFB48A", fontFamily: head, fontWeight: 900, fontSize: 34 }}>{Math.min(30, i0 + 1)}</span> / 30 人
+        見て回れたのは <span style={{ color: "#FFB48A", fontFamily: head, fontWeight: 900, fontSize: 34 }}>{Math.min(30, i0 + 1)}</span> / 30 人（授業 1 回のイメージ）
       </div>
     </Paper>
   );
@@ -167,23 +171,23 @@ export const Predict: React.FC = () => (
       <Pop src="02-question-back.png" imgW={400} x={18} y={708} w={366} h={90} at={4.0} origin="18% 100%" />
       <Mark x={20} y={713} w={360} h={68} at={4.9} color={C.teal} label="ラボ先生" />
     </Phone>
-    <SideText title="予想を書くまで、実験もセンサーも出てこない。" sub="理由が無ければ、ラボ先生（Gemini）が 1 回だけ聞き返す。" subAt={4.4} />
+    <SideText title="予想を書くまで、実験もセンサーも出てこない。" sub="理由が無いと、ラボ先生（Gemini）が理由を聞き返す。" subAt={4.4} />
     <Logo />
   </Paper>
 );
 
 /* ---------- 3. 計画 ---------- */
-const TRAIL = ["読んだ：予想（29 字）と、選べる実験 3 件", "AI に渡す前のチェック：問題なし", "選んだ：「同じ輪ゴムで、はじく強さだけ変える」", "AI の答えのチェック：問題なし"];
+const TRAIL = ["読んだ：生徒の予想と、選べる実験 3 件", "AI に渡す前のチェック：問題なし", "選んだ：「同じ輪ゴムで、はじく強さだけ変える」", "AI の答えのチェック：問題なし"];
 
 export const Plan: React.FC = () => (
   <Paper>
     <Kicker text="② ラボ先生が実験を選ぶ" color={C.teal} />
     <Phone src="03-plan.png" imgH={1163} x={600} scroll={[[0, 0.12], [6.2, 0.12], [7.6, 0.42]]}>
       <Mark x={30} y={286} w={340} h={62} at={1.0} until={3.6} color={C.teal} />
-      <Mark x={30} y={455} w={340} h={142} at={3.8} until={7.4} color={C.teal} label="判断の跡" />
-      <Mark x={36} y={603} w={328} h={90} at={7.8} color={C.orange} label="変えるのは 1 つ" />
+      <Mark x={30} y={455} w={340} h={142} at={3.8} until={7.4} color={C.teal} label="何を読んで、何を選んだか" />
+      <Mark x={36} y={603} w={328} h={90} at={7.8} color={C.orange} label="変える条件は 1 つだけ" />
     </Phone>
-    <SideText title="予想を読んで、確かめる実験をカタログから選ぶ。答えは知らない。" x={960} y={140} w={900} size={48} color={C.teal} />
+    <SideText title="ラボ先生は予想を読んで、確かめる実験を一覧から選ぶ。答えは渡していない。" x={960} y={140} w={900} size={48} color={C.teal} />
     <div style={{ position: "absolute", left: 1000, top: 520, width: 820 }}>
       <Rows
         at={4.0}
@@ -220,7 +224,7 @@ export const Permit: React.FC = () => {
         <Tap x={200} y={1008} at={2.8} />
       </Phone>
       <div style={{ opacity: intro }}>
-        <SideText title="使うセンサーと秒数を見て、自分で許可する。" sub="押すまで、センサーは動かない。カメラと位置は使わない。" subAt={1.2} x={900} y={330} w={900} />
+        <SideText title="使うセンサーと秒数を見て、自分で許可する。" sub="押すまで、センサーは動かない。カメラと位置情報は使わない。" subAt={1.2} x={900} y={330} w={900} />
       </div>
       {nums.map(({ n, at }) => {
         const p = prog(t, at, 0.55, Easing.linear);
@@ -241,7 +245,7 @@ export const Permit: React.FC = () => {
             <div style={{ width: `${bar * 100}%`, height: 18, borderRadius: 9, background: C.teal }} />
           </div>
           <div style={{ marginTop: 16, fontSize: 30, color: C.ink2, opacity: measuring }}>
-            マイクを読むのは <b style={{ fontFamily: head }}>{Math.min(5, bar * 5).toFixed(1)}</b> / 5 秒。波形はスマホの外に出ない
+            マイクを使うのは <b style={{ fontFamily: head }}>{Math.min(5, bar * 5).toFixed(1)}</b> / 5 秒。音そのものはスマホの外に出ない
           </div>
         </div>
       ) : null}
@@ -286,7 +290,7 @@ export const Result: React.FC = () => {
             <Bar label="弱く" value={<><Count to={220} at={0.6} />Hz</>} h={220} color={C.teal} at={0.6} />
             <Bar label="強く" value={<><Count to={222} at={0.9} />Hz</>} h={222} color={C.teal} at={0.9} />
           </div>
-          <div style={{ position: "absolute", left: 250, top: 120 }}>
+          <div style={{ position: "absolute", left: 40, top: 470 }}>
             <Stamp text="変わらなかった" at={2.6} color={C.ink} size={58} />
           </div>
         </div>
@@ -305,7 +309,7 @@ export const Result: React.FC = () => {
         </div>
       ) : null}
       <Sequence from={Math.round(8.2 * 30)} layout="none">
-        <SideText title="正解とは言わない。測定が言っていることを見せる。" sub="予想と食い違ったら、次へ進む前に、まずふり返り。" subAt={0.6} x={980} y={300} w={840} size={52} />
+        <SideText title="「正解」とは言わない。測った結果だけを見せる。" sub="予想と違ったら、次の実験の前に、まずふり返り。" subAt={0.6} x={980} y={300} w={840} size={52} />
       </Sequence>
       <Logo />
     </Paper>

@@ -24,7 +24,7 @@ export const Phone: React.FC<{
   swapTo?: { src: string; imgH: number; at: number };
   /** スクショの代わりに画面収録を流す */
   video?: Clip;
-}> = ({ src, imgH, x = 960, y = 80, scroll = [[0, 0]], enter = 0, exit = 999, tilt = true, children, swapTo, video }) => {
+}> = ({ src, imgH, x = 960, y = 100, scroll = [[0, 0]], enter = 0, exit = 999, tilt = true, children, swapTo, video }) => {
   const t = useT();
   const inS = useSpring(enter);
   const out = prog(t, exit, 0.5);

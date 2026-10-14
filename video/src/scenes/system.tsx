@@ -1,4 +1,4 @@
-// 仕組み: 統制の流れ → 構成 → 記録 → 数字 → 締め
+// 仕組み: AI を囲む検査 → 構成 → 記録 → 数字 → 締め
 import React from "react";
 import { AbsoluteFill, Easing, interpolate, OffthreadVideo, staticFile } from "remotion";
 import { FOOTAGE } from "../footage";
@@ -13,12 +13,12 @@ const RED = "#C94A3D";
 type Node = { x: number; title: string; sub: string; kind: "student" | "gate" | "ai" | "out" };
 const NODES: Node[] = [
   { x: 70, title: "生徒の文", sub: "予想・会話・考え", kind: "student" },
-  { x: 330, title: "① Policy", sub: "危ない実験・命令", kind: "gate" },
+  { x: 330, title: "① ルール", sub: "危ない実験・隠れた命令", kind: "gate" },
   { x: 590, title: "② before_run", sub: "先生が止めたら動かさない", kind: "gate" },
-  { x: 850, title: "③ before_model", sub: "Model Armor・回数の枠", kind: "gate" },
+  { x: 850, title: "③ before_model", sub: "Model Armor・回数の上限", kind: "gate" },
   { x: 1110, title: "Gemini", sub: "5 つのエージェント", kind: "ai" },
-  { x: 1370, title: "④ after_model", sub: "先出し・危ない勧め・条件", kind: "gate" },
-  { x: 1630, title: "画面", sub: "判断の跡つき", kind: "out" },
+  { x: 1370, title: "④ after_model", sub: "答えの先出し・危ない助言", kind: "gate" },
+  { x: 1630, title: "画面", sub: "理由つき", kind: "out" },
 ];
 const NW = 220;
 const NY = 330;
@@ -50,7 +50,7 @@ export const Governance: React.FC = () => {
   };
   return (
     <Paper>
-      <Kicker text="統制の流れ（ADK の PolicyPlugin）" color={C.teal} />
+      <Kicker text="AI を囲む検査（ADK の Plugin）" color={C.teal} />
       <svg width={1920} height={1080} style={{ position: "absolute", inset: 0 }}>
         {NODES.slice(0, -1).map((n, i) => {
           const p = prog(t, 0.4 + i * 0.25, 0.4);
@@ -74,13 +74,13 @@ export const Governance: React.FC = () => {
         );
       })}
       <Token label="予想と理由" color={C.teal} x={ax} o={ao} />
-      <Token label="スマホを落として測りたい" color={RED} x={bx} y={NY - 70 + bDrop * 330} o={bo} />
+      <Token label="スマホを落として測りたい" color={RED} x={bx - bDrop * 110} o={bo * (1 - bDrop * 0.7)} />
       {t > 7.8 && t < 10 ? (
         <div style={{ position: "absolute", left: center(1) - 160, top: NY + 220, width: 320, textAlign: "center" }}>
           <Chip at={8.0} color={RED} solid>却下（AI は呼ばない）</Chip>
         </div>
       ) : null}
-      <Token label="結果の先出し" color={C.orange} x={cx + (center(4) - cx) * cBack} y={NY - 70 - Math.sin(Math.PI * cBack) * 90} o={co} />
+      <Token label="答えの先出し" color={C.orange} x={cx + (center(4) - cx) * cBack} y={NY - 70 - Math.sin(Math.PI * cBack) * 90} o={co} />
       {t > 10.8 && t < 13 ? (
         <div style={{ position: "absolute", left: center(4) - 40, top: NY - 190, width: 420, textAlign: "center" }}>
           <Chip at={10.9} color={C.orange}>理由を返して作り直し</Chip>
@@ -89,10 +89,10 @@ export const Governance: React.FC = () => {
       <Token label="問い返し" color={C.teal} x={dx} o={dO} />
       <div style={{ position: "absolute", left: 70, top: 640, display: "flex", gap: 20 }}>
         <Chip at={2.8} color={C.teal}>通る</Chip>
-        <Chip at={7.0} color={RED}>入口で止める</Chip>
-        <Chip at={10.2} color={C.orange}>出口で落として作り直す</Chip>
+        <Chip at={7.0} color={RED}>AI の前で止める</Chip>
+        <Chip at={10.2} color={C.orange}>AI の答えを直させる</Chip>
       </div>
-      <Caption text="5 つのエージェントを、ADK の統制層が囲む。" sub="入口で止め、Model Armor で確かめ、出口で落ちたら理由を返して 1 回だけ作り直す" />
+      <Caption text="5 つのエージェントを、ADK の検査が前後から囲む。" sub="AI の前で止め、Model Armor で確かめ、AI の答えも検査。落ちたら理由を返して 1 回だけ作り直させる" />
     </Paper>
   );
 };
@@ -138,7 +138,7 @@ export const System: React.FC = () => {
           ))}
         </div>
         <div style={{ marginTop: 26, borderRadius: 16, background: C.ink, color: "#fff", padding: "18px 20px", fontFamily: head, fontWeight: 900, fontSize: 26, opacity: prog(t, 1.4, 0.4) }}>
-          PolicyPlugin（統制層）
+          PolicyPlugin（AI を囲む検査）
           <div style={{ fontFamily: "inherit", fontWeight: 400, fontSize: 20, color: "#C9D3DE", marginTop: 6 }}>before_run・before_model・before_tool・after_model</div>
         </div>
       </div>
@@ -191,7 +191,7 @@ const TraceLive: React.FC = () => {
       <div style={{ position: "absolute", left: 160, top: 110, width: 1600, height: 760, borderRadius: 22, overflow: "hidden", border: `3px solid ${C.ink}`, background: C.card }}>
         <OffthreadVideo src={staticFile(`footage/${clip.file}`)} startFrom={Math.round((clip.startFrom ?? 0) * 30)} muted style={{ width: "100%", height: "100%", objectFit: "contain" }} />
       </div>
-      <Caption text="判断の跡は Cloud Trace にも同じ段で残る。生徒の文は残さない。" />
+      <Caption text="AI の判断の記録は Cloud Trace にも残る。生徒の文は残さない。" />
     </Paper>
   );
 };
@@ -214,7 +214,7 @@ const TraceAnim: React.FC = () => {
           );
         })}
       </div>
-      <Caption text="判断の跡は Cloud Trace にも同じ段で残る。生徒の文は残さない。" />
+      <Caption text="AI の判断の記録は Cloud Trace にも残る。生徒の文は残さない。" />
       <SwapTag text="実際の Cloud Trace の画面 6 秒" />
     </Paper>
   );
@@ -225,12 +225,12 @@ export const Numbers: React.FC = () => (
   <Paper>
     <Kicker text="数字で" />
     <AbsoluteFill style={{ flexDirection: "row", justifyContent: "center", alignItems: "center", gap: 36, paddingBottom: 140 }}>
-      <Stat value={30} suffix=" / 30" label="予想を読む" note="変数・向き・実験の選択（本物の Gemini）" delay={4} color={C.teal} />
-      <Stat value={0} suffix=" 件" label="結果の先出し" note="別のモデルの判定、延べ 84 回" delay={12} color={C.ink} />
-      <Stat value={0} suffix=" 件" label="測定の誤った通過" note="別の音を混ぜた 6,240 通り（直す前 493）" delay={20} color={C.orange} />
-      <Stat value={30} prefix="約 " suffix=" 円" label="授業 1 回の Gemini" note="31 人 × 3 実験の試算" delay={28} color={C.teal} />
+      <Stat value={30} suffix=" / 30" label="予想を正しく読めた" note="30 件の予想で実験の選択が一致（本物の Gemini）" delay={4} color={C.teal} />
+      <Stat value={0} suffix=" 件" label="答えの先出し" note="別のモデルが判定、延べ 84 回" delay={12} color={C.ink} />
+      <Stat value={0} suffix=" 件" label="怪しい測定の見逃し" note="別の音を混ぜた 6,240 通り（直す前は 493 件）" delay={20} color={C.orange} />
+      <Stat value={30} prefix="約 " suffix=" 円" label="授業 1 回の AI 費用" note="31 人 × 3 実験の試算" delay={28} color={C.teal} />
     </AbsoluteFill>
-    <Caption text="評価はリポジトリに保存。数字はそこから引いている。" />
+    <Caption text="評価の記録はリポジトリにあります。" />
   </Paper>
 );
 

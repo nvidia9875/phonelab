@@ -25,7 +25,8 @@ export const Paper: React.FC<{ children: React.ReactNode; dark?: boolean }> = ({
 );
 
 /** 下の字幕。少し遅れて下から出る */
-export const Caption: React.FC<{ text: string; sub?: string }> = ({ text, sub }) => {
+/** right: 右に寄せた物（スマホなど）を避けるときの右の余白 */
+export const Caption: React.FC<{ text: string; sub?: string; right?: number }> = ({ text, sub, right = 120 }) => {
   const frame = useCurrentFrame();
   const { durationInFrames } = useVideoConfig();
   const inP = interpolate(frame, [6, 22], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp", easing: ease });
@@ -35,7 +36,7 @@ export const Caption: React.FC<{ text: string; sub?: string }> = ({ text, sub })
       style={{
         position: "absolute",
         left: 120,
-        right: 120,
+        right,
         bottom: 56,
         display: "flex",
         justifyContent: "center",
@@ -73,7 +74,7 @@ export const Kicker: React.FC<{ text: string; color?: string }> = ({ text, color
   const frame = useCurrentFrame();
   const p = interpolate(frame, [0, 14], [0, 1], { extrapolateRight: "clamp", easing: ease });
   return (
-    <div style={{ position: "absolute", left: 80, top: 44, opacity: p, transform: `translateX(${(1 - p) * -20}px)` }}>
+    <div style={{ position: "absolute", left: 80, top: 34, opacity: p, transform: `translateX(${(1 - p) * -20}px)` }}>
       <span style={{ fontFamily: head, fontWeight: 900, fontSize: 30, color, letterSpacing: "0.1em" }}>{text}</span>
     </div>
   );

@@ -115,7 +115,7 @@ function phalanx(len: number, r0: number, r1: number, tip: boolean): THREE.Buffe
 
 const FingerTip: React.FC<{ t: number }> = ({ t }) => {
   const st = pluckState(t);
-  const g = useMemo(() => ({ dist: phalanx(0.026, 0.0088, 0.0082, true), mid: phalanx(0.032, 0.0088, 0.0096, false), prox: phalanx(0.11, 0.0096, 0.0125, false) }), []);
+  const g = useMemo(() => ({ dist: phalanx(0.021, 0.0084, 0.0078, true), mid: phalanx(0.025, 0.0086, 0.0092, false), prox: phalanx(0.04, 0.0092, 0.0102, false) }), []);
   if (!st.p) return null;
   const s = st.since;
   const top = BOX.h + 0.0015;
@@ -137,23 +137,24 @@ const FingerTip: React.FC<{ t: number }> = ({ t }) => {
   }
   if (s > 0.4) return null;
   // 指先の腹を上に向けて輪ゴムの下に入れ、引き上げる。手は右上奥（画面の外）
-  const DL = 0.0272;
+  // 人さし指は 本物の長さ（先 2.1・中 2.5・付け根 4.0 cm）。付け根から先の手は画面の上の外
+  const DL = 0.021 * 0.7 + 0.0078 * 1.1;
   return (
     <group position={[x, y, z]} rotation={[0, 0.5, 0.95]}>
       <mesh geometry={g.dist} position={[DL, 0, 0]} rotation={[0, Math.PI, 0]}>
         <meshPhysicalMaterial {...SKIN} />
       </mesh>
-      <group position={[DL - 0.002, 0, 0]} rotation={[0, 0, -0.32]}>
+      <group position={[DL - 0.0015, 0, 0]} rotation={[0, 0, -0.25]}>
         <mesh geometry={g.mid}>
           <meshPhysicalMaterial {...SKIN} />
         </mesh>
-        <group position={[0.029, 0, 0]} rotation={[0, 0, -0.28]}>
+        <group position={[0.024, 0, 0]} rotation={[0, 0, -0.2]}>
           <mesh geometry={g.prox}>
             <meshPhysicalMaterial {...SKIN} />
           </mesh>
-          {/* 手の甲（画面の外へ） */}
-          <mesh position={[0.15, -0.012, -0.02]} scale={[1.6, 0.6, 1.2]}>
-            <sphereGeometry args={[0.04, 24, 16]} />
+          {/* 手の甲（付け根の関節から画面の上の外へ続く） */}
+          <mesh position={[0.075, 0.002, -0.022]} rotation={[0, 0.25, 0]} scale={[1.9, 0.38, 1.0]}>
+            <sphereGeometry args={[0.042, 40, 24]} />
             <meshPhysicalMaterial {...SKIN} />
           </mesh>
         </group>

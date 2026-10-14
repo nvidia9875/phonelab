@@ -45,7 +45,7 @@ export const Hold: React.FC = () => {
   const proposal = useSpring(6.4);
   return (
     <Paper>
-      <Kicker text="保留" color={C.ink} />
+      <Kicker text="保留 ＝ 結論を出さない" color={C.ink} />
       <div style={{ position: "absolute", left: 100, top: 130, width: 900, height: 640, background: C.card, border: `3px solid ${bad ? RED : C.ink}`, borderRadius: 26, boxShadow: `0 6px 0 ${bad ? RED : C.ink}`, padding: "32px 40px" }}>
         <div style={{ fontFamily: head, fontWeight: 900, fontSize: 36 }}>「強く」を測っています</div>
         <div style={{ marginTop: 30 }}>
@@ -63,17 +63,17 @@ export const Hold: React.FC = () => {
       </div>
       <div style={{ position: "absolute", left: 1060, top: 230, width: 760, opacity: proposal, transform: `translateX(${(1 - proposal) * 120}px)` }}>
         <div style={{ background: C.ink, color: "#fff", borderRadius: 24, padding: "30px 34px", boxShadow: `0 6px 0 ${C.teal}` }}>
-          <div style={{ fontFamily: head, fontWeight: 900, fontSize: 30, color: "#7FD6D2" }}>ラボ先生の次の一手：同じ実験で直す</div>
+          <div style={{ fontFamily: head, fontWeight: 900, fontSize: 30, color: "#7FD6D2" }}>ラボ先生の提案：同じ実験で測り直す</div>
           <div style={{ position: "relative", height: 150, marginTop: 14 }}>
             <Type x={0} y={0} w={690} h={150} text="スマホを箱に 10 cm まで近づけ、合図のあと 1 秒待ってからはじこう。" from={6.9} to={9.8} bg={C.ink} size={34} color="#fff" family={body} />
           </div>
         </div>
         <div style={{ marginTop: 34, display: "flex", gap: 14, flexWrap: "wrap" }}>
           <Chip at={10.2} color={C.ink}>結論は出さない</Chip>
-          <Chip at={10.6} color={C.teal}>理由を読んで提案</Chip>
+          <Chip at={10.6} color={C.teal}>保留の理由を読んで提案</Chip>
         </div>
       </div>
-      <Caption text="怪しいデータでは、結論を出さない（保留）。" sub="雑音が大きい・二つの計算が食い違うときは、測り直し方か別の実験をラボ先生が提案する" />
+      <Caption text="怪しいデータでは、結論を出さない（保留）。" sub="雑音が大きいときなどは、測り直し方か別の実験をラボ先生が提案する" />
       <div style={{ position: "absolute", left: 0, top: 0, opacity: prog(t, 0.5, 0.5) }}>
         <SwapTag text="騒がしい隣の班 5 秒 ＋ 保留の画面 10 秒" />
       </div>
@@ -87,13 +87,14 @@ export const Reject: React.FC = () => {
   const move = prog(t, 0.6, 1.2, Easing.in(Easing.cubic));
   const bounce = prog(t, 1.8, 0.6, Easing.out(Easing.back(2)));
   const hit = t > 1.8;
-  const cardX = 100 + move * 360 - bounce * 120;
+  // 盾（左端 610）の手前で止まって、はね返る。文は盾に隠れない
+  const cardX = 40 + move * 125 - bounce * 70;
   const shake = hit && t < 2.3 ? Math.sin(t * 80) * 8 : 0;
   const glow = hit ? 1 - prog(t, 1.8, 1.2) : 0;
   const alt = useSpring(3.6);
   return (
     <Paper>
-      <Kicker text="却下" color={C.ink} />
+      <Kicker text="却下 ＝ AI を呼ばずに止める" color={C.ink} />
       {/* 生徒の文 */}
       <div style={{ position: "absolute", left: cardX + shake, top: 250, width: 440, padding: "22px 24px", background: C.card, border: `3px solid ${hit ? RED : C.orange}`, borderRadius: 20, fontSize: 28, lineHeight: 1.5, boxShadow: `0 5px 0 ${hit ? RED : C.orange}` }}>
         <div style={{ fontSize: 20, color: C.muted, marginBottom: 6 }}>生徒の文</div>
@@ -106,24 +107,24 @@ export const Reject: React.FC = () => {
         <path d="M110 10 L200 45 L200 120 C200 185 160 225 110 250 C60 225 20 185 20 120 L20 45 Z" fill={C.ink} />
         <path d="M70 125 L100 155 L155 95" fill="none" stroke="#7FD6D2" strokeWidth={14} strokeLinecap="round" strokeLinejoin="round" />
       </svg>
-      <div style={{ position: "absolute", left: 590, top: 480, width: 260, textAlign: "center", fontFamily: head, fontWeight: 900, fontSize: 26 }}>決定論の Policy</div>
+      <div style={{ position: "absolute", left: 510, top: 480, width: 420, textAlign: "center", fontFamily: head, fontWeight: 900, fontSize: 26 }}>固定のルール（AI ではない）</div>
       {/* AI は呼ばない */}
       <div style={{ position: "absolute", left: 900, top: 250, width: 230, height: 180, borderRadius: 24, background: C.sand, border: `3px dashed ${C.muted}`, display: "grid", placeItems: "center", textAlign: "center", opacity: 0.5 + 0.5 * prog(t, 2.0, 0.4) }}>
         <div style={{ fontFamily: head, fontWeight: 900, fontSize: 30, color: C.muted }}>Gemini</div>
         <div style={{ fontSize: 22, color: RED, fontWeight: 700, marginTop: -30 }}>呼ばない</div>
       </div>
-      <div style={{ position: "absolute", left: 300, top: 540 }}>
-        <Stamp text="却下" at={2.2} color={RED} size={90} />
+      <div style={{ position: "absolute", left: 140, top: 470 }}>
+        <Stamp text="却下" at={2.2} color={RED} size={80} />
       </div>
       <div style={{ position: "absolute", left: 100, top: 700, width: 1020, opacity: alt, transform: `translateY(${(1 - alt) * 40}px)`, display: "flex", alignItems: "center", gap: 18, background: C.card, border: `3px solid ${C.teal}`, borderRadius: 20, padding: "20px 26px", boxShadow: `0 5px 0 ${C.teal}` }}>
         <span style={{ fontFamily: head, fontWeight: 900, fontSize: 26, color: "#13807C", flex: "none" }}>代わりの実験</span>
         <span style={{ fontSize: 30 }}>同じボトルで、水の量だけ変える</span>
       </div>
-      <Phone src="08-rejected.png" imgH={860} x={1500} enter={3.0}>
+      <Phone src="08-rejected.png" imgH={860} x={1585} enter={3.0}>
         <Mark x={20} y={195} w={360} h={220} at={4.6} until={7.0} color={RED} label="理由 3 つ" />
         <Mark x={20} y={433} w={360} h={160} at={7.2} color={C.teal} />
       </Phone>
-      <Caption text="危ない実験と、メモに紛れた命令は、AI を呼ぶ前に機械が止める。" sub="止めた理由と代わりの実験を出し、記録に残す" />
+      <Caption text="危ない実験と、AI への隠れた命令は、AI を呼ぶ前にルールで止める。" sub="止めた理由と代わりの実験を出し、記録に残す" right={600} />
     </Paper>
   );
 };
@@ -137,33 +138,33 @@ const Wipe: React.FC<{ x: number; y: number; w: number; h: number; at: number; d
 
 export const Teacher: React.FC = () => (
   <Paper>
-    <Kicker text="先生の画面" />
+    <Kicker text="先生の画面（30 人を 1 画面で）" />
     <Browser
       src="07-teacher.png"
       imgW={1280}
       x={150}
       w={1620}
-      h={760}
+      h={730}
       camera={[
         [0, 1, 640, 282],
-        [4.4, 1, 640, 282],
-        [5.8, 2.05, 1000, 300],
-        [11.6, 2.05, 1000, 300],
-        [13.0, 2.0, 380, 225],
-        [18, 2.0, 380, 225],
+        [3.4, 1, 640, 282],
+        [4.5, 2.05, 1000, 300],
+        [9, 2.05, 1000, 300],
+        [10.1, 2.0, 380, 225],
+        [14, 2.0, 380, 225],
       ]}
     >
-      <Wipe x={772} y={183} w={470} h={28} at={6.2} />
-      <Wipe x={772} y={210} w={470} h={52} at={7.0} />
-      <Wipe x={772} y={260} w={470} h={30} at={7.8} />
-      <Wipe x={770} y={290} w={470} h={40} at={8.6} dur={0.5} />
-      <Tap x={1180} y={158} at={5.6} />
-      <Mark x={842} y={292} w={360} h={38} at={9.4} until={11.4} color={C.orange} label="見に行く順" />
-      <Wipe x={175} y={186} w={470} h={20} at={13.4} dur={0.9} />
-      <Wipe x={175} y={215} w={470} h={20} at={13.7} dur={0.9} />
-      <Mark x={40} y={140} w={680} h={160} at={14.6} color={C.teal} label="予想の分布" />
+      <Wipe x={772} y={183} w={470} h={28} at={4.8} />
+      <Wipe x={772} y={210} w={470} h={52} at={5.5} />
+      <Wipe x={772} y={260} w={470} h={30} at={6.1} />
+      <Wipe x={770} y={290} w={470} h={40} at={6.7} dur={0.5} />
+      <Tap x={1180} y={158} at={4.4} />
+      <Mark x={842} y={292} w={360} h={38} at={7.3} until={8.9} color={C.orange} label="見に行く順" />
+      <Wipe x={175} y={186} w={470} h={20} at={10.5} dur={0.9} />
+      <Wipe x={175} y={215} w={470} h={20} at={10.7} dur={0.9} />
+      <Mark x={40} y={140} w={680} h={160} at={11.4} color={C.teal} label="予想の分布" />
     </Browser>
-    <Caption text="先生にはラボ先生の見立て。学級の要約を読み、3 行と見に行く順で伝える。" sub="ラボ先生は提案するだけ。止める・許可を変えるのは先生のボタン" />
+    <Caption text="30 人の予想と、見に行く順が 1 画面に。" sub="ラボ先生は提案するだけ。止める・許可するのは先生" />
   </Paper>
 );
 
@@ -181,7 +182,7 @@ export const Halt: React.FC = () => {
         imgW={1280}
         x={80}
         w={1000}
-        h={720}
+        h={680}
         camera={FOOTAGE.haltTeacher ? [[0, 1.25, 640, 300], [1.0, 2.3, 1010, 150], [15, 2.3, 1010, 150]] : [[0, 2.5, 1000, 165]]}
         video={FOOTAGE.haltTeacher}
       >
@@ -190,26 +191,26 @@ export const Halt: React.FC = () => {
       </Browser>
       {/* 届く合図 */}
       <svg width={1920} height={1080} style={{ position: "absolute", inset: 0, overflow: "visible" }}>
-        <path id="sig" d="M 1085 330 C 1150 200, 1200 200, 1262 300" fill="none" stroke={C.line} strokeWidth={4} strokeDasharray="8 10" />
+        <path id="sig" d="M 1085 330 C 1170 200, 1260 200, 1350 300" fill="none" stroke={C.line} strokeWidth={4} strokeDasharray="8 10" />
         {[0, 0.25, 0.5, 0.75].map((d) => {
           const p = (t - 2.4 - d) / 1.2;
           if (p < 0 || p > 1 || t > 4.6) return null;
-          const x = (1 - p) ** 3 * 1085 + 3 * (1 - p) ** 2 * p * 1150 + 3 * (1 - p) * p ** 2 * 1200 + p ** 3 * 1262;
+          const x = (1 - p) ** 3 * 1085 + 3 * (1 - p) ** 2 * p * 1170 + 3 * (1 - p) * p ** 2 * 1260 + p ** 3 * 1350;
           const y = (1 - p) ** 3 * 330 + 3 * (1 - p) ** 2 * p * 200 + 3 * (1 - p) * p ** 2 * 200 + p ** 3 * 300;
           return <circle key={d} cx={x} cy={y} r={12} fill={RED} opacity={1 - p * 0.3} />;
         })}
       </svg>
-      <div style={{ position: "absolute", left: 1090, top: 120, width: 170, fontSize: 22, lineHeight: 1.4, color: C.muted, opacity: prog(t, 2.4, 0.3) }}>2 秒ごとの確認で届く</div>
-      <Phone src="04-checks.png" imgH={860} x={1490} y={80} swapTo={FOOTAGE.haltPhone ? undefined : { src: "09-halted.png", imgH: 860, at: 4.0 }} video={FOOTAGE.haltPhone} />
-      <div style={{ position: "absolute", left: 80, top: 850, opacity: prog(t, 2.4, 0.3) }}>
+      <div style={{ position: "absolute", left: 1110, top: 120, width: 200, fontSize: 22, lineHeight: 1.4, color: C.muted, opacity: prog(t, 2.4, 0.3) }}>スマホが 2 秒ごとに確認</div>
+      <Phone src="04-checks.png" imgH={860} x={1580} y={80} swapTo={FOOTAGE.haltPhone ? undefined : { src: "09-halted.png", imgH: 860, at: 4.0 }} video={FOOTAGE.haltPhone} />
+      <div style={{ position: "absolute", left: 80, top: 805, opacity: prog(t, 2.4, 0.3) }}>
         <Chip color={RED} solid>
           止まるまで {timer.toFixed(1)} 秒
         </Chip>
       </div>
-      <div style={{ position: "absolute", left: 380, top: 850 }}>
-        <Chip at={5.4} color={C.ink}>サーバも AI を動かさない（409）</Chip>
+      <div style={{ position: "absolute", left: 380, top: 805 }}>
+        <Chip at={5.4} color={C.ink}>サーバも AI を呼ばない</Chip>
       </div>
-      <Caption text="止めるのも解除するのも、先生だけ。" sub="測定中のスマホは 2 秒ごとに確かめて止まる。ラボ先生には止める手段が無い" />
+      <Caption text="止めるのも解除するのも、先生だけ。" sub="測定中のスマホは 2 秒ごとに確かめて止まる。ラボ先生（AI）はスマホを操作できない" right={620} />
     </Paper>
   );
 };
@@ -230,7 +231,7 @@ const HomeLive: React.FC = () => {
         </div>
       ) : null}
       <Phone src="p05-result.png" imgH={1286} x={side ? 1530 : 960} y={90} video={FOOTAGE.pendulumScreen} />
-      <Caption text="先生が許可した実験は、家で自分のスマホから。" sub="記録は学校と同じ列に並ぶ" />
+      <Caption text="先生が許可した実験は、家で自分のスマホから。" sub="家の記録も、先生の画面に並ぶ" right={660} />
     </Paper>
   );
 };
@@ -271,7 +272,7 @@ const HomeAnim: React.FC = () => {
         <div style={{ fontFamily: head, fontWeight: 900, fontSize: 70, color: C.ink }}>{vmax} m/s</div>
       </div>
       <Sequence from={sec(4)} layout="none">
-        <SideText title="先生が許可した実験は、家で自分のスマホから。" sub="記録は学校と同じ列に並ぶ。" subAt={0.8} x={1000} y={620} w={820} size={46} />
+        <SideText title="先生が許可した実験は、家で自分のスマホから。" sub="家の記録も、先生の画面に並ぶ。" subAt={0.8} x={1000} y={620} w={820} size={46} />
       </Sequence>
       <SwapTag text="家の振り子 15 秒" />
     </Paper>
