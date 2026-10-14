@@ -18,7 +18,7 @@ const SCENES: Scene[] = [
   // いまの理科の授業の課題 3 つ → メインタイトル → PhoneLab なら
   { sec: 3.5, el: <IssueTitle /> },
   { sec: 7, el: <PainTime />, enter: "fade" },
-  { sec: 7.5, el: <Problem />, enter: "fade" },
+  { sec: 8.5, el: <Problem />, enter: "fade" },
   { sec: 7, el: <PainAI />, enter: "wipe" },
   { sec: 3.5, el: <MainTitle />, enter: "fade" },
   { sec: 8, el: <Opening />, enter: "fade" },

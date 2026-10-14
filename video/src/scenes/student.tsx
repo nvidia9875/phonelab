@@ -113,6 +113,10 @@ const OpeningAnim: React.FC = () => {
 };
 
 /* ---------- 1. 課題 ---------- */
+const BLUE = "#3B7DD8";
+const RED_X = "#C94A3D";
+/** 実験の時間 15 分で、1 人 1 分ずつ回ると 12 人（あとは見られない） */
+const SEEN = 12;
 export const Problem: React.FC = () => {
   const t = useT();
   const cols = 6;
@@ -123,15 +127,20 @@ export const Problem: React.FC = () => {
   // 先生が歩く道（左上から蛇行）
   const path: [number, number][] = [];
   for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) path.push([r % 2 ? cols - 1 - c : c, r]);
-  const walk = interpolate(t, [2.2, 7.6], [0, path.length - 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const W0 = 1.6;
+  const W1 = 5.4;
+  const walk = interpolate(t, [W0, W1], [0, SEEN - 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
   const i0 = Math.floor(walk);
   const f = walk - i0;
   const [ax, ay] = path[i0];
-  const [bx, by] = path[Math.min(i0 + 1, path.length - 1)];
+  const [bx, by] = path[Math.min(i0 + 1, SEEN - 1)];
   const tx = gx + (ax + (bx - ax) * f) * step;
   const ty = gy + (ay + (by - ay) * f) * step;
-  const visited = new Set(path.slice(0, i0 + 1).map(([c, r]) => `${c}-${r}`));
-  const teacher = prog(t, 2.0, 0.4);
+  const teacher = prog(t, 1.3, 0.4) * (1 - prog(t, 5.6, 0.3));
+  const seenNow = t < W0 ? 0 : Math.min(SEEN, i0 + 1);
+  const left = Math.max(0, 15 - Math.round(prog(t, W0, W1 - W0, Easing.linear) * 15));
+  const over = t > W1 + 0.1;
+  const result = prog(t, 6.6, 0.5);
   const l1 = prog(t, 0.4, 0.7);
   const l2 = prog(t, 1.2, 0.7);
   return (
@@ -141,22 +150,42 @@ export const Problem: React.FC = () => {
         <div style={{ opacity: l1, transform: `translateY(${(1 - l1) * 30}px)` }}>30 人が、それぞれ<br />違う実験をしている。</div>
         <div style={{ opacity: l2, transform: `translateY(${(1 - l2) * 30}px)`, color: "#FFB48A" }}>先生一人では、<br />全員を見て回れない。</div>
       </div>
+      {/* 実験の時間 */}
+      <div style={{ position: "absolute", left: gx - 34, top: gy - 140, display: "flex", alignItems: "baseline", gap: 14, opacity: prog(t, 1.0, 0.4), fontFamily: head, fontWeight: 900 }}>
+        <span style={{ fontSize: 30, color: "#C9D3DE" }}>実験の時間 残り</span>
+        <span style={{ fontSize: 56, color: over ? RED_X : "#fff" }}>{left}</span>
+        <span style={{ fontSize: 30, color: "#C9D3DE" }}>分</span>
+        {over ? <span style={{ marginLeft: 16, fontSize: 34, color: RED_X, opacity: prog(t, W1 + 0.1, 0.3) }}>時間切れ</span> : null}
+      </div>
       {Array.from({ length: rows * cols }).map((_, k) => {
         const c = k % cols;
         const r = Math.floor(k / cols);
-        const p = prog(t, 0.2 + k * 0.035, 0.4);
-        const done = visited.has(`${c}-${r}`) && teacher > 0;
-        const q = Math.sin(t * 3 + k) * 4;
+        const order = path.findIndex(([pc, pr]) => pc === c && pr === r);
+        const p = prog(t, 0.2 + k * 0.03, 0.4);
+        const seen = order < SEEN && order < seenNow;
+        // 見られなかった席は、時間切れのあと順に赤い ✕
+        const missAt = W1 + 0.2 + (order - SEEN) * 0.05;
+        const miss = order >= SEEN ? prog(t, missAt, 0.25) : 0;
+        const pop = order >= SEEN ? 1 + 0.25 * Math.sin(Math.PI * miss) : 1;
+        const bg = seen ? BLUE : miss > 0 ? `rgba(201,74,61,${0.35 + 0.65 * miss})` : "#2C3B50";
+        const border = seen ? "#8DB8F0" : miss > 0 ? "#F0A79C" : "#4A5A70";
+        const q = seen || miss > 0 ? 0 : Math.sin(t * 3 + k) * 4;
         return (
-          <div key={k} style={{ position: "absolute", left: gx + c * step - 34, top: gy + r * step - 34, width: 68, height: 68, borderRadius: 34, background: done ? C.teal : "#2C3B50", border: `4px solid ${done ? "#7FD6D2" : "#4A5A70"}`, opacity: p, transform: `scale(${p}) translateY(${done ? 0 : q}px)`, display: "grid", placeItems: "center", color: "#fff", fontFamily: head, fontWeight: 900, fontSize: 30 }}>
-            {done ? "✓" : "?"}
+          <div key={k} style={{ position: "absolute", left: gx + c * step - 34, top: gy + r * step - 34, width: 68, height: 68, borderRadius: 34, background: bg, border: `4px solid ${border}`, opacity: p, transform: `scale(${p * pop}) translateY(${q}px)`, display: "grid", placeItems: "center", color: "#fff", fontFamily: head, fontWeight: 900, fontSize: 32 }}>
+            {seen ? "✓" : miss > 0.3 ? "✕" : "?"}
           </div>
         );
       })}
       <div style={{ position: "absolute", left: tx - 30, top: ty - 30, width: 60, height: 60, borderRadius: 30, background: C.orange, border: "5px solid #fff", opacity: teacher, boxShadow: "0 0 0 10px rgba(226,122,63,0.25)" }} />
-      <div style={{ position: "absolute", left: gx - 34, top: gy + rows * step - 10, fontSize: 26, color: "#C9D3DE", opacity: teacher }}>
-        見て回れたのは <span style={{ color: "#FFB48A", fontFamily: head, fontWeight: 900, fontSize: 34 }}>{Math.min(30, i0 + 1)}</span> / 30 人（授業 1 回のイメージ）
+      {/* 回れた人数（回っている間）→ 結果 */}
+      <div style={{ position: "absolute", left: gx - 34, top: gy + rows * step - 4, fontSize: 28, color: "#C9D3DE", opacity: prog(t, 1.4, 0.3) * (1 - result) }}>
+        見て回れたのは <span style={{ color: "#8DB8F0", fontFamily: head, fontWeight: 900, fontSize: 38 }}>{seenNow}</span> 人
       </div>
+      <div style={{ position: "absolute", left: gx - 34, top: gy + rows * step - 14, display: "flex", gap: 30, fontFamily: head, fontWeight: 900, opacity: result, transform: `translateY(${(1 - result) * 16}px)` }}>
+        <span style={{ fontSize: 34, color: "#8DB8F0" }}>✓ 見られた {SEEN} 人</span>
+        <span style={{ fontSize: 44, color: "#F08A7C" }}>✕ 見られなかった {30 - SEEN} 人</span>
+      </div>
+      <div style={{ position: "absolute", left: gx - 34, top: gy + rows * step + 50, fontSize: 20, color: "#8F9BAA", opacity: result }}>1 人 1 分で回ったとき</div>
     </Paper>
   );
 };
