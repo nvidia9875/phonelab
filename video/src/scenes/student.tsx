@@ -54,6 +54,11 @@ const OpeningLive: React.FC = () => {
     <Paper>
       <OffthreadVideo src={staticFile(`footage/${clip.file}`)} startFrom={Math.round((clip.startFrom ?? 0) * 30)} muted={clip.muted ?? false} style={{ position: "absolute", inset: 0, width: 1920, height: 1080, objectFit: "cover" }} />
       <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: 420, background: "linear-gradient(transparent, rgba(30,42,58,0.85))" }} />
+      {clip.label ? (
+        <div style={{ position: "absolute", left: 0, top: 0 }}>
+          <div style={{ position: "absolute", left: 40, top: 40, padding: "6px 14px", borderRadius: 999, background: "rgba(30,42,58,0.72)", color: "#fff", fontSize: 20, fontWeight: 700, whiteSpace: "nowrap" }}>{clip.label}</div>
+        </div>
+      ) : null}
       <div style={{ position: "absolute", left: 0, right: 0, bottom: 110, textAlign: "center", fontFamily: head, fontWeight: 900, fontSize: 84, color: "#fff" }}>
         <span style={{ display: "inline-block", opacity: w1, transform: `translateY(${(1 - w1) * 40}px)` }}>スマホが実験器具。</span>
         <span style={{ display: "inline-block", color: "#FFB48A", opacity: w2, transform: `translateY(${(1 - w2) * 40}px)` }}>AI は答えを言わない。</span>

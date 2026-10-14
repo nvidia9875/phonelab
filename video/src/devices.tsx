@@ -61,6 +61,7 @@ export const Phone: React.FC<{
             <Img src={staticFile(swapTo.src)} style={{ width: IMG_W, display: "block" }} />
           </div>
         ) : null}
+        {video?.label ? <FootageLabel text={video.label} small top /> : null}
         {/* ノッチ */}
         <div style={{ position: "absolute", left: IN_W / 2 - 60, top: 10, width: 120, height: 26, borderRadius: 14, background: C.ink }} />
       </div>
@@ -118,14 +119,36 @@ export const Browser: React.FC<{
         </div>
       </div>
       <div style={{ position: "relative", width: vw, height: vh, overflow: "hidden" }}>
-        {video ? (
-          <OffthreadVideo src={staticFile(`footage/${video.file}`)} startFrom={Math.round((video.startFrom ?? 0) * 30)} muted={video.muted ?? true} style={{ position: "absolute", inset: 0, width: vw, height: vh, objectFit: "contain", background: C.card }} />
-        ) : null}
-        <div style={{ position: "absolute", left: 0, top: 0, width: imgW, transformOrigin: "0 0", opacity: video ? 0 : 1, transform: `translate(${vw / 2}px, ${vh / 2}px) scale(${s}) translate(${-cx}px, ${-cy}px)` }}>
-          <Img src={staticFile(src)} style={{ width: imgW, display: "block" }} />
+        <div style={{ position: "absolute", left: 0, top: 0, width: imgW, transformOrigin: "0 0", transform: `translate(${vw / 2}px, ${vh / 2}px) scale(${s}) translate(${-cx}px, ${-cy}px)` }}>
+          {video ? (
+            <OffthreadVideo src={staticFile(`footage/${video.file}`)} startFrom={Math.round((video.startFrom ?? 0) * 30)} muted={video.muted ?? true} style={{ width: imgW, display: "block" }} />
+          ) : (
+            <Img src={staticFile(src)} style={{ width: imgW, display: "block" }} />
+          )}
           {children}
         </div>
       </div>
     </div>
   );
 };
+
+/** 映像の左下の注記（CG・再現など） */
+export const FootageLabel: React.FC<{ text: string; small?: boolean; top?: boolean }> = ({ text, small, top }) => (
+  <div
+    style={{
+      position: "absolute",
+      left: small ? 14 : 22,
+      ...(top ? { top: 46 } : { bottom: small ? 14 : 20 }),
+      maxWidth: small ? 360 : undefined,
+      padding: small ? "5px 10px" : "6px 14px",
+      borderRadius: 999,
+      background: "rgba(30,42,58,0.72)",
+      color: "#fff",
+      fontSize: small ? 15 : 20,
+      lineHeight: 1.35,
+      fontWeight: 700,
+    }}
+  >
+    {text}
+  </div>
+);

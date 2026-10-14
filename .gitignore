@@ -15,3 +15,6 @@ video/node_modules/
 video/out/
 video/public/footage/*.mp4
 video/public/footage/*.mov
+video/public/footage/*.wav
+video/public/footage/*.json
+video/public/cg/

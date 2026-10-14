@@ -13,6 +13,19 @@ npm run render      # out/phonelab-demo-sample.mp4（1920×1080、30fps）
 
 Chrome のダウンロードが通らないときは、`--browser-executable` に手元の Chrome を渡す。
 
+## いまの版: CG と本物の画面録画（10/14）
+
+撮影の代わりに、4 場面を作った映像に替えた（`src/footage.ts`）。CG の絵には左上か左下に「CG で再現」と出る。
+
+| 場面 | 映像 | 作り方 |
+|---|---|---|
+| つかみ `Opening` | 輪ゴムをはじく手元（CG、音つき） | `npx remotion render CGPluck`（奥の部屋は先に `npx remotion still CGPluckRoom public/cg/pluck-room.png`）。音は `scripts/pluck-sound.py`（Karplus-Strong、放す時刻に合わせる）を `ffmpeg` で重ねる |
+| 止めるのは人 `Halt` | 先生の PC とスマホの画面録画（本物のアプリ） | `node scripts/rec-halt.mjs`（ローカルのアプリに、先生と生徒の 2 画面で入り、押して、止まるのを録る。最後に必ず解除） |
+| 家で `Home` 左 | 振り子を横から（CG） | `npx remotion render CGPendulum`（奥は `CGPendulumRoom`）。揺れは右の画面録画のセンサーと同じ式（糸 0.8 m・15 cm・減衰 0.03/s）、同じ 5.07 秒に放す。袋の中のスマホには、その画面録画を 1 コマずつ貼る |
+| 家で `Home` 右 | 振り子の測定の画面録画（本物のアプリ。センサーの値は式で再現） | `node scripts/rec-pendulum.mjs`（予想→計画→6 回の測定→結果を録る。24 秒からの 16 秒を `pendulum-screen-measure.mp4` に切り出す） |
+
+画面録画は、ローカル（`PHONELAB_CLASS_STORE=memory PHONELAB_DEMO_PIN=1234 PHONELAB_DEMO_SAMPLES=1`、Gemini は本物）を Playwright で動かし、Chrome の screencast で録った。映像（`public/footage/`・`public/cg/`）は git に入れていない。実写を撮ったら、`src/footage.ts` のファイル名を替えるだけで差し替わる。
+
 ## 差し替える場面（撮るもの）
 
 | 時刻（目安） | 場面（`src/scenes/`） | 撮るもの |

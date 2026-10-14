@@ -4,7 +4,7 @@ import { Easing, OffthreadVideo, Sequence, staticFile } from "remotion";
 import { FOOTAGE } from "../footage";
 import { Chip, Mark, Pop, prog, Stamp, Tap, Type, useSpring, useT, Wave } from "../anim";
 import { Caption, Kicker, Logo, Paper } from "../components";
-import { Browser, Phone } from "../devices";
+import { Browser, FootageLabel, Phone } from "../devices";
 import { body, C, head } from "../theme";
 import { SideText, SwapTag } from "./student";
 
@@ -171,13 +171,22 @@ export const Teacher: React.FC = () => (
 export const Halt: React.FC = () => {
   const t = useT();
   const sent = t > 2.3;
-  const timer = Math.min(1.5, Math.max(0, t - 2.4) * 0.9);
+  // 録画のときは本物の時間（押してから 2 秒で止まる）
+  const timer = FOOTAGE.haltPhone ? Math.min(2.0, Math.max(0, t - 2.0)) : Math.min(1.5, Math.max(0, t - 2.4) * 0.9);
   return (
     <Paper>
       <Kicker text="止めるのは人" color={C.ink} />
-      <Browser src="07-teacher.png" imgW={1280} x={80} w={1000} h={720} camera={[[0, 2.5, 1000, 165]]} video={FOOTAGE.haltTeacher}>
+      <Browser
+        src="07-teacher.png"
+        imgW={1280}
+        x={80}
+        w={1000}
+        h={720}
+        camera={FOOTAGE.haltTeacher ? [[0, 1.25, 640, 300], [1.0, 2.3, 1010, 150], [15, 2.3, 1010, 150]] : [[0, 2.5, 1000, 165]]}
+        video={FOOTAGE.haltTeacher}
+      >
         <Tap x={1147} y={50} at={2.0} />
-        {sent ? <div style={{ position: "absolute", left: 1047, top: 28, width: 201, height: 44, borderRadius: 10, background: RED, color: "#fff", display: "grid", placeItems: "center", fontFamily: head, fontWeight: 900, fontSize: 15, opacity: prog(t, 2.3, 0.2) }}>測定を止めています</div> : null}
+        {sent && !FOOTAGE.haltTeacher ? <div style={{ position: "absolute", left: 1047, top: 28, width: 201, height: 44, borderRadius: 10, background: RED, color: "#fff", display: "grid", placeItems: "center", fontFamily: head, fontWeight: 900, fontSize: 15, opacity: prog(t, 2.3, 0.2) }}>測定を止めています</div> : null}
       </Browser>
       {/* 届く合図 */}
       <svg width={1920} height={1080} style={{ position: "absolute", inset: 0, overflow: "visible" }}>
@@ -215,8 +224,9 @@ const HomeLive: React.FC = () => {
     <Paper>
       <Kicker text="家で" />
       {side ? (
-        <div style={{ position: "absolute", left: 80, top: 110, width: 1100, height: 760, borderRadius: 26, overflow: "hidden", border: `4px solid ${C.ink}`, boxShadow: `0 6px 0 ${C.ink}` }}>
+        <div style={{ position: "absolute", left: 60, top: 140, width: 1200, height: 675, borderRadius: 26, overflow: "hidden", border: `4px solid ${C.ink}`, boxShadow: `0 6px 0 ${C.ink}` }}>
           <OffthreadVideo src={staticFile(`footage/${side.file}`)} startFrom={Math.round((side.startFrom ?? 0) * 30)} muted={side.muted ?? true} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+          {side.label ? <FootageLabel text={side.label} /> : null}
         </div>
       ) : null}
       <Phone src="p05-result.png" imgH={1286} x={side ? 1530 : 960} y={90} video={FOOTAGE.pendulumScreen} />
