@@ -9,36 +9,40 @@ import { wipe } from "@remotion/transitions/wipe";
 import { Halt, Hold, Home, Reflect, Reject, Teacher } from "./scenes/guard";
 import { Opening, Permit, Plan, Predict, Problem, Result } from "./scenes/student";
 import { Governance, Numbers, System, Trace } from "./scenes/system";
-import { EndRecap, PainAI, PainTime } from "./scenes/pain";
+import { EndRecap, HomeWhy, IssueTitle, MainTitle, PainAI, PainTime } from "./scenes/pain";
 import { C, FADE, FPS } from "./theme";
 
 type Scene = { sec: number; el: React.ReactNode; enter?: "fade" | "slide" | "wipe" | "up" };
 
 const SCENES: Scene[] = [
-  // 先生の困りごと 3 つ → だから PhoneLab
-  { sec: 7, el: <PainTime /> },
-  { sec: 8, el: <Problem />, enter: "fade" },
+  // いまの理科の授業の課題 3 つ → メインタイトル → PhoneLab なら
+  { sec: 3.5, el: <IssueTitle /> },
+  { sec: 7, el: <PainTime />, enter: "fade" },
+  { sec: 7.5, el: <Problem />, enter: "fade" },
   { sec: 7, el: <PainAI />, enter: "wipe" },
-  { sec: 9, el: <Opening />, enter: "fade" },
+  { sec: 3.5, el: <MainTitle />, enter: "fade" },
+  { sec: 8, el: <Opening />, enter: "fade" },
   // 生徒の 1 回
-  { sec: 10.5, el: <Predict />, enter: "slide" },
-  { sec: 10.5, el: <Plan />, enter: "slide" },
+  { sec: 9.5, el: <Predict />, enter: "slide" },
+  { sec: 9.5, el: <Plan />, enter: "slide" },
   { sec: 11, el: <Permit />, enter: "slide" },
   { sec: 12, el: <Result />, enter: "slide" },
   { sec: 7, el: <Reflect />, enter: "fade" },
   // 怪しい・危ないとき
-  { sec: 12, el: <Hold />, enter: "wipe" },
+  { sec: 11, el: <Hold />, enter: "wipe" },
   { sec: 12, el: <Reject />, enter: "slide" },
   // 先生
-  { sec: 14, el: <Teacher />, enter: "up" },
-  { sec: 13, el: <Halt />, enter: "fade" },
-  { sec: 12, el: <Home />, enter: "wipe" },
+  { sec: 13, el: <Teacher />, enter: "up" },
+  { sec: 12, el: <Halt />, enter: "fade" },
+  // 家で
+  { sec: 6, el: <HomeWhy />, enter: "wipe" },
+  { sec: 11, el: <Home />, enter: "slide" },
   // 仕組みと数字
-  { sec: 14, el: <Governance />, enter: "up" },
-  { sec: 7, el: <System />, enter: "slide" },
-  { sec: 6, el: <Trace />, enter: "slide" },
+  { sec: 13, el: <Governance />, enter: "up" },
+  { sec: 6, el: <System />, enter: "slide" },
+  { sec: 5.5, el: <Trace />, enter: "slide" },
   { sec: 7, el: <Numbers />, enter: "wipe" },
-  { sec: 8, el: <EndRecap />, enter: "fade" },
+  { sec: 7.5, el: <EndRecap />, enter: "fade" },
 ];
 
 const s = (sec: number) => Math.round(sec * FPS);

@@ -42,7 +42,7 @@ function bandOffset(t: number): number {
 export const Opening: React.FC = () => (FOOTAGE.pluck ? <OpeningLive /> : <OpeningAnim />);
 
 /** だから PhoneLab: 輪ゴムをはじく手元の上に、タイトルと 3 つの答え */
-export const ANSWERS = ["① 器具はスマホ", "② 先生には 1 画面", "③ AI の「ラボ先生」は問い返すだけ"];
+export const ANSWERS = ["① スマホで実験", "② 30 人を先生の 1 画面で", "③ AI「ラボ先生」は答えを言わず、質問で助ける"];
 const OpeningLive: React.FC = () => {
   const t = useT();
   const k = useSpring(0.3);
@@ -54,18 +54,17 @@ const OpeningLive: React.FC = () => {
       <OffthreadVideo src={staticFile(`footage/${clip.file}`)} startFrom={Math.round((clip.startFrom ?? 0) * 30)} muted={clip.muted ?? false} style={{ position: "absolute", inset: 0, width: 1920, height: 1080, objectFit: "cover" }} />
       <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: 600, background: "linear-gradient(transparent, rgba(30,42,58,0.9))" }} />
       <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 1100, background: "linear-gradient(90deg, rgba(30,42,58,0.55), transparent)" }} />
-      {/* 題字は左に寄せて、右下の CG のスマホにかからないように */}
-      <div style={{ position: "absolute", left: 110, bottom: 385, fontFamily: head, fontWeight: 900, fontSize: 46, color: "#FFB48A", opacity: k, transform: `translateY(${(1 - k) * 20}px)` }}>だから、PhoneLab。</div>
-      <div style={{ position: "absolute", left: 110, bottom: 150, fontFamily: head, fontWeight: 900, fontSize: 80, lineHeight: 1.3, color: "#fff" }}>
-        <div style={{ opacity: w1, transform: `translateY(${(1 - w1) * 40}px)` }}>スマホが実験器具。</div>
-        <div style={{ color: "#FFB48A", opacity: w2, transform: `translateY(${(1 - w2) * 40}px)` }}>AI は答えを言わない。</div>
-      </div>
-      <div style={{ position: "absolute", left: 110, bottom: 70, display: "flex", gap: 22 }}>
-        {ANSWERS.map((a, i) => (
-          <Chip key={a} at={3.6 + i * 0.5} color={C.teal} solid size={27}>
-            {a}
-          </Chip>
-        ))}
+      {/* 左に寄せて、右下の CG のスマホにかからないように */}
+      <div style={{ position: "absolute", left: 110, top: 470, fontFamily: head, fontWeight: 900, fontSize: 64, color: "#FFB48A", opacity: k, transform: `translateY(${(1 - k) * 20}px)` }}>PhoneLab なら、</div>
+      <div style={{ position: "absolute", left: 110, top: 580, display: "flex", flexDirection: "column", gap: 18 }}>
+        {ANSWERS.map((a, i) => {
+          const s = useSpring(1.0 + i * 0.9);
+          return (
+            <div key={a} style={{ fontFamily: head, fontWeight: 900, fontSize: 52, color: "#fff", opacity: s, transform: `translateX(${(1 - s) * -40}px)` }}>
+              {a}
+            </div>
+          );
+        })}
       </div>
     </Paper>
   );
@@ -137,6 +136,7 @@ export const Problem: React.FC = () => {
   const l2 = prog(t, 1.2, 0.7);
   return (
     <Paper dark>
+      <div style={{ position: "absolute", left: 110, top: 110, padding: "8px 20px", borderRadius: 999, background: "#FFB48A", color: C.ink, fontFamily: head, fontWeight: 900, fontSize: 30, opacity: prog(t, 0.1, 0.4) }}>課題 ②</div>
       <div style={{ position: "absolute", left: 110, top: 330, width: 880, fontFamily: head, fontWeight: 900, fontSize: 60, lineHeight: 1.45 }}>
         <div style={{ opacity: l1, transform: `translateY(${(1 - l1) * 30}px)` }}>30 人が、それぞれ<br />違う実験をしている。</div>
         <div style={{ opacity: l2, transform: `translateY(${(1 - l2) * 30}px)`, color: "#FFB48A" }}>先生一人では、<br />全員を見て回れない。</div>
@@ -171,13 +171,13 @@ export const Predict: React.FC = () => (
       <Pop src="02-question-back.png" imgW={400} x={18} y={708} w={366} h={90} at={4.0} origin="18% 100%" />
       <Mark x={20} y={713} w={360} h={68} at={4.9} color={C.teal} label="ラボ先生" />
     </Phone>
-    <SideText title="予想を書くまで、実験もセンサーも出てこない。" sub="理由が無いと、ラボ先生（Gemini）が理由を聞き返す。" subAt={4.4} />
+    <SideText title="予想を書いてから、実験を始める。" sub="理由がないと、ラボ先生が「どうして」と聞く。" subAt={4.4} />
     <Logo />
   </Paper>
 );
 
 /* ---------- 3. 計画 ---------- */
-const TRAIL = ["読んだ：生徒の予想と、選べる実験 3 件", "AI に渡す前のチェック：問題なし", "選んだ：「同じ輪ゴムで、はじく強さだけ変える」", "AI の答えのチェック：問題なし"];
+const TRAIL = ["AI が読む：予想と実験 3 件", "AI に送る文：問題なし", "AI が選ぶ：同じ輪ゴムで、強さだけ変える", "AI の返事：問題なし"];
 
 export const Plan: React.FC = () => (
   <Paper>
@@ -187,7 +187,7 @@ export const Plan: React.FC = () => (
       <Mark x={30} y={455} w={340} h={142} at={3.8} until={7.4} color={C.teal} label="何を読んで、何を選んだか" />
       <Mark x={36} y={603} w={328} h={90} at={7.8} color={C.orange} label="変える条件は 1 つだけ" />
     </Phone>
-    <SideText title="ラボ先生は予想を読んで、確かめる実験を一覧から選ぶ。答えは渡していない。" x={960} y={140} w={900} size={48} color={C.teal} />
+    <SideText title="ラボ先生が、予想を確かめる実験を選ぶ。AI に答えは渡さない。" x={960} y={140} w={900} size={48} color={C.teal} />
     <div style={{ position: "absolute", left: 1000, top: 520, width: 820 }}>
       <Rows
         at={4.0}
@@ -218,13 +218,13 @@ export const Permit: React.FC = () => {
   const intro = 1 - prog(t, 3.5, 0.3);
   return (
     <Paper>
-      <Kicker text="③ センサーを許可して測る" />
+      <Kicker text="③ マイクを使って測る" />
       <Phone src="03-plan.png" imgH={1163} x={480} scroll={[[0, 1]]}>
         <Mark x={36} y={743} w={328} h={64} at={0.8} color={C.teal} label="マイクを 5 秒だけ" />
         <Tap x={200} y={1008} at={2.8} />
       </Phone>
       <div style={{ opacity: intro }}>
-        <SideText title="使うセンサーと秒数を見て、自分で許可する。" sub="押すまで、センサーは動かない。カメラと位置情報は使わない。" subAt={1.2} x={900} y={330} w={900} />
+        <SideText title="マイクを 5 秒使うか、自分で決める。" sub="押すまで動かない。カメラも位置情報も使わない。" subAt={1.2} x={900} y={330} w={900} />
       </div>
       {nums.map(({ n, at }) => {
         const p = prog(t, at, 0.55, Easing.linear);
@@ -291,7 +291,7 @@ export const Result: React.FC = () => {
             <Bar label="強く" value={<><Count to={222} at={0.9} />Hz</>} h={222} color={C.teal} at={0.9} />
           </div>
           <div style={{ position: "absolute", left: 40, top: 470 }}>
-            <Stamp text="変わらなかった" at={2.6} color={C.ink} size={58} />
+            <Stamp text="ほぼ同じ" at={2.6} color={C.ink} size={58} />
           </div>
         </div>
       ) : null}
@@ -309,7 +309,7 @@ export const Result: React.FC = () => {
         </div>
       ) : null}
       <Sequence from={Math.round(8.2 * 30)} layout="none">
-        <SideText title="「正解」とは言わない。測った結果だけを見せる。" sub="予想と違ったら、次の実験の前に、まずふり返り。" subAt={0.6} x={980} y={300} w={840} size={52} />
+        <SideText title="AI は正解を言わず、測った結果を見せる。" sub="予想と違ったら、まず考える。" subAt={0.6} x={980} y={300} w={840} size={52} />
       </Sequence>
       <Logo />
     </Paper>

@@ -30,7 +30,7 @@ export const Reflect: React.FC = () => {
         ) : null}
         <Mark x={20} y={362} w={310} h={158} at={4.4} color={C.teal} label="答えは言わない" />
       </Phone>
-      <SideText title="ふり返りでも、ラボ先生は答えを言わずに問い返す。" sub="説明が聞けるのは、自分の考えを書いたあと。" subAt={4.6} />
+      <SideText title="ラボ先生の質問で、結果を考える。" sub="考えを書いたら、説明が聞ける。" subAt={2.6} />
       <Logo />
     </Paper>
   );
@@ -42,19 +42,19 @@ export const Hold: React.FC = () => {
   const noisy = prog(t, 1.0, 2.6, Easing.inOut(Easing.cubic));
   const bad = t > 3.4;
   const fail = prog(t, 3.6, 0.4);
-  const proposal = useSpring(6.4);
+  const proposal = useSpring(5.0);
   return (
     <Paper>
       <Kicker text="保留 ＝ 結論を出さない" color={C.ink} />
       <div style={{ position: "absolute", left: 100, top: 130, width: 900, height: 640, background: C.card, border: `3px solid ${bad ? RED : C.ink}`, borderRadius: 26, boxShadow: `0 6px 0 ${bad ? RED : C.ink}`, padding: "32px 40px" }}>
-        <div style={{ fontFamily: head, fontWeight: 900, fontSize: 36 }}>「強く」を測っています</div>
+        <div style={{ fontFamily: head, fontWeight: 900, fontSize: 36 }}>強くはじいた音を測定中</div>
         <div style={{ marginTop: 30 }}>
           <Wave w={820} h={240} freq={9} amp={1 - 0.75 * noisy} noise={0.85 * noisy} color={bad ? RED : C.teal} speed={6} />
         </div>
         <div style={{ marginTop: 30, display: "flex", flexDirection: "column", gap: 14, fontSize: 30 }}>
           <div style={{ color: C.ink2 }}>✓ 音割れなし</div>
           <div style={{ color: bad ? RED : C.ink2, fontWeight: 700, opacity: 0.4 + 0.6 * fail }}>
-            {bad ? "✕ 音が小さく、まわりの雑音と区別できない" : "… 雑音との差を調べています"}
+            {bad ? "✕ 音が小さく、雑音にまぎれている" : "… 雑音との差を調べています"}
           </div>
         </div>
         <div style={{ position: "absolute", right: 40, top: 70 }}>
@@ -63,17 +63,17 @@ export const Hold: React.FC = () => {
       </div>
       <div style={{ position: "absolute", left: 1060, top: 230, width: 760, opacity: proposal, transform: `translateX(${(1 - proposal) * 120}px)` }}>
         <div style={{ background: C.ink, color: "#fff", borderRadius: 24, padding: "30px 34px", boxShadow: `0 6px 0 ${C.teal}` }}>
-          <div style={{ fontFamily: head, fontWeight: 900, fontSize: 30, color: "#7FD6D2" }}>ラボ先生の提案：同じ実験で測り直す</div>
+          <div style={{ fontFamily: head, fontWeight: 900, fontSize: 30, color: "#7FD6D2" }}>ラボ先生：同じ実験をもう一度</div>
           <div style={{ position: "relative", height: 150, marginTop: 14 }}>
-            <Type x={0} y={0} w={690} h={150} text="スマホを箱に 10 cm まで近づけ、合図のあと 1 秒待ってからはじこう。" from={6.9} to={9.8} bg={C.ink} size={34} color="#fff" family={body} />
+            <Type x={0} y={0} w={690} h={150} text="スマホを箱の 10 cm 以内に。合図の 1 秒後にはじこう。" from={5.4} to={7.6} bg={C.ink} size={34} color="#fff" family={body} />
           </div>
         </div>
         <div style={{ marginTop: 34, display: "flex", gap: 14, flexWrap: "wrap" }}>
-          <Chip at={10.2} color={C.ink}>結論は出さない</Chip>
-          <Chip at={10.6} color={C.teal}>保留の理由を読んで提案</Chip>
+          <Chip at={8.0} color={C.ink}>結論は出さない</Chip>
+          <Chip at={8.4} color={C.teal}>AI が次の方法をすすめる</Chip>
         </div>
       </div>
-      <Caption text="怪しいデータでは、結論を出さない（保留）。" sub="雑音が大きいときなどは、測り直し方か別の実験をラボ先生が提案する" />
+      <Caption text="正しく測れたか分からないときは、保留。" sub="ラボ先生が、測り直し方や別の実験をすすめる" />
       <div style={{ position: "absolute", left: 0, top: 0, opacity: prog(t, 0.5, 0.5) }}>
         <SwapTag text="騒がしい隣の班 5 秒 ＋ 保留の画面 10 秒" />
       </div>
@@ -94,7 +94,7 @@ export const Reject: React.FC = () => {
   const alt = useSpring(3.6);
   return (
     <Paper>
-      <Kicker text="却下 ＝ AI を呼ばずに止める" color={C.ink} />
+      <Kicker text="却下 ＝ その実験はさせない" color={C.ink} />
       {/* 生徒の文 */}
       <div style={{ position: "absolute", left: cardX + shake, top: 250, width: 440, padding: "22px 24px", background: C.card, border: `3px solid ${hit ? RED : C.orange}`, borderRadius: 20, fontSize: 28, lineHeight: 1.5, boxShadow: `0 5px 0 ${hit ? RED : C.orange}` }}>
         <div style={{ fontSize: 20, color: C.muted, marginBottom: 6 }}>生徒の文</div>
@@ -107,11 +107,11 @@ export const Reject: React.FC = () => {
         <path d="M110 10 L200 45 L200 120 C200 185 160 225 110 250 C60 225 20 185 20 120 L20 45 Z" fill={C.ink} />
         <path d="M70 125 L100 155 L155 95" fill="none" stroke="#7FD6D2" strokeWidth={14} strokeLinecap="round" strokeLinejoin="round" />
       </svg>
-      <div style={{ position: "absolute", left: 510, top: 480, width: 420, textAlign: "center", fontFamily: head, fontWeight: 900, fontSize: 26 }}>固定のルール（AI ではない）</div>
+      <div style={{ position: "absolute", left: 510, top: 480, width: 420, textAlign: "center", fontFamily: head, fontWeight: 900, fontSize: 26 }}>決めたルールで止める</div>
       {/* AI は呼ばない */}
       <div style={{ position: "absolute", left: 900, top: 250, width: 230, height: 180, borderRadius: 24, background: C.sand, border: `3px dashed ${C.muted}`, display: "grid", placeItems: "center", textAlign: "center", opacity: 0.5 + 0.5 * prog(t, 2.0, 0.4) }}>
         <div style={{ fontFamily: head, fontWeight: 900, fontSize: 30, color: C.muted }}>Gemini</div>
-        <div style={{ fontSize: 22, color: RED, fontWeight: 700, marginTop: -30 }}>呼ばない</div>
+        <div style={{ fontSize: 22, color: RED, fontWeight: 700, marginTop: -30 }}>送らない</div>
       </div>
       <div style={{ position: "absolute", left: 140, top: 470 }}>
         <Stamp text="却下" at={2.2} color={RED} size={80} />
@@ -124,7 +124,7 @@ export const Reject: React.FC = () => {
         <Mark x={20} y={195} w={360} h={220} at={4.6} until={7.0} color={RED} label="理由 3 つ" />
         <Mark x={20} y={433} w={360} h={160} at={7.2} color={C.teal} />
       </Phone>
-      <Caption text="危ない実験と、AI への隠れた命令は、AI を呼ぶ前にルールで止める。" sub="止めた理由と代わりの実験を出し、記録に残す" right={600} />
+      <Caption text="危ない実験や、AI をだます指示は、ルールで止める。" sub="AI には送らない。止めた理由と、代わりの実験を見せる" right={600} />
     </Paper>
   );
 };
@@ -144,7 +144,7 @@ export const Teacher: React.FC = () => (
       imgW={1280}
       x={150}
       w={1620}
-      h={730}
+      h={680}
       camera={[
         [0, 1, 640, 282],
         [3.4, 1, 640, 282],
@@ -159,12 +159,12 @@ export const Teacher: React.FC = () => (
       <Wipe x={772} y={260} w={470} h={30} at={6.1} />
       <Wipe x={770} y={290} w={470} h={40} at={6.7} dur={0.5} />
       <Tap x={1180} y={158} at={4.4} />
-      <Mark x={842} y={292} w={360} h={38} at={7.3} until={8.9} color={C.orange} label="見に行く順" />
+      <Mark x={842} y={292} w={360} h={38} at={7.3} until={8.9} color={C.orange} label="先に声をかけたい生徒" />
       <Wipe x={175} y={186} w={470} h={20} at={10.5} dur={0.9} />
       <Wipe x={175} y={215} w={470} h={20} at={10.7} dur={0.9} />
-      <Mark x={40} y={140} w={680} h={160} at={11.4} color={C.teal} label="予想の分布" />
+      <Mark x={40} y={140} w={680} h={160} at={11.4} color={C.teal} label="みんなの予想" />
     </Browser>
-    <Caption text="30 人の予想と、見に行く順が 1 画面に。" sub="ラボ先生は提案するだけ。止める・許可するのは先生" />
+    <Caption text="30 人の予想と、先に声をかけたい生徒が、1 画面でわかる。" sub="AI は声をかける順をすすめるだけ。決めるのは先生" />
   </Paper>
 );
 
@@ -176,7 +176,7 @@ export const Halt: React.FC = () => {
   const timer = FOOTAGE.haltPhone ? Math.min(2.0, Math.max(0, t - 2.0)) : Math.min(1.5, Math.max(0, t - 2.4) * 0.9);
   return (
     <Paper>
-      <Kicker text="止めるのは人" color={C.ink} />
+      <Kicker text="止めるのは先生" color={C.ink} />
       <Browser
         src="07-teacher.png"
         imgW={1280}
@@ -200,7 +200,7 @@ export const Halt: React.FC = () => {
           return <circle key={d} cx={x} cy={y} r={12} fill={RED} opacity={1 - p * 0.3} />;
         })}
       </svg>
-      <div style={{ position: "absolute", left: 1110, top: 120, width: 200, fontSize: 22, lineHeight: 1.4, color: C.muted, opacity: prog(t, 2.4, 0.3) }}>スマホが 2 秒ごとに確認</div>
+      <div style={{ position: "absolute", left: 1110, top: 120, width: 200, fontSize: 22, lineHeight: 1.4, color: C.muted, opacity: prog(t, 2.4, 0.3) }}>すぐに全員のスマホへ</div>
       <Phone src="04-checks.png" imgH={860} x={1580} y={80} swapTo={FOOTAGE.haltPhone ? undefined : { src: "09-halted.png", imgH: 860, at: 4.0 }} video={FOOTAGE.haltPhone} />
       <div style={{ position: "absolute", left: 80, top: 805, opacity: prog(t, 2.4, 0.3) }}>
         <Chip color={RED} solid>
@@ -208,9 +208,9 @@ export const Halt: React.FC = () => {
         </Chip>
       </div>
       <div style={{ position: "absolute", left: 380, top: 805 }}>
-        <Chip at={5.4} color={C.ink}>サーバも AI を呼ばない</Chip>
+        <Chip at={5.4} color={C.ink}>止めている間は AI も動かない</Chip>
       </div>
-      <Caption text="止めるのも解除するのも、先生だけ。" sub="測定中のスマホは 2 秒ごとに確かめて止まる。ラボ先生（AI）はスマホを操作できない" right={620} />
+      <Caption text="先生がボタンを押すと、全員のスマホの測定が止まる。" sub="再開できるのも先生だけ。AI にはできない" right={620} />
     </Paper>
   );
 };
@@ -231,7 +231,7 @@ const HomeLive: React.FC = () => {
         </div>
       ) : null}
       <Phone src="p05-result.png" imgH={1286} x={side ? 1530 : 960} y={90} video={FOOTAGE.pendulumScreen} />
-      <Caption text="先生が許可した実験は、家で自分のスマホから。" sub="家の記録も、先生の画面に並ぶ" right={660} />
+      <Caption text="先生が許可した実験は、家で自分のスマホからできる。" sub="家でやった記録も、先生の画面に届く" right={660} />
     </Paper>
   );
 };

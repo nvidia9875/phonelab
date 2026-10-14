@@ -13,11 +13,11 @@ const RED = "#C94A3D";
 type Node = { x: number; title: string; sub: string; kind: "student" | "gate" | "ai" | "out" };
 const NODES: Node[] = [
   { x: 70, title: "生徒の文", sub: "予想・会話・考え", kind: "student" },
-  { x: 330, title: "① ルール", sub: "危ない実験・隠れた命令", kind: "gate" },
+  { x: 330, title: "① ルール", sub: "危険・AI をだます文", kind: "gate" },
   { x: 590, title: "② before_run", sub: "先生が止めたら動かさない", kind: "gate" },
-  { x: 850, title: "③ before_model", sub: "Model Armor・回数の上限", kind: "gate" },
-  { x: 1110, title: "Gemini", sub: "5 つのエージェント", kind: "ai" },
-  { x: 1370, title: "④ after_model", sub: "答えの先出し・危ない助言", kind: "gate" },
+  { x: 850, title: "③ before_model", sub: "危険な文と使う回数を確認", kind: "gate" },
+  { x: 1110, title: "Gemini", sub: "5 つの係の AI", kind: "ai" },
+  { x: 1370, title: "④ after_model", sub: "答えや危ない助言を止める", kind: "gate" },
   { x: 1630, title: "画面", sub: "理由つき", kind: "out" },
 ];
 const NW = 220;
@@ -50,7 +50,7 @@ export const Governance: React.FC = () => {
   };
   return (
     <Paper>
-      <Kicker text="AI を囲む検査（ADK の Plugin）" color={C.teal} />
+      <Kicker text="AI の前後で確認（ADK の Plugin）" color={C.teal} />
       <svg width={1920} height={1080} style={{ position: "absolute", inset: 0 }}>
         {NODES.slice(0, -1).map((n, i) => {
           const p = prog(t, 0.4 + i * 0.25, 0.4);
@@ -77,22 +77,22 @@ export const Governance: React.FC = () => {
       <Token label="スマホを落として測りたい" color={RED} x={bx - bDrop * 110} o={bo * (1 - bDrop * 0.7)} />
       {t > 7.8 && t < 10 ? (
         <div style={{ position: "absolute", left: center(1) - 160, top: NY + 220, width: 320, textAlign: "center" }}>
-          <Chip at={8.0} color={RED} solid>却下（AI は呼ばない）</Chip>
+          <Chip at={8.0} color={RED} solid>却下（AI に送らない）</Chip>
         </div>
       ) : null}
       <Token label="答えの先出し" color={C.orange} x={cx + (center(4) - cx) * cBack} y={NY - 70 - Math.sin(Math.PI * cBack) * 90} o={co} />
       {t > 10.8 && t < 13 ? (
         <div style={{ position: "absolute", left: center(4) - 40, top: NY - 190, width: 420, textAlign: "center" }}>
-          <Chip at={10.9} color={C.orange}>理由を返して作り直し</Chip>
+          <Chip at={10.9} color={C.orange}>AI が理由を見て直す</Chip>
         </div>
       ) : null}
-      <Token label="問い返し" color={C.teal} x={dx} o={dO} />
+      <Token label="質問" color={C.teal} x={dx} o={dO} />
       <div style={{ position: "absolute", left: 70, top: 640, display: "flex", gap: 20 }}>
         <Chip at={2.8} color={C.teal}>通る</Chip>
         <Chip at={7.0} color={RED}>AI の前で止める</Chip>
         <Chip at={10.2} color={C.orange}>AI の答えを直させる</Chip>
       </div>
-      <Caption text="5 つのエージェントを、ADK の検査が前後から囲む。" sub="AI の前で止め、Model Armor で確かめ、AI の答えも検査。落ちたら理由を返して 1 回だけ作り直させる" />
+      <Caption text="5 つの係の AI を、ADK が前後で確認する。" sub="危ない文は Model Armor でも確認。AI の返事に問題があれば、理由を伝えて 1 回だけ直させる" />
     </Paper>
   );
 };
@@ -124,7 +124,7 @@ export const System: React.FC = () => {
       <Kicker text="構成" />
       <div style={{ position: "absolute", left: 80, top: 250, width: 360, height: 430, borderRadius: 28, background: C.card, border: `4px solid ${C.orange}`, boxShadow: `0 6px 0 ${C.orange}`, padding: 28, opacity: a, transform: `translateX(${(1 - a) * -80}px)` }}>
         <div style={{ fontFamily: head, fontWeight: 900, fontSize: 34 }}>スマホ</div>
-        <div style={{ fontSize: 24, color: C.ink2, marginTop: 12, lineHeight: 1.6 }}>センサーを読む<br />計算と検査<br />判定と記録</div>
+        <div style={{ fontSize: 24, color: C.ink2, marginTop: 12, lineHeight: 1.6 }}>測る<br />計算して確かめる<br />結果を残す</div>
         <div style={{ marginTop: 24, display: "flex", justifyContent: "center" }}>
           <Wave w={280} h={80} freq={5} color={C.orange} />
         </div>
@@ -138,7 +138,7 @@ export const System: React.FC = () => {
           ))}
         </div>
         <div style={{ marginTop: 26, borderRadius: 16, background: C.ink, color: "#fff", padding: "18px 20px", fontFamily: head, fontWeight: 900, fontSize: 26, opacity: prog(t, 1.4, 0.4) }}>
-          PolicyPlugin（AI を囲む検査）
+          PolicyPlugin（AI の前後で確認）
           <div style={{ fontFamily: "inherit", fontWeight: 400, fontSize: 20, color: "#C9D3DE", marginTop: 6 }}>before_run・before_model・before_tool・after_model</div>
         </div>
       </div>
@@ -165,20 +165,20 @@ export const System: React.FC = () => {
           return x > 0 ? <circle key={`b${o}`} cx={x} cy={465} r={11} fill={C.teal} /> : null;
         })}
       </svg>
-      <div style={{ position: "absolute", left: 444, top: 360, width: 152, textAlign: "center", fontSize: 18, lineHeight: 1.4, color: C.muted, opacity: prog(t, 2, 0.4) }}>文と数値の<br />要約だけ<br />（約 285 B）</div>
-      <Caption text="測るのはスマホ。エージェントは Cloud Run の 1 つのサービス。" sub="音声や加速度の生データは、スマホから出さない" />
+      <div style={{ position: "absolute", left: 444, top: 360, width: 152, textAlign: "center", fontSize: 18, lineHeight: 1.4, color: C.muted, opacity: prog(t, 2, 0.4) }}>文と数値の<br />まとめだけ<br />（約 285 B）</div>
+      <Caption text="スマホで測る。AI は Cloud Run の 1 つのサービスで動く。" sub="音や動きの元データは、スマホの外に出さない" />
     </Paper>
   );
 };
 
 /* ---------- 14. 記録 ---------- */
 const SPANS = [
-  { name: "phonelab.plan", at: 0, len: 1.0, color: C.ink },
-  { name: "invoke_agent", at: 0.05, len: 0.9, color: C.teal },
-  { name: "phonelab.model_armor", at: 0.08, len: 0.18, color: RED },
-  { name: "call_llm", at: 0.3, len: 0.35, color: C.teal },
-  { name: "phonelab.policy", at: 0.66, len: 0.08, color: C.orange },
-  { name: "phonelab.self_correct", at: 0.75, len: 0.2, color: C.orange },
+  { name: "実験を選ぶ", at: 0, len: 1.0, color: C.ink },
+  { name: "AI を動かす", at: 0.05, len: 0.9, color: C.teal },
+  { name: "Model Armor：危険を確認", at: 0.08, len: 0.18, color: RED },
+  { name: "AI に聞く", at: 0.3, len: 0.35, color: C.teal },
+  { name: "ルールを確認", at: 0.66, len: 0.08, color: C.orange },
+  { name: "AI が直す", at: 0.75, len: 0.2, color: C.orange },
 ];
 
 export const Trace: React.FC = () => (FOOTAGE.trace ? <TraceLive /> : <TraceAnim />);
@@ -191,7 +191,7 @@ const TraceLive: React.FC = () => {
       <div style={{ position: "absolute", left: 160, top: 110, width: 1600, height: 760, borderRadius: 22, overflow: "hidden", border: `3px solid ${C.ink}`, background: C.card }}>
         <OffthreadVideo src={staticFile(`footage/${clip.file}`)} startFrom={Math.round((clip.startFrom ?? 0) * 30)} muted style={{ width: "100%", height: "100%", objectFit: "contain" }} />
       </div>
-      <Caption text="AI の判断の記録は Cloud Trace にも残る。生徒の文は残さない。" />
+      <Caption text="AI の動きだけ記録。生徒の文は残さない。" />
     </Paper>
   );
 };
@@ -206,7 +206,7 @@ const TraceAnim: React.FC = () => {
           const p = prog(t, 0.3 + i * 0.35, 0.6);
           return (
             <div key={s.name} style={{ display: "flex", alignItems: "center", height: 74, borderTop: i ? `2px solid ${C.sand}` : undefined }}>
-              <div style={{ width: 420, fontFamily: "ui-monospace, Menlo, monospace", fontSize: 26, color: C.ink, paddingLeft: i ? 18 * Math.min(i, 2) : 0 }}>{s.name}</div>
+              <div style={{ width: 460, fontFamily: "ui-monospace, Menlo, monospace", fontSize: 24, color: C.ink, paddingLeft: i ? 18 * Math.min(i, 2) : 0 }}>{s.name}</div>
               <div style={{ position: "relative", flex: 1, height: 30 }}>
                 <div style={{ position: "absolute", left: `${s.at * 100}%`, width: `${s.len * 100 * p}%`, height: 30, borderRadius: 8, background: s.color }} />
               </div>
@@ -214,7 +214,7 @@ const TraceAnim: React.FC = () => {
           );
         })}
       </div>
-      <Caption text="AI の判断の記録は Cloud Trace にも残る。生徒の文は残さない。" />
+      <Caption text="AI の動きだけ記録。生徒の文は残さない。" />
       <SwapTag text="実際の Cloud Trace の画面 6 秒" />
     </Paper>
   );
@@ -225,12 +225,12 @@ export const Numbers: React.FC = () => (
   <Paper>
     <Kicker text="数字で" />
     <AbsoluteFill style={{ flexDirection: "row", justifyContent: "center", alignItems: "center", gap: 36, paddingBottom: 140 }}>
-      <Stat value={30} suffix=" / 30" label="予想を正しく読めた" note="30 件の予想で実験の選択が一致（本物の Gemini）" delay={4} color={C.teal} />
-      <Stat value={0} suffix=" 件" label="答えの先出し" note="別のモデルが判定、延べ 84 回" delay={12} color={C.ink} />
+      <Stat value={30} suffix=" / 30" label="予想に合う実験を選べた" note="Gemini で予想 30 件を確認" delay={4} color={C.teal} />
+      <Stat value={0} suffix=" 件" label="先に答えを言った" note="別の AI が確認、計 84 回" delay={12} color={C.ink} />
       <Stat value={0} suffix=" 件" label="怪しい測定の見逃し" note="別の音を混ぜた 6,240 通り（直す前は 493 件）" delay={20} color={C.orange} />
-      <Stat value={30} prefix="約 " suffix=" 円" label="授業 1 回の AI 費用" note="31 人 × 3 実験の試算" delay={28} color={C.teal} />
+      <Stat value={30} prefix="約 " suffix=" 円" label="授業 1 回の AI 費用" note="31 人 × 3 実験で計算" delay={28} color={C.teal} />
     </AbsoluteFill>
-    <Caption text="評価の記録はリポジトリにあります。" />
+    <Caption text="テスト結果はコードと一緒に保存。" />
   </Paper>
 );
 
